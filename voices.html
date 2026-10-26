@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="parent.css">
+<title>小狐聲音試聽</title>
+<style>
+  .voices { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .voices button { text-align: left; font-size: 14px; padding: 9px 10px; border: 1px solid var(--line); background: transparent; }
+  .voices button small { display: block; color: var(--muted); font-size: 11px; }
+  .voices button.playing { border-color: var(--accent); }
+  .voices button.current { background: var(--soft); border-color: var(--accent); font-weight: 700; }
+  .voices button.loading { opacity: .55; }
+  .group { font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; font-size: 14px; }
+  .bar input[type=text] { flex: 1; min-width: 220px; font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--soft); color: var(--ink); }
+  .sel { position: sticky; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 0 4px; display: flex; gap: 10px; align-items: center; }
+  .sel span { flex: 1; font-size: 14px; }
+  .fx { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 10px; font-size: 14px; }
+  .fx label { display: grid; grid-template-columns: 11em 1fr 3.5em; align-items: center; gap: 8px; margin: 6px 0; }
+  .fx b { text-align: right; }
+  .presets { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .presets button { padding: 5px 12px; font-size: 13px; border: 1px solid var(--line); background: transparent; }
+  .presets button.on { border-color: var(--accent); background: var(--soft); font-weight: 700; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1 style="margin:0 0 4px">小狐聲音試聽</h1>
+  <p class="hint" style="margin:0 0 10px">Kokoro 離線語音模型＋童趣變聲（音高、體型、活潑度）。每種組合第一次播放要生成 2–4 秒，之後就是即時播放。選好後按「用這個聲音」，整個 App 都會換成它。</p>
+
+  <section class="card">
+    <div class="tabs" style="grid-template-columns:1fr 1fr">
+      <button data-lang="en" class="on">English</button>
+      <button data-lang="zh">中文</button>
+    </div>
+    <div class="bar">
+      <input type="text" id="sample" maxlength="120">
+    </div>
+    <div class="bar">
+      語速 <input type="range" id="speed" min="0.8" max="1.2" step="0.05" value="1"> <b id="speedVal">1.00</b>
+    </div>
+    <div class="fx">
+      <div class="presets">童趣效果：
+        <button data-preset="none">原聲</button><button data-preset="kid">小孩</button>
+        <button data-preset="fox">小狐狸</button><button data-preset="toon">卡通</button>
+      </div>
+      <label>音高（越高越小）<input type="range" id="fxPitch" min="0" max="450" step="10"><b id="fxPitchVal"></b></label>
+      <label>體型（越大越像小動物）<input type="range" id="fxFormant" min="1.0" max="1.35" step="0.01"><b id="fxFormantVal"></b></label>
+      <label>活潑度（語調起伏）<input type="range" id="fxRange" min="1.0" max="2.2" step="0.05"><b id="fxRangeVal"></b></label>
+      <p class="hint">調完再點一次聲音就會用新效果重新生成。</p>
+    </div>
+    <div id="list"></div>
+    <div class="sel">
+      <span id="selInfo">先點一個聲音試聽</span>
+      <button id="useBtn" class="primary" disabled>用這個聲音</button>
+    </div>
+    <p class="hint" id="state"></p>
+  </section>
+</main>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const SAMPLES = {
+  en: "Hi! I'm Foxy. Let's learn a new word today: apple! Can you say apple?",
+  zh: '你好！我是小狐，今天要不要一起玩？我們來學一個新的英文單字吧！',
+};
+// curated candidates: youthful / bright voices first
+const PICKS = {
+  en: [
+    ['美式女聲（v1.0）', 'v1_0', ['af_heart', 'af_bella', 'af_nicole', 'af_sky', 'af_nova', 'af_sarah', 'af_jessica', 'af_kore', 'af_river', 'af_aoede', 'af_alloy']],
+    ['英式女聲（v1.0）', 'v1_0', ['bf_emma', 'bf_isabella', 'bf_lily', 'bf_alice']],
+    ['v1.1 英文聲音', 'v1_1', ['af_maple', 'af_sol', 'bf_vale']],
+  ],
+  zh: [
+    ['中文女聲（v1.0）', 'v1_0', ['zf_xiaobei', 'zf_xiaoni', 'zf_xiaoxiao', 'zf_xiaoyi']],
+    ['中文女聲（v1.1，較新）', 'v1_1', null], // filled from the model: every zf_*
+  ],
+};
+let lang = 'en', cfg = null, models = {}, chosen = null, audio = null;
+const PRESETS = {
+  none: { pitch: 0, formant: 1.0, range: 1.0 },
+  kid: { pitch: 300, formant: 1.12, range: 1.3 },
+  fox: { pitch: 340, formant: 1.18, range: 1.6 },
+  toon: { pitch: 390, formant: 1.26, range: 1.9 },
+};
+const FX = [['pitch', 'fxPitch', v => (Number(v) ? `${v}Hz` : '原聲')], ['formant', 'fxFormant', v => Number(v).toFixed(2)], ['range', 'fxRange', v => Number(v).toFixed(2)]];
+function getFx() { return Object.fromEntries(FX.map(([k, id]) => [k, Number($('#' + id).value)])); }
+function setFx(fx) {
+  FX.forEach(([k, id, fmt]) => { $('#' + id).value = fx[k]; $('#' + id + 'Val').textContent = fmt(fx[k]); });
+  const cur = getFx();
+  document.querySelectorAll('[data-preset]').forEach(b => {
+    const p = PRESETS[b.dataset.preset];
+    b.classList.toggle('on', Object.keys(p).every(k => Math.abs(p[k] - cur[k]) < 1e-6));
+  });
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => setFx(PRESETS[b.dataset.preset])));
+FX.forEach(([, id]) => $('#' + id).addEventListener('input', () => setFx(getFx())));
+
+async function init() {
+  const r = await fetch('api/voices');
+  if (!r.ok) { $('#state').textContent = '伺服器沒有載入本地模型'; return; }
+  ({ config: cfg, models } = await r.json());
+  PICKS.zh[1][2] = models.v1_1.filter(n => n.startsWith('zf_'));
+  setLang('en');
+}
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('[data-lang]').forEach(b => b.classList.toggle('on', b.dataset.lang === l));
+  $('#sample').value = SAMPLES[l];
+  $('#speed').value = cfg[l].speed; $('#speedVal').textContent = Number(cfg[l].speed).toFixed(2);
+  setFx(cfg[l].fx || PRESETS.fox);
+  chosen = null; $('#useBtn').disabled = true;
+  $('#selInfo').textContent = `目前使用：${cfg[l].voice}（${cfg[l].model}，語速 ${cfg[l].speed}）`;
+  $('#list').innerHTML = PICKS[l].map(([title, model, names]) => `<div class="group">${title}</div><div class="voices">${
+    names.map(n => `<button data-model="${model}" data-voice="${n}" class="${cfg[l].model === model && cfg[l].voice === n ? 'current' : ''}">▶ ${n}<small>${model}</small></button>`).join('')}</div>`).join('');
+}
+
+$('#list').addEventListener('click', async e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (audio) audio.pause();
+  document.querySelectorAll('.voices button').forEach(x => x.classList.remove('playing'));
+  b.classList.add('loading', 'playing');
+  chosen = { model: b.dataset.model, voice: b.dataset.voice };
+  $('#selInfo').textContent = `試聽中：${chosen.voice}（${chosen.model}）`;
+  $('#useBtn').disabled = false;
+  const fx = getFx();
+  const url = `api/tts?lang=${lang}&model=${chosen.model}&voice=${chosen.voice}&speed=${$('#speed').value}`
+    + `&pitch=${fx.pitch}&formant=${fx.formant}&range=${fx.range}&text=${encodeURIComponent($('#sample').value)}`;
+  audio = new Audio(url);
+  audio.oncanplay = () => b.classList.remove('loading');
+  audio.onerror = () => { b.classList.remove('loading'); $('#state').textContent = '生成失敗'; };
+  audio.play().catch(() => {});
+});
+
+$('#speed').addEventListener('input', () => { $('#speedVal').textContent = Number($('#speed').value).toFixed(2); });
+document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+
+$('#useBtn').addEventListener('click', async () => {
+  if (!chosen) return;
+  const r = await fetch('api/voice-config', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lang, ...chosen, speed: Number($('#speed').value), fx: getFx() }) });
+  if (!r.ok) { $('#state').textContent = '儲存失敗'; return; }
+  cfg = await r.json();
+  $('#state').textContent = `已設定：${lang === 'en' ? '英文' : '中文'}用 ${chosen.voice}。固定台詞正在背景重新生成。`;
+  setLang(lang);
+});
+
+init();
+</script>
+</body>
+</html>

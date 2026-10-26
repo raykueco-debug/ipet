@@ -1,0 +1,22 @@
+{
+ "en": {
+  "model": "v1_0",
+  "voice": "af_heart",
+  "speed": 1.0,
+  "fx": {
+   "pitch": 340.0,
+   "formant": 1.18,
+   "range": 1.6
+  }
+ },
+ "zh": {
+  "model": "v1_1",
+  "voice": "zf_001",
+  "speed": 1.0,
+  "fx": {
+   "pitch": 340,
+   "formant": 1.15,
+   "range": 1.25
+  }
+ }
+}

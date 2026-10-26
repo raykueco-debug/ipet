@@ -1,0 +1,7 @@
+# server.py / localtts.py
+sherpa-onnx>=1.12
+praat-parselmouth>=0.4
+numpy
+# asset tools (tools/*.py)
+pillow
+opencv-python-headless

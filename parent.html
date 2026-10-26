@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="小狐家長版">
+<meta name="theme-color" content="#f4f1ec">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="parent.css">
+<title>小狐 家長版</title>
+</head>
+<body>
+<main class="wrap">
+  <header class="head">
+    <img src="assets/fox/t1/normal.png" alt="" class="avatar">
+    <div>
+      <h1 data-i18n="p_title">小狐 家長版</h1>
+      <label class="family"><span data-i18n="pairCode">配對碼</span> <input id="family" maxlength="12" autocomplete="off"></label>
+    </div>
+    <div class="coins" title="原型示意，尚未串接金流">🪙 <b id="coins">0</b></div>
+  </header>
+
+  <section class="card">
+    <h2 data-i18n="p_gifts">送零食給孩子的小狐</h2>
+    <div class="gifts" id="gifts"></div>
+    <div class="coin-actions">
+      <button id="adBtn" class="ghost" data-i18n="p_ad">▶ 看廣告 +10（示意）</button>
+      <button id="buyBtn" class="ghost" data-i18n="p_buy">購買金幣（示意）</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="p_speak">讓小狐說話</h2>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-mode="line" class="on" data-i18n="p_tab_line">a. 固定台詞</button>
+      <button role="tab" data-mode="tts" data-i18n="p_tab_tts">b. 打字發音</button>
+      <button role="tab" data-mode="voice" data-i18n="p_tab_voice">c. 錄音變聲</button>
+    </div>
+    <div class="hint" id="engine"></div>
+
+    <div class="pane" data-pane="line">
+      <div class="speak-lang" hidden><span data-i18n="p_speakLang">小狐說：</span>
+        <button data-slang="en" class="on">English</button><button data-slang="zh">中文</button></div>
+      <div id="lines" class="chips"></div>
+    </div>
+
+    <div class="pane" data-pane="tts" hidden>
+      <textarea id="ttsText" maxlength="40" rows="2" data-i18n-ph="p_ttsPh" placeholder="What should Foxy say?"></textarea>
+      <div class="hint"><span id="ttsCount">0</span>/40</div>
+    </div>
+
+    <div class="pane" data-pane="voice" hidden>
+      <button id="recBtn" class="rec" data-i18n="p_rec">● 按一下開始錄音（最長 10 秒）</button>
+      <div class="hint" id="recState" data-i18n="p_recHint">錄完可以先試聽變聲效果</div>
+    </div>
+
+    <div class="when">
+      <label><input type="radio" name="when" value="now" checked> <span data-i18n="p_now">立刻說</span></label>
+      <label><input type="radio" name="when" value="at"> <span data-i18n="p_at">指定時間</span> <input type="time" id="atTime"></label>
+      <label><input type="checkbox" id="daily"> <span data-i18n="p_daily">每天重複</span></label>
+    </div>
+
+    <div class="row">
+      <button id="previewBtn" class="ghost" data-i18n="p_preview">🔊 試聽</button>
+      <button id="sendBtn" class="primary" data-i18n="p_send">送出</button>
+    </div>
+    <div class="hint" id="sendState"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="p_scheduled">已排程</h2>
+    <ul id="schedule" class="schedule"><li class="empty" data-i18n="p_empty">還沒有排程</li></ul>
+  </section>
+
+  <p class="foot" data-i18n="p_foot"></p>
+  <p class="foot lang-row"><button data-lang="zh">中文</button> <button data-lang="en">English</button></p>
+</main>
+<script src="i18n.js"></script>
+<script src="voice.js"></script>
+<script src="parent.js"></script>
+</body>
+</html>

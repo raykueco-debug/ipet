@@ -1,0 +1,16 @@
+# voice models (~280 MB) – fetch with: python tools/get_models.py
+models/
+
+# runtime data from server.py (families, recordings, TTS cache); keep the chosen voice
+data/*
+!data/voice.json
+
+# regenerable / rejected art
+assets/source/*_alpha.png
+assets/source/*_flat.png
+assets/source/rejected/
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

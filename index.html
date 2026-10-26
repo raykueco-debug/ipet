@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="iPet">
+<meta name="theme-color" content="#fff3e6">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<title>iPet</title>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="title-row">
+      <button id="nameBtn" class="name-btn"><span id="petName">iPet</span></button>
+      <span class="lv" id="tailBadge">1 尾</span>
+      <span class="age" id="age"></span>
+      <button id="menuBtn" class="icon-btn" aria-label="設定">⚙︎</button>
+    </div>
+    <div class="xp"><div id="growBar"></div></div>
+    <div class="stats">
+      <div class="stat" data-k="hunger"><span class="ico">🍙</span><span class="lbl" data-i18n="stat_hunger">飽足</span><div class="bar"><i></i></div></div>
+      <div class="stat" data-k="fun"><span class="ico">💗</span><span class="lbl" data-i18n="stat_fun">快樂</span><div class="bar"><i></i></div></div>
+      <div class="stat" data-k="energy"><span class="ico">⚡</span><span class="lbl" data-i18n="stat_energy">精神</span><div class="bar"><i></i></div></div>
+      <div class="stat" data-k="clean"><span class="ico">🫧</span><span class="lbl" data-i18n="stat_clean">清潔</span><div class="bar"><i></i></div></div>
+    </div>
+  </header>
+
+  <main id="stage">
+    <div class="stars"></div>
+    <div class="hill"></div>
+    <div id="poops"></div>
+    <div id="petWrap">
+      <div id="bubble"></div>
+      <div class="pet-scale">
+        <div id="fox" class="fox ex-normal">
+          <div id="tails" class="tails"></div>
+          <img id="foxBody" class="fox-body" alt="" draggable="false">
+          <video id="foxVideo" class="fox-body" playsinline muted hidden></video>
+        </div>
+      </div>
+      <div class="shadow"></div>
+    </div>
+    <div id="fx"></div>
+  </main>
+
+  <nav class="actions">
+    <button data-act="feed"><span>🍙</span><i data-i18n="act_feed">餵食</i></button>
+    <button data-act="play"><span>⚽</span><i data-i18n="act_play">玩耍</i></button>
+    <button data-act="clean"><span>🧽</span><i data-i18n="act_clean">清潔</i></button>
+    <button data-act="learn" id="learnBtn"><span>🔤</span><i data-i18n="act_learn">學英文</i></button>
+    <button data-act="sleep" id="sleepBtn"><span>🌙</span><em>睡覺</em></button>
+  </nav>
+</div>
+
+<div id="intro" class="modal hidden">
+  <div class="card">
+    <div id="egg" class="egg">🥚</div>
+    <h1 data-i18n="eggTitle">一顆狐狸蛋出現了！</h1>
+    <p data-i18n="eggSub">幫牠取個名字吧</p>
+    <input id="nameInput" maxlength="10" data-i18n-ph="foxName" placeholder="小狐" autocomplete="off">
+    <button id="hatchBtn" class="primary" data-i18n="hatch">孵化 ✨</button>
+  </div>
+</div>
+
+<div id="menu" class="modal hidden">
+  <div class="card">
+    <h1 data-i18n="settings">設定</h1>
+    <p><span data-i18n="pairCode">配對碼</span>：<b id="familyCode"></b><br><small data-i18n="pairHint">家長版輸入同一個配對碼即可連線</small></p>
+    <p class="lang-row"><span data-i18n="language">Language / 語言</span>
+      <button data-lang="zh">中文</button><button data-lang="en">English</button></p>
+    <button id="renameBtn" data-i18n="rename">改名字</button>
+    <button id="resetBtn" class="danger" data-i18n="reset">重新開始（會清除寵物）</button>
+    <button id="closeMenu" class="primary" data-i18n="close">關閉</button>
+  </div>
+</div>
+
+<div id="learn" class="modal hidden">
+  <div class="card learn-card">
+    <div class="learn-head">
+      <h1 data-i18n="learnTitle">跟小狐學英文</h1>
+      <button id="learnClose" class="icon-btn" aria-label="close">✕</button>
+    </div>
+    <div class="learn-tabs">
+      <button data-lmode="word" class="on" data-i18n="mode_word">每日單字</button>
+      <button data-lmode="quiz" data-i18n="mode_quiz">聽音選圖</button>
+      <button data-lmode="speak" data-i18n="mode_speak">跟讀練習</button>
+    </div>
+    <div id="learnBody"></div>
+    <p class="learn-progress" id="learnProgress"></p>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="voice.js"></script>
+<script src="words.js"></script>
+<script src="app.js"></script>
+<script src="learn.js"></script>
+</body>
+</html>

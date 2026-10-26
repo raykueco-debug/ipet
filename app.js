@@ -1,0 +1,573 @@
+'use strict';
+
+/* ================= config ================= */
+const KEY = 'ipet-fox-v1';
+const DAY = 864e5;
+const params = new URLSearchParams(location.search);
+// ?speed=1440 → 1 real minute = 1 day (for testing growth); ?week=5 → preview 5 tails
+const SPEED = Math.max(1, Number(params.get('speed')) || 1);
+const FORCE_WEEK = Number(params.get('week')) || 0;
+
+// stats change per (virtual) hour
+const RATES_AWAKE = { hunger: -6, fun: -5, energy: -4, clean: -3 };
+const RATES_SLEEP = { hunger: -3, fun: -1, energy: +18, clean: -1 };
+const MAX_CATCHUP_H = 48;
+
+// sprite layout (fractions of the square sprite canvas) — tuned to GPT's D01/B01 sprites
+const TAIL_ROOT = { x: 0.54, y: 0.92 };
+const STAGES = [
+  { id: 'cub', maxTails: 3, scale: 0.78 },
+  { id: 'teen', maxTails: 6, scale: 0.9 },
+  { id: 'adult', maxTails: 9, scale: 1.0 },
+];
+
+// mood/expression → sprite name (D01 / B01 order from the GPT session)
+const SPRITES = ['happy', 'smile', 'surprised', 'puzzled', 'playful', 'sulky', 'sleepy', 'angry', 'normal'];
+// action poses from the D03–D10 grids (assets/fox/t<N>/<group>/<pose>.png), each with an expression fallback
+const ACTIONS = {
+  'd05/eat': 'smile', 'd06/pounce': 'playful', 'd08/sleep_curl': 'sleepy', 'd04/pet_happy': 'smile',
+  'd03/tilt_left': 'puzzled', 'd07/yawn': 'sleepy', 'd04/surprised_joy': 'surprised',
+};
+const EXPR_SPRITE = {
+  normal: 'normal', happy: 'happy', love: 'd04/pet_happy', eat: 'd05/eat', play: 'd06/pounce',
+  sad: 'sulky', sleep: 'd08/sleep_curl', meh: 'puzzled', surprised: 'd04/surprised_joy', curious: 'd03/tilt_left',
+  angry: 'angry', tired: 'd07/yawn',
+  talkA: 'happy', talkB: 'normal', // mouth open / closed while the pet speaks a parent's message
+};
+
+const FOODS = [
+  { e: '🍙', hunger: 25 }, { e: '🍎', hunger: 18, fun: 3 }, { e: '🐟', hunger: 30 },
+  { e: '🍰', hunger: 15, fun: 10 }, { e: '🍗', hunger: 32 },
+];
+
+/* ================= assets ================= */
+// Resolved at startup: tailless body (B01) if present, else D01 sprites (which already include 1 tail).
+const ASSET = { body: {}, tailMode: 'd01', tails: [], dir: '' };
+
+function probe(src) {
+  return new Promise(res => { const i = new Image(); i.onload = () => res(src); i.onerror = () => res(null); i.src = src; });
+}
+
+const FALLBACK_TAIL = 'data:image/svg+xml,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">
+    <path d="M50 198 C20 170 8 120 18 70 C26 30 44 6 52 4 C66 14 88 50 86 100 C84 150 70 180 50 198Z" fill="#F28C38" stroke="#49352D" stroke-width="3"/>
+    <path d="M18 70 C26 30 44 6 52 4 C66 14 82 44 85 72 C66 60 38 60 18 70Z" fill="#FFF0D9" stroke="#49352D" stroke-width="3"/>
+  </svg>`);
+
+/* Art is whole-fox images with the tails drawn in (so WAN can animate the full character):
+     assets/fox/t<N>/<expression>.png   N = tail count 1..9
+   Until a tail count has its own art, a temporary preview stacks tail sprites behind the
+   tailless body (ASSET.tailMode 'layer') — not the production path. */
+async function loadAssets() {
+  const n = tailCount();
+  Object.assign(ASSET, { body: {}, tailMode: 'layer', tails: [], dir: '' });
+  renderedTails = -1;
+  if (await probe(`assets/fox/t${n}/normal.png`)) {
+    ASSET.tailMode = 'baked';
+    ASSET.dir = `t${n}`;
+    // expressions arrive grid by grid; anything not delivered yet falls back to the home pose
+    const found = await Promise.all(SPRITES.map(name => probe(`assets/fox/t${n}/${name}.png`)));
+    SPRITES.forEach((name, i) => { ASSET.body[name] = found[i] || `assets/fox/t${n}/normal.png`; });
+    const acts = Object.keys(ACTIONS);
+    const got = await Promise.all(acts.map(a => probe(`assets/fox/t${n}/${a}.png`)));
+    acts.forEach((a, i) => { ASSET.body[a] = got[i] || ASSET.body[ACTIONS[a]]; });
+  } else {
+    // probe one sprite per folder; a folder is either complete or absent
+    const hasBody = await probe('assets/fox/cub/normal.png');
+    if (!hasBody) ASSET.tailMode = 'd01'; // D01 sprites already draw one tail
+    for (const name of SPRITES) ASSET.body[name] = hasBody ? `assets/fox/cub/${name}.png` : `assets/fox/${name}.png`;
+    for (const a in ACTIONS) ASSET.body[a] = ASSET.body[ACTIONS[a]];
+    const hasTails = await probe('assets/fox/tail/t1.png');
+    for (let i = 1; i <= 9; i++) ASSET.tails.push(hasTails ? `assets/fox/tail/t${i}.png` : FALLBACK_TAIL);
+  }
+  el.petWrap.classList.toggle('baked', ASSET.tailMode === 'baked');
+  try { ANIM = await fetch('assets/fox/anim.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})); } catch (e) { ANIM = {}; }
+  player.name = null;
+}
+
+/* ================= WAN animation hook =================
+   assets/fox/anim.json maps a sprite name (optionally "<stage>/<name>") to an animation:
+     { "happy": { "frames": "assets/fox/anim/happy/%03d.png", "count": 24, "fps": 12, "loop": true },
+       "cub/playful": { "video": "assets/fox/anim/cub_playful.mov", "loop": false } }
+   Frames: transparent PNG/WebP sequence (same 512² canvas + feet baseline as the stills).
+   Video: HEVC-with-alpha .mov plays transparent on iOS Safari; anything else needs a background.
+   Sprites without an entry fall back to the static PNG. */
+let ANIM = {};
+const player = { name: null, timer: 0 };
+
+function frameUrls(a) {
+  if (Array.isArray(a.frames)) return a.frames;
+  const start = a.start || 0;
+  return Array.from({ length: a.count }, (_, i) => a.frames.replace(/%0(\d)d/, (_, w) => String(start + i).padStart(+w, '0')));
+}
+
+function showSprite(name) {
+  if (player.name === name) return;
+  player.name = name;
+  clearInterval(player.timer);
+  const a = ANIM[`t${tailCount()}/${name}`] || ANIM[name];
+  el.fox.classList.toggle('animated', !!a);
+  if (a && a.video) {
+    el.body.hidden = true;
+    el.video.hidden = false;
+    el.video.loop = a.loop !== false;
+    if (el.video.getAttribute('src') !== a.video) el.video.src = a.video;
+    el.video.currentTime = 0;
+    el.video.play().catch(() => {});
+    return;
+  }
+  el.video.pause();
+  el.video.hidden = true;
+  el.body.hidden = false;
+  if (a && a.frames) {
+    const urls = frameUrls(a);
+    urls.forEach(u => { new Image().src = u; }); // warm the cache so frames don't flicker
+    let i = 0;
+    el.body.src = urls[0];
+    player.timer = setInterval(() => {
+      if (++i >= urls.length) {
+        if (a.loop === false) { clearInterval(player.timer); return; } // hold last frame
+        i = 0;
+      }
+      el.body.src = urls[i];
+    }, 1000 / (a.fps || 12));
+    return;
+  }
+  const src = ASSET.body[name];
+  if (src && el.body.getAttribute('src') !== src) el.body.src = src;
+}
+
+/* ================= state ================= */
+const clamp = (v, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+function defaultState() {
+  const now = Date.now();
+  return {
+    name: '', hatched: false, age: 0, last: now,
+    stats: { hunger: 80, fun: 80, energy: 85, clean: 100 },
+    bond: 0, sleeping: false, poops: [], nextPoop: now + rand(2, 4) * 36e5 / SPEED, tails: 1,
+  };
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.stats) return Object.assign(defaultState(), s);
+  } catch (e) {}
+  return defaultState();
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+let S = load();
+
+const weeks = () => FORCE_WEEK || Math.floor(S.age / (7 * DAY)) + 1;
+const tailCount = () => clamp(weeks(), 1, 9);
+function currentStage() { const t = tailCount(); return STAGES.find(s => t <= s.maxTails); }
+
+/* advance the world by real elapsed time (scaled by SPEED) */
+function simulate(now) {
+  const realMs = Math.max(0, now - S.last);
+  S.last = now;
+  if (!S.hatched || realMs === 0) return 0;
+  S.age += realMs * SPEED; // growth never caps — the fox keeps aging while you're away
+  const h = Math.min(realMs * SPEED / 36e5, MAX_CATCHUP_H);
+  const r = S.sleeping ? RATES_SLEEP : RATES_AWAKE;
+  for (const k in r) S.stats[k] = clamp(S.stats[k] + r[k] * h);
+  S.stats.clean = clamp(S.stats.clean - S.poops.length * 2 * h);
+  if (!S.sleeping) {
+    while (S.nextPoop <= now && S.poops.length < 4) {
+      S.poops.push({ id: Math.random().toString(36).slice(2), x: rand(12, 88) });
+      S.nextPoop += rand(2, 4) * 36e5 / SPEED;
+    }
+  }
+  if (S.nextPoop <= now) S.nextPoop = now + rand(2, 4) * 36e5 / SPEED;
+  if (S.sleeping && S.stats.energy >= 100) { S.sleeping = false; say(t('wokeUp')); setExpr('happy', 2000); }
+  return h;
+}
+
+/* ================= dom ================= */
+const $ = s => document.querySelector(s);
+const el = {
+  stage: $('#stage'), petWrap: $('#petWrap'), fox: $('#fox'), body: $('#foxBody'), video: $('#foxVideo'), tails: $('#tails'),
+  bubble: $('#bubble'), fx: $('#fx'), poops: $('#poops'), name: $('#petName'), tailBadge: $('#tailBadge'),
+  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'),
+};
+
+let expr = null, exprUntil = 0, bubbleTimer = 0, lastPet = 0, renderedTails = -1, renderedStage = '';
+
+function setExpr(name, ms) { expr = name; exprUntil = Date.now() + ms; render(); }
+
+function mood() {
+  if (expr && Date.now() < exprUntil) return expr;
+  expr = null;
+  if (S.sleeping) return 'sleep';
+  const { hunger, fun, energy, clean } = S.stats;
+  const low = Math.min(hunger, fun, energy, clean);
+  if (energy < 20) return 'tired';
+  if (low < 20) return 'sad';
+  if (low > 65) return 'happy';
+  return 'normal';
+}
+
+function say(text, ms = 2600) {
+  el.bubble.textContent = text;
+  // keep the bubble inside the stage when the fox stands near an edge
+  el.bubble.style.setProperty('--bx', '0px');
+  const b = el.bubble.getBoundingClientRect(), s = el.stage.getBoundingClientRect(), pad = 8;
+  const shift = Math.min(0, s.right - pad - b.right) || Math.max(0, s.left + pad - b.left);
+  el.bubble.style.setProperty('--bx', shift + 'px');
+  el.bubble.classList.add('show');
+  clearTimeout(bubbleTimer);
+  bubbleTimer = setTimeout(() => el.bubble.classList.remove('show'), ms);
+}
+
+function spawnFx(emoji, xPct, yPct, cls = '') {
+  const d = document.createElement('div');
+  d.className = 'fx ' + cls;
+  d.textContent = emoji;
+  d.style.left = xPct + '%';
+  d.style.top = yPct + '%';
+  el.fx.appendChild(d);
+  setTimeout(() => d.remove(), 3200);
+}
+function petPos() {
+  const s = el.stage.getBoundingClientRect(), p = el.fox.getBoundingClientRect();
+  return { x: ((p.left + p.width / 2 - s.left) / s.width) * 100, y: ((p.top + p.height * 0.35 - s.top) / s.height) * 100 };
+}
+
+/* tails: fan behind the body; each tail sways around its root */
+function renderTails() {
+  const n = tailCount();
+  if (n === renderedTails) return;
+  renderedTails = n;
+  el.tails.innerHTML = '';
+  // baked art draws every tail itself; D01 sprites already draw one
+  const extra = ASSET.tailMode === 'baked' ? 0 : ASSET.tailMode === 'd01' ? n - 1 : n;
+  el.tails.style.setProperty('--ts', tailScale(n));
+  const angles = fanAngles(n).slice(n - extra);
+  angles.forEach((a, i) => {
+    const t = document.createElement('img');
+    t.className = 'tail';
+    t.src = ASSET.tails[i % ASSET.tails.length];
+    t.draggable = false;
+    t.style.setProperty('--a', a + 'deg');
+    t.style.setProperty('--x', TAIL_ROOT.x * 100 + '%');
+    t.style.setProperty('--y', TAIL_ROOT.y * 100 + '%');
+    t.style.setProperty('--d', rand(1.6, 2.4).toFixed(2) + 's');
+    t.style.animationDelay = (-rand(0, 2)).toFixed(2) + 's';
+    el.tails.appendChild(t);
+  });
+}
+// every 3 tails beyond the first three, all tails shrink 15%: 1–3 → 100%, 4–6 → 85%, 7–9 → 72%
+const tailScale = n => Math.pow(0.85, Math.floor((n - 1) / 3));
+
+function fanAngles(n) {
+  if (n === 1) return [48];
+  const spread = Math.min(124, 17 * (n - 1));
+  const start = 18 - spread / 2; // fan centred just right of straight-up
+  // draw outer tails first so the centre ones overlap them
+  return Array.from({ length: n }, (_, i) => start + (spread * i) / (n - 1)).sort((a, b) => Math.abs(b - 18) - Math.abs(a - 18));
+}
+
+function render() {
+  for (const k in S.stats) {
+    const v = S.stats[k];
+    const bar = document.querySelector(`.stat[data-k="${k}"] .bar i`);
+    bar.style.width = v + '%';
+    bar.className = v < 25 ? 'low' : v < 50 ? 'mid' : '';
+  }
+  el.name.textContent = S.name || t('foxName');
+  const n = tailCount(), wk = weeks();
+  el.tailBadge.textContent = t('tails', { n });
+  const days = Math.floor(S.age / DAY);
+  const toNext = 7 - (S.age / DAY) % 7;
+  el.age.textContent = `${t('week', { w: wk })} · ` + (n >= 9 ? t('nineDone') : t('nextTail', { t: toNext < 1 ? t('hours', { n: Math.ceil(toNext * 24) }) : t('days', { n: Math.ceil(toNext) }) }));
+  el.growBar.style.width = (n >= 9 ? 100 : ((S.age / DAY) % 7) / 7 * 100) + '%';
+
+  const st = currentStage();
+  if (st.id !== renderedStage) {
+    el.petWrap.classList.remove(...STAGES.map(s => s.id));
+    el.petWrap.classList.add(st.id);
+    renderedStage = st.id;
+  }
+  renderTails();
+
+  const m = mood();
+  el.fox.classList.remove(...[...el.fox.classList].filter(c => c.startsWith('ex-')));
+  el.fox.classList.add('ex-' + m);
+  showSprite(EXPR_SPRITE[m] || 'normal');
+
+  el.stage.classList.toggle('night', S.sleeping);
+  el.sleepBtn.querySelector('em').textContent = S.sleeping ? t('act_wake') : t('act_sleep');
+  el.sleepBtn.querySelector('span').textContent = S.sleeping ? '☀️' : '🌙';
+  document.querySelectorAll('.actions button:not(#sleepBtn)').forEach(b => (b.disabled = S.sleeping));
+
+  // poops
+  const ids = S.poops.map(p => p.id).join();
+  if (el.poops.dataset.ids !== ids) {
+    el.poops.dataset.ids = ids;
+    el.poops.innerHTML = '';
+    for (const p of S.poops) {
+      const d = document.createElement('div');
+      d.className = 'poop';
+      d.textContent = '💩';
+      d.style.left = p.x + '%';
+      d.onclick = e => { e.stopPropagation(); S.poops = S.poops.filter(q => q.id !== p.id); S.stats.clean = clamp(S.stats.clean + 8); spawnFx('✨', p.x, 85); render(); save(); };
+      el.poops.appendChild(d);
+    }
+  }
+}
+
+/* ================= actions ================= */
+function addBond(n) { S.bond += n; }
+
+const actions = {
+  feed() {
+    if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }
+    const f = pick(FOODS);
+    const p = petPos();
+    spawnFx(f.e, p.x, p.y + 8, 'drop');
+    setTimeout(() => {
+      S.stats.hunger = clamp(S.stats.hunger + f.hunger);
+      if (f.fun) S.stats.fun = clamp(S.stats.fun + f.fun);
+      S.stats.clean = clamp(S.stats.clean - 2);
+      addBond(2);
+      setExpr('eat', 1800);
+      say(pick(t('yum')));
+      if (Math.random() < 0.3) S.nextPoop = Math.min(S.nextPoop, Date.now() + rand(20, 40) * 6e4 / SPEED);
+      save();
+    }, 650);
+  },
+  play() {
+    if (S.stats.energy < 15) { say(t('tooTired')); setExpr('tired', 1800); return; }
+    S.stats.fun = clamp(S.stats.fun + 20);
+    S.stats.energy = clamp(S.stats.energy - 10);
+    S.stats.hunger = clamp(S.stats.hunger - 5);
+    addBond(3);
+    setExpr('play', 1800);
+    const p = petPos();
+    for (let i = 0; i < 4; i++) setTimeout(() => spawnFx(pick(['⭐', '⚽', '🎵']), p.x + rand(-20, 20), p.y), i * 200);
+    say(pick(t('playLines')));
+    save();
+  },
+  clean() {
+    S.poops = [];
+    S.stats.clean = 100;
+    addBond(1);
+    setExpr('love', 1600);
+    for (let i = 0; i < 8; i++) setTimeout(() => spawnFx('🫧', rand(15, 85), rand(45, 85)), i * 90);
+    say(t('cleanDone'));
+    save();
+  },
+  sleep() {
+    if (S.sleeping) {
+      S.sleeping = false;
+      say(S.stats.energy < 50 ? t('stillSleepy') : t('morning'));
+      setExpr(S.stats.energy < 50 ? 'tired' : 'happy', 1500);
+    } else {
+      if (S.stats.energy > 80) { say(t('notSleepy')); setExpr('play', 1500); return; }
+      S.sleeping = true;
+      say(t('goodnight'));
+    }
+    save();
+    render();
+  },
+};
+
+function onPetTap() {
+  if (S.sleeping) { say(t('dontWake')); return; }
+  const now = Date.now();
+  if (now - lastPet < 600) return;
+  lastPet = now;
+  S.stats.fun = clamp(S.stats.fun + 3);
+  addBond(1);
+  const p = petPos();
+  spawnFx(pick(['💗', '💕', '✨']), p.x + rand(-10, 10), p.y);
+  // curious & playful personality: not always the same reaction
+  const r = Math.random();
+  if (r < 0.15) { setExpr('surprised', 1200); say(t('huh')); }
+  else if (r < 0.3) { setExpr('curious', 1400); say(t('what')); }
+  else { setExpr('love', 1300); if (Math.random() < 0.4) say(pick(t('petLines'))); }
+  save();
+}
+
+/* ================= behaviour loop ================= */
+function wander() {
+  if (!S.hatched || S.sleeping || expr) return;
+  const cur = parseFloat(el.petWrap.style.left) || 50;
+  const next = clamp(cur + rand(-35, 35), 22, 78);
+  if (Math.abs(next - cur) < 6) return;
+  el.fox.classList.toggle('flip', next < cur);
+  el.petWrap.classList.add('walking');
+  el.petWrap.style.left = next + '%';
+  setTimeout(() => el.petWrap.classList.remove('walking'), 2600);
+}
+
+function chatter() {
+  if (!S.hatched || inbox.busy || el.bubble.classList.contains('show')) return;
+  if (S.sleeping) { const p = petPos(); spawnFx('Z', p.x + 8, p.y, 'zzz'); return; }
+  const { hunger, fun, energy, clean } = S.stats;
+  const needs = [
+    [hunger, t('hungry')], [fun, t('bored')], [energy, t('sleepy')], [clean, t('dirty')],
+  ].sort((a, b) => a[0] - b[0]);
+  if (needs[0][0] < 35) say(needs[0][1]);
+  else if (Math.random() < 0.35) {
+    setExpr('curious', 1500);
+    say(pick(t('idle')));
+  }
+}
+
+function tick() {
+  const before = S.tails;
+  simulate(Date.now());
+  const now = tailCount();
+  S.tails = now;
+  if (now > before) celebrateTail(now);
+  if (now !== before) loadAssets().then(render); // each tail count has its own whole-fox art
+  render();
+}
+
+function celebrateTail(n) {
+  const p = petPos();
+  setExpr('happy', 2500);
+  say(n === 9 ? t('nineTails') : t('newTail', { n }), 3500);
+  for (let i = 0; i < 10; i++) setTimeout(() => spawnFx(pick(['✨', '🌟', '🦊']), p.x + rand(-25, 25), p.y + rand(-5, 20)), i * 120);
+}
+
+/* ================= parent link (prototype backend: server.py) =================
+   The parent page schedules speech and sends gifts; the child page polls its inbox. */
+const FAMILY = (params.get('family') || localStorage.getItem('ipet-family') || 'demo').replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'demo';
+try { localStorage.setItem('ipet-family', FAMILY); } catch (e) {}
+const inbox = { queue: [], busy: false, unlocked: false, since: Number(localStorage.getItem('ipet-inbox-since')) || 0 };
+let talkTimer = 0;
+
+async function pollInbox() {
+  if (!S.hatched) return;
+  try {
+    const r = await fetch(`api/inbox?family=${FAMILY}&since=${inbox.since}`, { cache: 'no-store' });
+    if (!r.ok) return;
+    const { now, events } = await r.json();
+    if (!inbox.since) inbox.since = now; // first run: don't replay history
+    else for (const e of events) { inbox.queue.push(e); inbox.since = Math.max(inbox.since, e.at); }
+    try { localStorage.setItem('ipet-inbox-since', inbox.since); } catch (e) {}
+    processInbox();
+  } catch (e) {} // offline / no server: the pet still works on its own
+}
+
+async function processInbox() {
+  if (inbox.busy || !inbox.queue.length) return;
+  const ev = inbox.queue[0];
+  if (ev.type === 'speech' && !inbox.unlocked) {
+    // iOS won't play sound without a tap first
+    say(t('msgWaiting'), 600000);
+    setExpr('happy', 2000);
+    return;
+  }
+  inbox.queue.shift();
+  inbox.busy = true;
+  if (ev.type === 'gift') await receiveGift(ev);
+  else await speak(ev);
+  inbox.busy = false;
+  setTimeout(processInbox, 600);
+}
+
+function receiveGift(ev) {
+  const f = FOODS.find(x => x.e === ev.item) || { e: ev.item, hunger: 20 };
+  const p = petPos();
+  spawnFx(f.e, p.x, p.y + 8, 'drop');
+  return new Promise(res => setTimeout(() => {
+    S.stats.hunger = clamp(S.stats.hunger + f.hunger);
+    if (f.fun) S.stats.fun = clamp(S.stats.fun + f.fun);
+    addBond(3);
+    setExpr('eat', 1800);
+    say(t('giftFrom', { from: ev.from || t('parents'), e: f.e }), 3000);
+    save();
+    setTimeout(res, 2200);
+  }, 650));
+}
+
+async function speak(ev) {
+  say(ev.text || t('whisper'), 600000);
+  let open = false;
+  el.fox.classList.add('talking');
+  talkTimer = setInterval(() => { open = !open; setExpr(open ? 'talkA' : 'talkB', 60000); }, 170);
+  await PetVoice.play(ev);
+  clearInterval(talkTimer);
+  el.fox.classList.remove('talking');
+  setExpr('happy', 1500);
+  say(ev.text || t('whisper'), 2500);
+  addBond(2);
+}
+
+function unlockAudio() {
+  if (inbox.unlocked) return;
+  PetVoice.unlock();
+  inbox.unlocked = true;
+  setTimeout(processInbox, 300);
+}
+
+/* ================= boot ================= */
+function hatch() {
+  const name = $('#nameInput').value.trim() || t('foxName');
+  const egg = $('#egg');
+  egg.classList.add('cracking');
+  setTimeout(() => {
+    egg.classList.remove('cracking');
+    egg.classList.add('hatched');
+    setTimeout(() => {
+      Object.assign(S, defaultState(), { name, hatched: true, last: Date.now() });
+      save();
+      $('#intro').classList.add('hidden');
+      render();
+      say(t('hello', { name }), 3000);
+      setExpr('happy', 2500);
+    }, 450);
+  }, 1200);
+}
+
+function bind() {
+  document.querySelectorAll('.actions button').forEach(b => b.addEventListener('click', () => { actions[b.dataset.act](); render(); }));
+  el.fox.addEventListener('click', onPetTap);
+  $('#hatchBtn').addEventListener('click', hatch);
+  $('#nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') hatch(); });
+  $('#menuBtn').addEventListener('click', () => $('#menu').classList.remove('hidden'));
+  $('#closeMenu').addEventListener('click', () => $('#menu').classList.add('hidden'));
+  $('#renameBtn').addEventListener('click', () => {
+    const n = prompt(t('renamePrompt'), S.name);
+    if (n && n.trim()) { S.name = n.trim().slice(0, 10); save(); render(); }
+  });
+  $('#resetBtn').addEventListener('click', () => {
+    if (!confirm(t('resetConfirm'))) return;
+    localStorage.removeItem(KEY);
+    location.reload();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { simulate(Date.now()); save(); return; }
+    const away = (Date.now() - S.last) * SPEED;
+    tick();
+    if (S.hatched && away > 30 * 6e4) say(away > 36e5 ? t('awayHours', { n: Math.round(away / 36e5) }) : t('back'));
+  });
+}
+
+(async function boot() {
+  bind();
+  document.addEventListener('pointerdown', unlockAudio, { once: true });
+  $('#familyCode').textContent = FAMILY;
+  I18N.apply();
+  document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { I18N.set(b.dataset.lang); render(); }));
+  await loadAssets();
+  if (!S.hatched) $('#intro').classList.remove('hidden');
+  simulate(Date.now());
+  S.tails = tailCount();
+  render();
+  setInterval(tick, 1000);
+  setInterval(save, 5000);
+  setInterval(wander, 4500);
+  setInterval(chatter, 14000);
+  setInterval(pollInbox, 4000);
+  pollInbox();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+})();
