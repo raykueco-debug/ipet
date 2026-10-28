@@ -8,7 +8,7 @@
 #   <mood>_to_normal     mood → normal     17 frames, leaving it
 # A change from mood A to mood B plays A_to_normal then normal_to_B ("normal" is the hub).
 # Output: assets/fox/clips/<clip>/frame_XX.webp (keyed) + meta.json; check them in anichk (tools/anichk).
-# usage: [MOODS="curious sad"] bash tools/wan_clips.sh [seed] [loops|transitions|all|talk]
+# usage: [MOODS="curious sad"] bash tools/wan_clips.sh [seed] [loops|transitions|all|talk|home]
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1  # the tool prints ▶ ✔ ✘; the cp950 console crashed on them
 export TIVOT_GEN=512x512 TIVOT_FIT=1.0      # keep wan_prep.py's framing exactly (no re-crop, no re-scale)
@@ -57,5 +57,18 @@ if [ "$WHAT" = talk ]; then
   run "$IN/normal.png" _loop_talk 25 "${FOX}牠開心地對著你說話，小嘴巴一張一合，頭輕輕點動，表情生動。最後回到開始的姿勢。$KEEP"
   echo "=== normal_loop_listen $(date +%T)"
   run "$IN/normal.png" _loop_listen 25 "${FOX}牠專心地聽你說話，頭微微歪向一邊又回來，耳朵轉動，眼睛眨一眨。最後回到開始的姿勢。$KEEP"
+fi
+# more home-pose loops, so the pose it is in most of the time doesn't repeat one way
+if [ "$WHAT" = home ]; then
+  declare -A HOME=(
+    [ears]='牠平靜地坐著，耳朵抖一抖、左右轉一轉，像在聽周圍的聲音'
+    [tail]='牠平靜地坐著，大尾巴從一邊用力甩到另一邊再甩回來'
+    [blink]='牠平靜地坐著，慢慢眨眨眼睛，對你甜甜地微笑'
+    [sway]='牠平靜地坐著，身體輕輕地左右搖晃，很放鬆'
+  )
+  for v in ears tail blink sway; do
+    echo "=== normal_loop_$v $(date +%T)"
+    run "$IN/normal.png" "_loop_$v" 25 "${FOX}${HOME[$v]}。臉部表情維持原圖的樣子。最後回到開始的姿勢。$KEEP"
+  done
 fi
 echo "=== all done $(date +%T)"

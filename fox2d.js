@@ -105,7 +105,10 @@
     if (at === 'love' && rubbing && clips.love_loop_rub) return 'love_loop_rub';
     if (at === 'eat' && drinking && clips.eat_loop_drink) return 'eat_loop_drink';
     if (at === 'normal' && talking && clips.normal_loop_talk) return 'normal_loop_talk';
-    if (at === 'normal' && !talking && clips.normal_loop_listen && Math.random() < 0.12) return 'normal_loop_listen';
+    if (at === 'normal' && !talking && Math.random() < 0.35) { // now and then another way of sitting there
+      const ways = ['listen', 'ears', 'tail', 'blink', 'sway'].map(v => `normal_loop_${v}`).filter(c => clips[c]);
+      if (ways.length) return ways[Math.floor(Math.random() * ways.length)];
+    }
     if (at === 'sleep' && clips.sleep_to_sleep_belly && clips.sleep_belly_to_sleep && Math.random() < 0.12) return 'sleep_to_sleep_belly';
     if (at === 'sleep_belly') return clips.sleep_belly_loop && Math.random() < 0.75 ? 'sleep_belly_loop' : 'sleep_belly_to_sleep';
     if (at === 'sleep' && clips.sleep_loop_dream && Math.random() < 0.3) return 'sleep_loop_dream';
@@ -233,7 +236,7 @@
       'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal', 'eat_loop_drink',
       ...Object.keys(ACTIONS).map(a => `${a}_loop`), // poses with a loop of their own (the rest just 404)
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
-      'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen',
+      'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen', 'normal_loop_ears', 'normal_loop_tail', 'normal_loop_blink', 'normal_loop_sway',
       ...[...FACES, 'push'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),
       ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
         `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
