@@ -231,7 +231,7 @@
       ...WALK,
       ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`]),
       'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal', 'eat_loop_drink',
-      ...['rest', 'sit_back', 'bored', 'hug_tail', 'belly', 'dance', 'think', 'beg'].map(a => `${a}_loop`),
+      ...Object.keys(ACTIONS).map(a => `${a}_loop`), // poses with a loop of their own (the rest just 404)
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
       'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen',
       ...[...FACES, 'push'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),

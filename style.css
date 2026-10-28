@@ -148,7 +148,7 @@ html, body {
 .fox.flip { transform: scaleX(-1); }
 .fox.anim2d.flip { transform: none; }
 /* food bowl: its own layer in front of the fox (the fox clips never have a bowl in them) */
-.bowl { position: absolute; left: 50%; bottom: 1%; width: 36%; transform: translateX(-50%); pointer-events: none;
+.bowl { position: absolute; left: 43%; bottom: 1%; width: 36%; transform: translateX(-50%); pointer-events: none;
   transition: opacity .3s; z-index: 2; }
 .bowl.out { opacity: 0; }
 .bowl img, .bowl svg { display: block; width: 100%; height: auto; }

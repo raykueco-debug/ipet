@@ -58,8 +58,8 @@ POSES = {
 }
 # facing right = the left picture flipped on the canvas, so the player can flip left-facing frames exactly
 FLIPPED = {'walk_r': 'walk'}
-MIRROR = {'yawn'}
-ZOOM = {'walk': 0.85}  # get_up is drawn closer than the other sprites: match the head size  # drawn with the tail on the left; the home pose has it on the right
+MIRROR = {'yawn'}  # drawn with the tail on the left; the home pose has it on the right
+ZOOM = {'walk': 0.85}  # get_up is drawn closer than the other sprites: match the head size
 
 
 def solid(im):
