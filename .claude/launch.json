@@ -18,6 +18,18 @@
         "8131"
       ],
       "port": 8131
+    },
+    {
+      "name": "fox-pick",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8140",
+        "--directory",
+        "C:/Users/RAYKU~1/AppData/Local/Temp/claude/C--Users-Ray-Ku-Desktop-ipet/508e36b6-055d-49be-833c-8972ead24e94/scratchpad/fox-pick-site"
+      ],
+      "port": 8140
     }
   ]
 }

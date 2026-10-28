@@ -2,9 +2,9 @@
 
 usage: python tools/anichk/serve.py [port]      → http://localhost:8131/player.html
 
-Serves ipet's animation folders only (assets/fox/wan_idle/<clip>/frame_XX.webp). player_list.js is rebuilt on
-every load, so new clips show up on refresh. The player's 「輸出」 button copies the kept frames, renumbered, to
-assets/fox/wan_idle/export/<name>/ (never overwrites: adds a suffix).
+Serves ipet's animation folders only: assets/fox/clips/<clip>/ (tools/wan_clips.sh) and assets/fox/wan_idle/<clip>/.
+player_list.js is rebuilt on every load, so new clips show up on refresh. The player's 「輸出」 button copies the
+kept frames, renumbered, to assets/fox/export/<name>/ (never overwrites: adds a suffix).
 player.html is copied from tivot_wan on first run (python tools/anichk/serve.py --refresh-player to update it).
 """
 import json
@@ -17,12 +17,12 @@ from urllib.parse import unquote, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 IPET = os.path.dirname(os.path.dirname(HERE))
-ROOT = os.path.join(IPET, 'assets', 'fox', 'wan_idle')  # served as /
+ROOT = os.path.join(IPET, 'assets', 'fox')  # served as /
 PLAYER = os.path.join(HERE, 'player.html')
 TIVOT_PLAYER = os.path.join(os.path.expanduser('~'), 'Desktop', 'ComfyUI-master', 'tivot_wan', 'out', 'player.html')
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 PORT = int(args[0]) if args else 8131
-GROUPS = [('', 'ipet 待機'), ('export', '輸出')]  # sub-folder of ROOT → group name in the player
+GROUPS = [('clips', '片段（循環／轉場）'), ('wan_idle', '心情待機（舊）'), ('export', '輸出')]  # sub-folder of ROOT → group
 
 if '--refresh-player' in sys.argv or not os.path.exists(PLAYER):
     shutil.copy(TIVOT_PLAYER, PLAYER)
@@ -36,7 +36,7 @@ def player_list():
             continue
         for name in sorted(os.listdir(base)):
             d = os.path.join(base, name)
-            if not os.path.isdir(d) or (not sub and name == 'export'):
+            if not os.path.isdir(d) or name == 'export':
                 continue
             fs = sorted(f for f in os.listdir(d) if f.startswith('frame_') and f.endswith('.webp'))
             if not fs:

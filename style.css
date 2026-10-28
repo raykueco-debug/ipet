@@ -109,6 +109,9 @@ html, body {
 /* 3D fox: fox3d.js scales the model per stage; canvas is larger than the box so fanned tails fit */
 #petWrap.r3d .pet-scale { transform: none; }
 .fox.three .fox-body, .fox.three .tails { display: none; }
+/* Wan clips (fox2d.js): the clip canvas replaces the sprite + tail layers; same square box, feet near the bottom */
+.fox.anim2d .fox-body, .fox.anim2d .tails { display: none; }
+.fox canvas.fox2d { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .fox.three.flip { transform: none; } /* the 3D fox turns to face its walking direction instead */
 /* 3D: drag the fox to turn it, drag the ground to lead it — no page scrolling under the finger */
 .fox.three { touch-action: none; cursor: grab; }
@@ -125,6 +128,7 @@ html, body {
 /* fox = tails layer behind + body sprite */
 .fox { position: relative; width: 100%; aspect-ratio: 1; transition: transform .25s; }
 .fox.flip { transform: scaleX(-1); }
+.fox.anim2d.flip { transform: none; } /* the 2D fox turns round in its own clips: never mirrored */
 .fox-body, .tails { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fox-body { transform-origin: 50% 95%; animation: breathe 2.6s ease-in-out infinite; -webkit-user-drag: none; pointer-events: none; }
 .tail {

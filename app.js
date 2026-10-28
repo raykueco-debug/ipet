@@ -7,11 +7,15 @@ const params = new URLSearchParams(location.search);
 // ?speed=1440 → 1 real minute = 1 day (for testing growth); ?week=5 → preview 5 tails
 const SPEED = Math.max(1, Number(params.get('speed')) || 1);
 const FORCE_WEEK = Number(params.get('week')) || 0;
-// ?r=2d / ?r=3d picks the fox renderer (remembered); 3D (the default) = fox3d.js + assets/fox3d/<model>/
-const RENDER_3D = (() => {
+// ?r= picks the fox renderer (remembered): anim (default) = Wan clips, fox2d.js + assets/fox/clips/;
+// 2d = the still sprites; 3d = fox3d.js + assets/fox3d/<model>/ (kept as the 3D prototype)
+const RENDER = (() => {
   const r = params.get('r');
-  try { if (r) localStorage.setItem('ipet-render', r); return (r || localStorage.getItem('ipet-render') || '3d') === '3d'; } catch (e) { return r !== '2d'; }
+  let v = r;
+  try { if (r) localStorage.setItem('ipet-renderer', r); else v = localStorage.getItem('ipet-renderer'); } catch (e) {}
+  return ['anim', '2d', '3d'].includes(v) ? v : 'anim';
 })();
+const RENDER_3D = RENDER === '3d';
 
 // stats change per (virtual) hour
 const RATES_AWAKE = { hunger: -6, fun: -5, energy: -4, clean: -3 };
@@ -306,6 +310,7 @@ function render() {
   el.fox.classList.add('ex-' + m);
   showSprite(EXPR_SPRITE[m] || 'normal');
   if (window.Fox3D) Fox3D.set({ mood: m, tails: n, scale: st.scale });
+  if (window.Fox2D) Fox2D.set({ mood: m });
 
   el.stage.classList.toggle('night', S.sleeping);
   el.sleepBtn.querySelector('em').textContent = S.sleeping ? t('act_wake') : t('act_sleep');
@@ -393,6 +398,8 @@ function onPetTap() {
   addBond(1);
   const p = petPos();
   spawnFx(pick(['💗', '💕', '✨']), p.x + rand(-10, 10), p.y);
+  // 2D fox: each tap plays another idle action
+  if (RENDER === 'anim' && window.Fox2D) { Fox2D.poke(); if (Math.random() < 0.3) say(pick(t('petLines'))); save(); return; }
   // curious & playful personality: not always the same reaction
   const r = Math.random();
   if (r < 0.15) { setExpr('surprised', 1200); say(t('huh')); }
@@ -407,6 +414,7 @@ function wander() {
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
+  if (walk2d(next)) return;
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.classList.add('walking');
   el.petWrap.style.left = next + '%';
@@ -419,6 +427,8 @@ function walkTo(pct, follow) {
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(pct, 15, 85);
   if (Math.abs(next - cur) < 1.5) return;
+  userWalkUntil = Date.now() + 8000; // don't wander off right after being led somewhere
+  if (walk2d(next)) return;
   const secs = follow ? 0.5 : Math.max(0.5, Math.abs(next - cur) / 22);
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.style.transitionDuration = secs + 's';
@@ -426,7 +436,32 @@ function walkTo(pct, follow) {
   el.petWrap.style.left = next + '%';
   clearTimeout(walkTimer);
   walkTimer = setTimeout(() => { el.petWrap.classList.remove('walking'); el.petWrap.style.transitionDuration = ''; }, secs * 1000 + (follow ? 150 : 0));
-  userWalkUntil = Date.now() + 8000; // don't wander off right after being led somewhere
+}
+
+/* 2D fox: it stands up, turns and walks in its own clips (fox2d.js), so the room position moves here, step by
+   step, and only while a walk loop is playing — not while it gets up, turns round or sits down */
+const WALK_SPEED = 16; // % of the room per second
+let walkTarget = null, walkClock = 0;
+function walk2d(target) {
+  if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
+  walkTarget = target;
+  el.petWrap.style.transition = 'none';
+  if (!walkClock) walkClock = setInterval(walkStep, 50);
+  walkStep();
+  return true;
+}
+function walkStep() {
+  if (walkTarget == null) return;
+  const pos = parseFloat(el.petWrap.style.left) || 50, d = walkTarget - pos;
+  if (Math.abs(d) < 0.3) {
+    walkTarget = null;
+    Fox2D.stop();
+    clearInterval(walkClock);
+    walkClock = 0;
+    return;
+  }
+  Fox2D.go(d < 0 ? 'walk' : 'walk_r');
+  if (Fox2D.state.walking) el.petWrap.style.left = pos + Math.sign(d) * Math.min(Math.abs(d), WALK_SPEED * 0.05) + '%';
 }
 
 function bindWalk() {
@@ -601,6 +636,12 @@ function bind() {
 
 (async function boot() {
   bind();
+  if (RENDER === 'anim') {
+    el.fox.classList.add('anim2d');
+    const js = document.createElement('script');
+    js.src = 'fox2d.js';
+    document.head.appendChild(js);
+  }
   if (RENDER_3D) {
     el.fox.classList.add('three');
     el.petWrap.classList.add('r3d');
