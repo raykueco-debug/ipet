@@ -50,7 +50,7 @@
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
   let push = false;   // standing at the ball: nudge it with the nose next (walk[_r]_loop_push)
 
-  async function load(name) {
+  async function load(name, wait = false) { // wait: until its first frames are in (the first clip only)
     if (clips[name] !== undefined) return clips[name];
     clips[name] = null;
     try {
@@ -59,7 +59,7 @@
       const v = meta.rev ? '?v=' + meta.rev : ''; // a new revision (tools/clip_fill.py) skips cached frames
       const frames = meta.frames.map(f => { const im = new Image(); im.src = ROOT + name + '/' + f + v; return im; });
       // wait for the first frames (onload, not decode(): decode() can hang while the page is in the background)
-      await Promise.all(frames.slice(0, 2).map(im => new Promise(ok => {
+      if (wait) await Promise.all(frames.slice(0, 2).map(im => new Promise(ok => {
         if (im.complete) return ok();
         im.onload = im.onerror = ok;
         setTimeout(ok, 3000);
@@ -197,24 +197,26 @@
   }
 
   async function init() {
-    await load('normal_loop');
+    await load('normal_loop', true);
     switchTo('normal_loop', false);
     setInterval(tick, 1000 / FPS); // a fixed clock (rAF stops while the page is hidden)
-    // the rest in the background: what plays soonest first
-    for (const a of Object.keys(ACTIONS)) { await load(`normal_to_${a}`); await load(`${a}_to_normal`); }
-    for (const c of WALK) await load(c);
-    for (const m of MOODS) { await load(`${m}_loop`); await load(`normal_to_${m}`); await load(`${m}_to_normal`); }
-    await load('love_loop_rub');
-    for (const c of ['normal_to_eat', 'eat_loop', 'eat_to_normal', 'normal_to_paw', 'paw_to_normal']) await load(c);
-    for (const c of ['normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop',
-                     'sleep_loop_dream', 'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep',
-                     'normal_loop_talk', 'normal_loop_listen']) await load(c);
-    for (const f of [...FACES, 'push']) { await load(`walk_loop_${f}`); await load(`walk_r_loop_${f}`); }
-    for (const v of ['walk_front', 'walk_back']) {
-      for (const c of [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`]) await load(c);
-      for (const w of ['walk', 'walk_r']) { await load(`${w}_to_${v}`); await load(`${v}_to_${w}`); }
-    }
-    await load('walk_front_to_walk_back'); await load('walk_back_to_walk_front');
+    // the rest in the background (their frames download on their own; draw() keeps the last picture until a
+    // frame is in), six lists at a time: what plays soonest first
+    const names = [
+      ...Object.keys(ACTIONS).flatMap(a => [`normal_to_${a}`, `${a}_to_normal`]),
+      ...WALK,
+      ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`]),
+      'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal',
+      'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
+      'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen',
+      ...[...FACES, 'push'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),
+      ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
+        `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
+      'walk_front_to_walk_back', 'walk_back_to_walk_front',
+    ];
+    let next = 0;
+    const worker = async () => { while (next < names.length) await load(names[next++]); };
+    await Promise.all(Array.from({ length: 6 }, worker));
   }
 
   window.Fox2D = {
