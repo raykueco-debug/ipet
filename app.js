@@ -201,7 +201,7 @@ const $ = s => document.querySelector(s);
 const el = {
   stage: $('#stage'), petWrap: $('#petWrap'), fox: $('#fox'), body: $('#foxBody'), video: $('#foxVideo'), tails: $('#tails'),
   bubble: $('#bubble'), fx: $('#fx'), poops: $('#poops'), name: $('#petName'), tailBadge: $('#tailBadge'),
-  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'),
+  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'), bowl: $('#bowl'), foodPick: $('#foodPick'),
 };
 
 let expr = null, exprUntil = 0, bubbleTimer = 0, lastPet = 0, renderedTails = -1, renderedStage = '';
@@ -336,9 +336,85 @@ function render() {
 /* ================= actions ================= */
 function addBond(n) { S.bond += n; }
 
+/* food bowl: meat or veggies. The fox loves both (the point: veggies are yummy too) and is happiest when it
+   gets both on the same day. The bowl is a layer in front of the fox; it shows assets/fox/food/<kind>_<3|2|1>.png
+   and empty.png once they are drawn, a simple drawn bowl until then. */
+const MEALS = { meat: { hunger: 30 }, veg: { hunger: 28, fun: 2 } };
+let eating = false;
+const foodArt = {};
+function foodImg(name) { // the picture's URL, or null until we know it exists
+  if (!(name in foodArt)) {
+    foodArt[name] = null;
+    const im = new Image();
+    im.onload = () => { foodArt[name] = im.src; };
+    im.src = `assets/fox/food/${name}.png`;
+  }
+  return foodArt[name];
+}
+function bowlSVG(kind, n) {
+  const spots = [[50, 38], [36, 41], [64, 41], [43, 33], [57, 33], [29, 45], [71, 45], [50, 28], [50, 45]];
+  const colours = kind === 'meat' ? ['#9a5634', '#b8693d', '#8a4a2c'] : ['#3f9b3a', '#f08a24', '#7cc242'];
+  const bits = spots.slice(0, n * 3).map(([x, y], k) =>
+    `<circle cx="${x}" cy="${y}" r="${kind === 'veg' && k % 3 === 2 ? 4 : 7}" fill="${colours[k % 3]}" stroke="#5a3a26" stroke-width="1.2"/>`);
+  return `<svg viewBox="0 0 100 70"><ellipse cx="50" cy="44" rx="40" ry="10" fill="#e9dccb" stroke="#5a3a26" stroke-width="2"/>${bits.join('')}
+    <path d="M10 44 Q14 66 50 66 Q86 66 90 44 Z" fill="#fff6ea" stroke="#5a3a26" stroke-width="2"/>
+    <circle cx="35" cy="56" r="3" fill="#f3a35b"/><circle cx="50" cy="58" r="3" fill="#f3a35b"/><circle cx="65" cy="56" r="3" fill="#f3a35b"/></svg>`;
+}
+function showBowl(kind, n) {
+  const art = foodImg(n ? `${kind}_${n}` : 'empty');
+  el.bowl.innerHTML = art ? `<img src="${art}" alt="">` : bowlSVG(kind, n);
+  el.bowl.hidden = false;
+  el.bowl.classList.remove('out');
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function eat(kind) {
+  if (eating) return;
+  if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }
+  eating = true;
+  walkTarget = null;
+  userWalkUntil = Date.now() + 20000;
+  showBowl(kind, 3);
+  const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
+  if (anim) { // lean down to the bowl first
+    Fox2D.eat(true);
+    for (let k = 0; k < 80 && !Fox2D.state.eating; k++) await wait(100);
+  } else setExpr('eat', 4800);
+  for (const n of [2, 1, 0]) { // three bites
+    await wait(1400);
+    showBowl(kind, n);
+  }
+  const m = MEALS[kind];
+  S.stats.hunger = clamp(S.stats.hunger + m.hunger);
+  if (m.fun) S.stats.fun = clamp(S.stats.fun + m.fun);
+  S.stats.clean = clamp(S.stats.clean - 2);
+  addBond(2);
+  const day = new Date().toDateString();
+  if (!S.meals || S.meals.day !== day) S.meals = { day, meat: 0, veg: 0, both: false };
+  S.meals[kind]++;
+  if (anim) Fox2D.eat(false);
+  const p = petPos();
+  if (S.meals.meat && S.meals.veg && !S.meals.both) { // meat and veggies on the same day: a little party
+    S.meals.both = true;
+    addBond(5);
+    say(t('balanced'), 3000);
+    for (let k = 0; k < 5; k++) setTimeout(() => spawnFx(pick(['💗', '✨', '🌟']), p.x + rand(-14, 14), p.y), k * 180);
+  } else {
+    say(pick(t(kind === 'veg' ? 'vegYum' : 'meatYum')));
+    if (!S.meals.both && Math.random() < 0.6) setTimeout(() => say(t(kind === 'veg' ? 'wantMeat' : 'wantVeg')), 2600);
+  }
+  if (Math.random() < 0.3) S.nextPoop = Math.min(S.nextPoop, Date.now() + rand(20, 40) * 6e4 / SPEED);
+  save();
+  await wait(1200);
+  el.bowl.classList.add('out');
+  await wait(300);
+  el.bowl.hidden = true;
+  eating = false;
+}
+
 const actions = {
   feed() {
     if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }
+    if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat or veggies?
     const f = pick(FOODS);
     const p = petPos();
     spawnFx(f.e, p.x, p.y + 8, 'drop');
@@ -390,6 +466,7 @@ const actions = {
 };
 
 function onPetTap() {
+  if (rubbed) { rubbed = false; return; } // the finger was rubbing, not tapping
   if (S.sleeping) { say(t('dontWake')); return; }
   const now = Date.now();
   if (now - lastPet < 600) return;
@@ -399,7 +476,7 @@ function onPetTap() {
   const p = petPos();
   spawnFx(pick(['💗', '💕', '✨']), p.x + rand(-10, 10), p.y);
   // 2D fox: each tap plays another idle action
-  if (RENDER === 'anim' && window.Fox2D) { Fox2D.poke(); if (Math.random() < 0.3) say(pick(t('petLines'))); save(); return; }
+  if (RENDER === 'anim' && window.Fox2D) { if (!eating) Fox2D.poke(); if (Math.random() < 0.3) say(pick(t('petLines'))); save(); return; }
   // curious & playful personality: not always the same reaction
   const r = Math.random();
   if (r < 0.15) { setExpr('surprised', 1200); say(t('huh')); }
@@ -408,13 +485,56 @@ function onPetTap() {
   save();
 }
 
+/* 2D fox: keep a finger on it and rub round and round → it's petted (eyes closed, head rubbing) for as long
+   as the finger keeps moving; a plain tap stays a tap */
+let rubbed = false;
+function bindRub() {
+  if (RENDER !== 'anim') return;
+  let down = null, path = 0, lastMove = 0, rubbing = false, timer = 0, fxAt = 0;
+  const end = () => {
+    down = null;
+    clearInterval(timer);
+    if (rubbing) { rubbing = false; Fox2D.rub(false); Fox2D.nudge(); save(); }
+  };
+  el.fox.addEventListener('pointerdown', e => {
+    if (!window.Fox2D || S.sleeping) return;
+    down = { x: e.clientX, y: e.clientY };
+    path = 0;
+    lastMove = Date.now();
+    el.fox.setPointerCapture(e.pointerId);
+    clearInterval(timer);
+    timer = setInterval(() => { if (rubbing && Date.now() - lastMove > 500) end(); }, 100); // finger stopped
+  });
+  el.fox.addEventListener('pointermove', e => {
+    if (!down) return;
+    path += Math.hypot(e.clientX - down.x, e.clientY - down.y);
+    down = { x: e.clientX, y: e.clientY };
+    lastMove = Date.now();
+    if (!rubbing && path > 60) { rubbing = rubbed = true; Fox2D.rub(true); userWalkUntil = Date.now() + 8000; }
+    if (rubbing) { // the head sways round with the finger
+      const r = el.fox.getBoundingClientRect(), hx = r.left + r.width / 2, hy = r.top + r.height * 0.35;
+      const k = v => Math.max(-1, Math.min(1, v / (r.width * 0.2)));
+      Fox2D.nudge(k(e.clientX - hx), k(e.clientY - hy));
+    }
+    if (rubbing && Date.now() - fxAt > 900) { // hearts and a little bond while it lasts
+      fxAt = Date.now();
+      const p = petPos();
+      spawnFx(pick(['💗', '💕']), p.x + rand(-8, 8), p.y - 4);
+      S.stats.fun = clamp(S.stats.fun + 1);
+      addBond(1);
+    }
+  });
+  el.fox.addEventListener('pointerup', end);
+  el.fox.addEventListener('pointercancel', end);
+}
+
 /* ================= behaviour loop ================= */
 function wander() {
-  if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil) return;
+  if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil || window.Ball?.busy) return;
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
-  if (walk2d(next)) return;
+  if (walk2d(next, Math.random() * 0.6)) return;
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.classList.add('walking');
   el.petWrap.style.left = next + '%';
@@ -423,12 +543,12 @@ function wander() {
 
 /* walk where the child points: tap the ground, or keep the finger down and the fox follows it */
 let userWalkUntil = 0, walkTimer = 0;
-function walkTo(pct, follow) {
+function walkTo(pct, follow, z) {
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(pct, 15, 85);
-  if (Math.abs(next - cur) < 1.5) return;
+  if (Math.abs(next - cur) < 1.5 && (z == null || Math.abs(z - foxZ) < 0.05)) return;
   userWalkUntil = Date.now() + 8000; // don't wander off right after being led somewhere
-  if (walk2d(next)) return;
+  if (walk2d(next, z ?? foxZ)) return;
   const secs = follow ? 0.5 : Math.max(0.5, Math.abs(next - cur) / 22);
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.style.transitionDuration = secs + 's';
@@ -442,9 +562,29 @@ function walkTo(pct, follow) {
    step, and only while a walk loop is playing — not while it gets up, turns round or sits down */
 const WALK_SPEED = 16; // % of the room per second
 let walkTarget = null, walkClock = 0;
-function walk2d(target) {
+/* depth (2.5D, scene.js): the ground runs from the front edge (z 0) back towards the trees (z 1). Farther
+   is higher on the stage and smaller; things nearer are drawn over things farther away. */
+const DEPTH = { near: 8, far: 30, shrink: 0.4, across: 30 }; // bottom % at z 0 / z 1, size lost at z 1, z 1 ≈ 30 % of width
+const groundAt = z => DEPTH.near + (DEPTH.far - DEPTH.near) * z;  // bottom % of the stage
+const sizeAt = z => 1 - DEPTH.shrink * z;
+const layerAt = z => 10 + Math.round((1 - z) * 80);                // z-index
+const zFromY = y => { const r = el.stage.getBoundingClientRect(); return clamp(((r.bottom - y) / r.height * 100 - DEPTH.near) / (DEPTH.far - DEPTH.near) * 100) / 100; };
+let foxX = 50, foxZ = 0;
+function placeFox() {
+  el.petWrap.style.left = foxX + '%';
+  if (RENDER !== 'anim') return;
+  el.petWrap.style.bottom = groundAt(foxZ) + '%';
+  el.petWrap.style.transform = `translateX(-50%) scale(${sizeAt(foxZ)})`;
+  el.petWrap.style.zIndex = layerAt(foxZ);
+}
+
+/* 2D fox: it stands up, turns and walks in its own clips (fox2d.js), so the room position moves here, step by
+   step, and only while a walk loop is playing — not while it gets up, turns round or sits down. It walks
+   side-on even when it goes deeper or nearer (it slants across the ground and shrinks / grows). */
+function walk2d(x, z = foxZ, then) {
   if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
-  walkTarget = target;
+  if (eating) return true; // stays at its bowl
+  walkTarget = { x, z: clamp(z * 100) / 100, then };
   el.petWrap.style.transition = 'none';
   if (!walkClock) walkClock = setInterval(walkStep, 50);
   walkStep();
@@ -452,28 +592,36 @@ function walk2d(target) {
 }
 function walkStep() {
   if (walkTarget == null) return;
-  const pos = parseFloat(el.petWrap.style.left) || 50, d = walkTarget - pos;
-  if (Math.abs(d) < 0.3) {
+  const dx = walkTarget.x - foxX, dz = (walkTarget.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
+  if (dist < 0.4) {
+    const then = walkTarget.then;
     walkTarget = null;
     Fox2D.stop();
     clearInterval(walkClock);
     walkClock = 0;
+    if (then) then();
     return;
   }
-  Fox2D.go(d < 0 ? 'walk' : 'walk_r');
-  if (Fox2D.state.walking) el.petWrap.style.left = pos + Math.sign(d) * Math.min(Math.abs(d), WALK_SPEED * 0.05) + '%';
+  // facing: by the sideways part; going almost straight in or out it keeps the way it faces
+  const facing = Math.abs(dx) > 1 ? (dx < 0 ? 'walk' : 'walk_r') : Fox2D.state.go || (dx < 0 ? 'walk' : 'walk_r');
+  Fox2D.go(facing);
+  if (!Fox2D.state.walking) return;
+  const step = Math.min(dist, WALK_SPEED * 0.05 * sizeAt(foxZ)); // farther away it looks slower
+  foxX += (dx / dist) * step;
+  foxZ += (dz / dist) * step / DEPTH.across;
+  placeFox();
 }
 
 function bindWalk() {
   let leading = false;
   const pct = e => { const r = el.stage.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * 100; };
   el.stage.addEventListener('pointerdown', e => {
-    if (!S.hatched || S.sleeping || e.target.closest('#petWrap, .poop, button, #tailCtl')) return;
+    if (!S.hatched || S.sleeping || e.target.closest('#petWrap, .poop, button, #tailCtl, .toy')) return;
     leading = true;
     el.stage.setPointerCapture(e.pointerId);
-    walkTo(pct(e));
+    walkTo(pct(e), false, zFromY(e.clientY));
   });
-  el.stage.addEventListener('pointermove', e => { if (leading) walkTo(pct(e), true); });
+  el.stage.addEventListener('pointermove', e => { if (leading) walkTo(pct(e), true, zFromY(e.clientY)); });
   const stop = () => { leading = false; };
   el.stage.addEventListener('pointerup', stop);
   el.stage.addEventListener('pointercancel', stop);
@@ -611,6 +759,12 @@ function hatch() {
 function bind() {
   document.querySelectorAll('.actions button').forEach(b => b.addEventListener('click', () => { actions[b.dataset.act](); render(); }));
   el.fox.addEventListener('click', onPetTap);
+  el.foodPick.querySelectorAll('button').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    el.foodPick.hidden = true;
+    eat(b.dataset.food);
+  }));
+  bindRub();
   bindWalk();
   document.querySelectorAll('#tailCtl button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setTailsByHand(+b.dataset.d); }));
   $('#hatchBtn').addEventListener('click', hatch);
@@ -638,6 +792,7 @@ function bind() {
   bind();
   if (RENDER === 'anim') {
     el.fox.classList.add('anim2d');
+    placeFox();
     const js = document.createElement('script');
     js.src = 'fox2d.js';
     document.head.appendChild(js);

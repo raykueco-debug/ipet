@@ -5,7 +5,7 @@
 #   <action>_to_normal   action pose → home     17 frames
 # The home loop (normal_loop) stays its own clip, so it keeps looping; the player drops into an action now
 # and then and comes back. Only the fox in the picture: no hands, bowls, toys or effect marks.
-# usage: bash tools/wan_actions.sh [seed]
+# usage: [ACTS="yawn tilt_left"] bash tools/wan_actions.sh [seed]
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
 export TIVOT_GEN=512x512 TIVOT_FIT=1.0
@@ -37,7 +37,7 @@ run() { # input  suffix  prompt  end-image
     --seed "$SEED" --out "$OUT" --suffix "$2" --prompt "$3" --end "$4" 2>&1 | tail -3
 }
 cd "$COMFY/tivot_wan" || exit 1
-for a in look_around tilt_left tilt_right look_up yawn stretch; do
+for a in ${ACTS:-look_around tilt_left tilt_right look_up yawn stretch}; do
   echo "=== normal_to_$a $(date +%T)"
   run "$IN/normal.png" "_to_$a" "${FOX}牠原本平常地坐著，${GO[$a]}。動作自然流暢。$KEEP" "$IN/$a.png"
   echo "=== ${a}_to_normal $(date +%T)"

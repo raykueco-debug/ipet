@@ -90,6 +90,21 @@ html, body {
 #stage.night { background: linear-gradient(#1d2450, #3b3f72 70%); }
 #stage.night .stars { opacity: 1; }
 #stage.night .hill { filter: brightness(.45) saturate(.6); }
+/* 2.5D scene (scene.js): layers wider than the stage, slid by the fox's position */
+.scene { position: absolute; inset: 0; pointer-events: none; }
+.scene-front { z-index: 4; }
+.scene .layer { position: absolute; left: -12%; right: -12%; bottom: 0; height: 100%; transition: filter 1s; }
+.scene .layer svg, .scene .layer img { position: absolute; bottom: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
+#stage.night .scene .layer { filter: brightness(.45) saturate(.6); }
+/* toys (ball.js): placed on the 2.5D ground; the ball is grabbed and thrown */
+.toy { position: absolute; transform: translateX(-50%); touch-action: none; }
+.toy svg, .toy img { display: block; width: 100%; height: auto; pointer-events: none; }
+.toy-ball { cursor: grab; }
+.toy-basket { pointer-events: none; transform-origin: 50% 100%; }
+.toy-basket.ask { animation: ask 1s ease-in-out infinite; }
+@keyframes ask { 50% { transform: translateX(-50%) scale(1.08); filter: drop-shadow(0 0 8px #fff6a8); } }
+.toy-shadow { position: absolute; aspect-ratio: 3 / 1; transform: translate(-50%, 50%); border-radius: 50%; background: #000; pointer-events: none; }
+#petWrap { transform-origin: 50% 100%; }
 
 #petWrap {
   position: absolute;
@@ -126,9 +141,19 @@ html, body {
 .shadow { width: 55%; height: 12px; margin: -14px auto 0; background: #0000001f; border-radius: 50%; }
 
 /* fox = tails layer behind + body sprite */
-.fox { position: relative; width: 100%; aspect-ratio: 1; transition: transform .25s; }
+.fox { position: relative; width: 100%; aspect-ratio: 1; transition: transform .25s; touch-action: none; } /* rubbing must not scroll */
 .fox.flip { transform: scaleX(-1); }
-.fox.anim2d.flip { transform: none; } /* the 2D fox turns round in its own clips: never mirrored */
+.fox.anim2d.flip { transform: none; }
+/* food bowl: its own layer in front of the fox (the fox clips never have a bowl in them) */
+.bowl { position: absolute; left: 50%; bottom: 1%; width: 36%; transform: translateX(-50%); pointer-events: none;
+  transition: opacity .3s; z-index: 2; }
+.bowl.out { opacity: 0; }
+.bowl img, .bowl svg { display: block; width: 100%; height: auto; }
+.food-pick { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); display: flex; gap: 12px; z-index: 5; }
+.food-pick button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 16px; border: 0;
+  border-radius: 16px; background: #fff; box-shadow: 0 3px 0 #0000001a; font: inherit; font-size: 14px; }
+.food-pick button span { font-size: 30px; }
+.food-pick[hidden], .bowl[hidden] { display: none; } /* the 2D fox turns round in its own clips: never mirrored */
 .fox-body, .tails { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fox-body { transform-origin: 50% 95%; animation: breathe 2.6s ease-in-out infinite; -webkit-user-drag: none; pointer-events: none; }
 .tail {

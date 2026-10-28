@@ -44,10 +44,15 @@
           <img id="foxBody" class="fox-body" alt="" draggable="false">
           <video id="foxVideo" class="fox-body" playsinline muted hidden></video>
         </div>
+        <div id="bowl" class="bowl" hidden></div>
       </div>
       <div class="shadow"></div>
     </div>
     <div id="fx"></div>
+    <div id="foodPick" class="food-pick" hidden>
+      <button data-food="meat"><span>🍖</span><i data-i18n="food_meat">肉肉</i></button>
+      <button data-food="veg"><span>🥦</span><i data-i18n="food_veg">青菜</i></button>
+    </div>
     <div id="tailCtl" class="tail-ctl">
       <button data-d="-1" aria-label="-">−</button><b id="tailN">1</b><button data-d="1" aria-label="+">＋</button>
       <button data-d="0" class="auto" data-i18n="tailAuto">自動</button>
@@ -106,6 +111,8 @@
 <script src="voice.js"></script>
 <script src="words.js"></script>
 <script src="app.js"></script>
+  <script src="scene.js"></script>
+  <script src="ball.js"></script>
 <script src="learn.js"></script>
 </body>
 </html>

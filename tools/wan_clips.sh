@@ -8,7 +8,7 @@
 #   <mood>_to_normal     mood → normal     17 frames, leaving it
 # A change from mood A to mood B plays A_to_normal then normal_to_B ("normal" is the hub).
 # Output: assets/fox/clips/<clip>/frame_XX.webp (keyed) + meta.json; check them in anichk (tools/anichk).
-# usage: bash tools/wan_clips.sh [seed] [loops|transitions|all]
+# usage: [MOODS="curious sad"] bash tools/wan_clips.sh [seed] [loops|transitions|all]
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1  # the tool prints ▶ ✔ ✘; the cp950 console crashed on them
 export TIVOT_GEN=512x512 TIVOT_FIT=1.0      # keep wan_prep.py's framing exactly (no re-crop, no re-scale)
@@ -38,13 +38,13 @@ run() { # input-image  name-suffix  length  prompt  [end-image]
 }
 cd "$COMFY/tivot_wan" || exit 1
 if [ "$WHAT" != transitions ]; then
-  for m in normal happy love surprised curious sad angry; do
+  for m in ${MOODS:-normal happy love surprised curious sad angry}; do
     echo "=== ${m}_loop $(date +%T)"
     run "$IN/$m.png" _loop 25 "$FOX${MOVE[$m]}$KEEP"
   done
 fi
 if [ "$WHAT" != loops ]; then
-  for m in happy love surprised curious sad angry; do
+  for m in ${MOODS:-happy love surprised curious sad angry}; do
     echo "=== normal_to_$m $(date +%T)"
     run "$IN/normal.png" "_to_$m" 17 "${FOX}牠從平常的表情與姿勢，自然、流暢地轉變成${NAME[$m]}的表情與姿勢。$KEEP" "$IN/$m.png"
     echo "=== ${m}_to_normal $(date +%T)"

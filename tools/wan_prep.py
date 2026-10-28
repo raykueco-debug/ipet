@@ -10,6 +10,8 @@ doesn't re-crop them per image (that gave each clip its own scale: chained clips
 import os
 
 from PIL import Image
+from scipy import ndimage
+import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPRITES = {  # mood → sprite
@@ -36,8 +38,19 @@ MIRROR = {'yawn'}
 ZOOM = {'walk': 0.85}  # get_up is drawn closer than the other sprites: match the head size  # drawn with the tail on the left; the home pose has it on the right
 
 
+def solid(im):
+    """The sprites' own background removal left the inside of the fox partly see-through (iris, shading over
+    closed eyes, white fur edges: alpha 125–225). On the green canvas the green showed through there, Wan
+    painted it into every frame and the key cut it out again. The colour of those pixels is right — make the
+    inside of the outline opaque, keep the soft outer edge."""
+    a = np.asarray(im).copy()
+    inside = ndimage.binary_erosion(ndimage.binary_fill_holes(a[..., 3] > 128), iterations=2)
+    a[inside, 3] = 255
+    return Image.fromarray(a)
+
+
 def main():
-    ims = {m: Image.open(os.path.join(ROOT, p)).convert('RGBA') for m, p in SPRITES.items()}
+    ims = {m: solid(Image.open(os.path.join(ROOT, p)).convert('RGBA')) for m, p in SPRITES.items()}
     # the framing is set once, by the mood sprites; every later picture reuses it so all clips chain
     boxes = [im.getchannel('A').point(lambda v: 255 if v > 8 else 0).getbbox() for im in ims.values()]
     x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
@@ -63,7 +76,7 @@ def main():
         dst = os.path.join(OUT, name + '.png')
         if os.path.exists(dst):
             continue
-        im = Image.open(os.path.join(ROOT, path)).convert('RGBA')
+        im = solid(Image.open(os.path.join(ROOT, path)).convert('RGBA'))
         if name in MIRROR:
             im = im.transpose(Image.FLIP_LEFT_RIGHT)
         im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
