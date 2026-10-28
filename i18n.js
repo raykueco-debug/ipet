@@ -5,7 +5,7 @@ const I18N = (() => {
   const DICT = {
     zh: {
       foxName: '小狐', tails: '{n} 尾', week: '第 {w} 週', nineDone: '九尾完成',
-      nextTail: '下一條尾巴 {t}', hours: '{n} 小時', days: '{n} 天',
+      nextTail: '下一條尾巴 {t}', hours: '{n} 小時', days: '{n} 天', tailAuto: '自動',
       stat_hunger: '飽足', stat_fun: '快樂', stat_energy: '精神', stat_clean: '清潔',
       act_feed: '餵食', act_play: '玩耍', act_clean: '清潔', act_sleep: '睡覺', act_wake: '叫醒', act_learn: '學英文',
       eggTitle: '一顆狐狸蛋出現了！', eggSub: '幫牠取個名字吧', hatch: '孵化 ✨',
@@ -48,7 +48,7 @@ const I18N = (() => {
     },
     en: {
       foxName: 'Foxy', tails: '{n} tail(s)', week: 'Week {w}', nineDone: 'Nine tails!',
-      nextTail: 'next tail in {t}', hours: '{n}h', days: '{n}d',
+      nextTail: 'next tail in {t}', hours: '{n}h', days: '{n}d', tailAuto: 'Auto',
       stat_hunger: 'Food', stat_fun: 'Fun', stat_energy: 'Energy', stat_clean: 'Clean',
       act_feed: 'Feed', act_play: 'Play', act_clean: 'Clean', act_sleep: 'Sleep', act_wake: 'Wake', act_learn: 'Learn',
       eggTitle: 'A fox egg appeared!', eggSub: 'Give it a name', hatch: 'Hatch ✨',

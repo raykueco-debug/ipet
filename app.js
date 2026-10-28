@@ -7,6 +7,11 @@ const params = new URLSearchParams(location.search);
 // ?speed=1440 → 1 real minute = 1 day (for testing growth); ?week=5 → preview 5 tails
 const SPEED = Math.max(1, Number(params.get('speed')) || 1);
 const FORCE_WEEK = Number(params.get('week')) || 0;
+// ?r=2d / ?r=3d picks the fox renderer (remembered); 3D (the default) = fox3d.js + assets/fox3d/<model>/
+const RENDER_3D = (() => {
+  const r = params.get('r');
+  try { if (r) localStorage.setItem('ipet-render', r); return (r || localStorage.getItem('ipet-render') || '3d') === '3d'; } catch (e) { return r !== '2d'; }
+})();
 
 // stats change per (virtual) hour
 const RATES_AWAKE = { hunger: -6, fun: -5, energy: -4, clean: -3 };
@@ -162,7 +167,8 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e
 let S = load();
 
 const weeks = () => FORCE_WEEK || Math.floor(S.age / (7 * DAY)) + 1;
-const tailCount = () => clamp(weeks(), 1, 9);
+// tailsOverride: set by hand with the tail buttons on the stage (0 = follow the weeks)
+const tailCount = () => S.tailsOverride || clamp(weeks(), 1, 9);
 function currentStage() { const t = tailCount(); return STAGES.find(s => t <= s.maxTails); }
 
 /* advance the world by real elapsed time (scaled by SPEED) */
@@ -280,6 +286,8 @@ function render() {
   el.name.textContent = S.name || t('foxName');
   const n = tailCount(), wk = weeks();
   el.tailBadge.textContent = t('tails', { n });
+  $('#tailN').textContent = n;
+  $('#tailCtl').classList.toggle('manual', !!S.tailsOverride);
   const days = Math.floor(S.age / DAY);
   const toNext = 7 - (S.age / DAY) % 7;
   el.age.textContent = `${t('week', { w: wk })} · ` + (n >= 9 ? t('nineDone') : t('nextTail', { t: toNext < 1 ? t('hours', { n: Math.ceil(toNext * 24) }) : t('days', { n: Math.ceil(toNext) }) }));
@@ -297,6 +305,7 @@ function render() {
   el.fox.classList.remove(...[...el.fox.classList].filter(c => c.startsWith('ex-')));
   el.fox.classList.add('ex-' + m);
   showSprite(EXPR_SPRITE[m] || 'normal');
+  if (window.Fox3D) Fox3D.set({ mood: m, tails: n, scale: st.scale });
 
   el.stage.classList.toggle('night', S.sleeping);
   el.sleepBtn.querySelector('em').textContent = S.sleeping ? t('act_wake') : t('act_sleep');
@@ -394,7 +403,7 @@ function onPetTap() {
 
 /* ================= behaviour loop ================= */
 function wander() {
-  if (!S.hatched || S.sleeping || expr) return;
+  if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil) return;
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
@@ -402,6 +411,44 @@ function wander() {
   el.petWrap.classList.add('walking');
   el.petWrap.style.left = next + '%';
   setTimeout(() => el.petWrap.classList.remove('walking'), 2600);
+}
+
+/* walk where the child points: tap the ground, or keep the finger down and the fox follows it */
+let userWalkUntil = 0, walkTimer = 0;
+function walkTo(pct, follow) {
+  const cur = parseFloat(el.petWrap.style.left) || 50;
+  const next = clamp(pct, 15, 85);
+  if (Math.abs(next - cur) < 1.5) return;
+  const secs = follow ? 0.5 : Math.max(0.5, Math.abs(next - cur) / 22);
+  el.fox.classList.toggle('flip', next < cur);
+  el.petWrap.style.transitionDuration = secs + 's';
+  el.petWrap.classList.add('walking');
+  el.petWrap.style.left = next + '%';
+  clearTimeout(walkTimer);
+  walkTimer = setTimeout(() => { el.petWrap.classList.remove('walking'); el.petWrap.style.transitionDuration = ''; }, secs * 1000 + (follow ? 150 : 0));
+  userWalkUntil = Date.now() + 8000; // don't wander off right after being led somewhere
+}
+
+function bindWalk() {
+  let leading = false;
+  const pct = e => { const r = el.stage.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * 100; };
+  el.stage.addEventListener('pointerdown', e => {
+    if (!S.hatched || S.sleeping || e.target.closest('#petWrap, .poop, button, #tailCtl')) return;
+    leading = true;
+    el.stage.setPointerCapture(e.pointerId);
+    walkTo(pct(e));
+  });
+  el.stage.addEventListener('pointermove', e => { if (leading) walkTo(pct(e), true); });
+  const stop = () => { leading = false; };
+  el.stage.addEventListener('pointerup', stop);
+  el.stage.addEventListener('pointercancel', stop);
+}
+
+function setTailsByHand(d) {
+  S.tailsOverride = d === 0 ? 0 : clamp(tailCount() + d, 1, 9);
+  S.tails = tailCount();
+  save();
+  loadAssets().then(render);
 }
 
 function chatter() {
@@ -529,6 +576,8 @@ function hatch() {
 function bind() {
   document.querySelectorAll('.actions button').forEach(b => b.addEventListener('click', () => { actions[b.dataset.act](); render(); }));
   el.fox.addEventListener('click', onPetTap);
+  bindWalk();
+  document.querySelectorAll('#tailCtl button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setTailsByHand(+b.dataset.d); }));
   $('#hatchBtn').addEventListener('click', hatch);
   $('#nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') hatch(); });
   $('#menuBtn').addEventListener('click', () => $('#menu').classList.remove('hidden'));
@@ -552,6 +601,14 @@ function bind() {
 
 (async function boot() {
   bind();
+  if (RENDER_3D) {
+    el.fox.classList.add('three');
+    el.petWrap.classList.add('r3d');
+    const js = document.createElement('script');
+    js.type = 'module';
+    js.src = 'fox3d.js';
+    document.head.appendChild(js);
+  }
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   $('#familyCode').textContent = FAMILY;
   I18N.apply();

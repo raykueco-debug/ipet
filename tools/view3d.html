@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D 模型檢視</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #fdf3e6; font: 14px system-ui, sans-serif; color: #4a2e2a; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #ui { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  #ui button, #ui select { padding: 6px 10px; border-radius: 8px; border: 1px solid #e3cbb0; background: #fff; font: inherit; }
+  #info { position: fixed; bottom: 12px; left: 12px; opacity: .7; }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="ui">
+  <select id="shade"><option value="basic">原圖色（不打光）</option><option value="lit">打光</option><option value="clay">白模</option></select>
+  <button id="spin">自動旋轉</button>
+</div>
+<div id="info"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const url = new URLSearchParams(location.search).get('m') || '../assets/fox3d/cub.glb';
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xfdf3e6);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd8c4a8, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+sun.position.set(1, 2, 2);
+scene.add(sun);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 50);
+camera.position.set(0, 0.55, 2.4);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.5, 0);
+
+let model, mixer, originals = new Map();
+const clock = new THREE.Clock();
+window.view3d = { get mixer() { return mixer; }, get model() { return model; } }; // for scripted checks
+new GLTFLoader().load(url, g => {
+  model = g.scene;
+  model.traverse(o => { if (o.isMesh) originals.set(o, o.material); });
+  scene.add(model);
+  let tris = 0;
+  model.traverse(o => { if (o.isMesh) tris += o.geometry.index ? o.geometry.index.count / 3 : o.geometry.attributes.position.count / 3; });
+  document.getElementById('info').textContent = `${url} · ${Math.round(tris).toLocaleString()} 面`;
+  applyShade();
+  // one button per animation clip (looped); "停" stops
+  if (g.animations.length) {
+    mixer = new THREE.AnimationMixer(model);
+    const sel = Object.assign(document.createElement('select'), { id: 'clip' });
+    sel.innerHTML = '<option value="">動作：停</option>' + g.animations.map((c, i) => `<option value="${i}">${c.name}</option>`).join('');
+    sel.onchange = () => {
+      mixer.stopAllAction();
+      if (sel.value !== '') mixer.clipAction(g.animations[+sel.value]).play();
+    };
+    const speed = Object.assign(document.createElement('select'), { id: 'speed' });
+    speed.innerHTML = '<option value="1">1×</option><option value="0.25">0.25× 慢動作</option><option value="0.5">0.5×</option>';
+    speed.onchange = () => { mixer.timeScale = +speed.value; };
+    document.getElementById('ui').append(sel, speed);
+  }
+  // one slider per shape key (mouth Open / Smile …)
+  model.traverse(o => {
+    if (!o.morphTargetDictionary) return;
+    for (const [key, i] of Object.entries(o.morphTargetDictionary)) {
+      const label = document.createElement('label');
+      label.textContent = ` ${o.name}.${key} `;
+      const range = Object.assign(document.createElement('input'), { type: 'range', min: 0, max: 1, step: 0.01, value: 0 });
+      range.oninput = () => { o.morphTargetInfluences[i] = +range.value; };
+      label.appendChild(range);
+      document.getElementById('ui').appendChild(label);
+    }
+  });
+}, undefined, e => { document.getElementById('info').textContent = '載入失敗：' + url; });
+
+function applyShade() {
+  const mode = document.getElementById('shade').value;
+  originals.forEach((m, o) => {
+    if (mode === 'lit') o.material = m;
+    else if (mode === 'clay') o.material = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.8 });
+    else o.material = new THREE.MeshBasicMaterial({ map: m.map, color: m.map ? 0xffffff : m.color,
+      transparent: m.transparent, alphaTest: m.alphaTest, depthWrite: m.depthWrite });
+  });
+}
+document.getElementById('shade').onchange = applyShade;
+document.getElementById('spin').onclick = () => { controls.autoRotate = !controls.autoRotate; };
+
+function resize() {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+renderer.setAnimationLoop(() => { mixer?.update(clock.getDelta()); controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

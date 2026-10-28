@@ -14,3 +14,9 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# 3D: the .glb under a .wasm name is only for publishing to artifacts (copy of fox_toon.glb);
+# cub.glb / cub_tex.png were the first single-view projection test
+assets/fox3d/**/*.glb.wasm
+assets/fox3d/cub.glb
+assets/fox3d/cub_tex.png

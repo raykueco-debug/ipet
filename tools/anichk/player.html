@@ -1,0 +1,115 @@
+<!doctype html><meta charset="utf-8"><title>動檔播放器</title>
+<style>
+html,body{height:100%}
+/* 整頁不捲：控制列佔它自己折行後的高度，下面三欄填滿剩下的、各自捲（舊版控制列 sticky 蓋住播放區上緣） */
+body{margin:0;background:#15151b;color:#ccc;font:14px sans-serif;display:flex;flex-direction:column;overflow:hidden}
+#top{flex:0 0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#1e1d25}
+select{max-width:420px;font-size:14px}button{padding:5px 12px;font-size:14px}
+#main{flex:1 1 auto;min-height:0;display:flex;gap:12px;padding:12px}
+#list{flex:0 0 236px;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start}
+#list h4{flex:0 0 100%;margin:8px 0 0;color:#fc6;font-size:13px}
+.c{width:112px;cursor:pointer;border:3px solid transparent;background:#222}.c.cur{border-color:#fc6}
+.c img{width:112px;height:150px;object-fit:cover;display:block;background:#2a2730}
+.c div{font:11px monospace;color:#bbb;padding:2px 3px;word-break:break-all;line-height:1.25}
+#view{flex:0 0 420px;display:flex;flex-direction:column;min-height:0;text-align:center}#im{flex:1 1 auto;min-height:0;width:420px;max-height:630px;object-fit:contain;background:#2a2730;display:block}
+#info{font:15px monospace;color:#fc6;margin:6px 0}
+#strip{flex:1;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;overflow:auto}
+.t{position:relative;width:120px;cursor:pointer;user-select:none;touch-action:none;border:3px solid transparent}
+.t img{-webkit-user-drag:none;pointer-events:none;width:120px;height:180px;object-fit:cover;display:block}
+.t span{position:absolute;left:4px;top:2px;font:bold 15px monospace;color:#fff;text-shadow:0 0 4px #000}
+.t input{position:absolute;right:4px;top:4px;margin:0;width:26px;height:26px;pointer-events:none}
+.t.off::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 64px sans-serif;color:#f44;text-shadow:0 0 6px #000;pointer-events:none}
+.t.off img{opacity:.25}.t.cur{border-color:#fc6}
+.t b{position:absolute;left:4px;bottom:4px;font:bold 18px monospace;color:#000;background:#9f9;padding:0 5px;border-radius:4px;pointer-events:none}.t b.h1{display:none}
+#kept{width:100%;font:12px monospace;background:#222;color:#9f9;border:1px solid #444}
+small{color:#888}
+#cats button{margin-right:2px}#cats button.on{background:#fc6;color:#000;font-weight:bold}
+</style>
+<div id=top>
+ <span id=cats></span>
+ <input id=q placeholder="篩選名稱…" style="width:160px;font-size:14px">
+ <button id=pv>◀</button><button id=pp>▶ 播放</button><button id=nx>▶|</button>
+ <label><input type=checkbox id=loop> 循環</label>
+ 倍速 <input id=sp type=range min=0.1 max=3 step=0.05 value=1 style="width:160px"> <b id=spv></b>
+ 基準 <select id=base><option>24</option><option>16</option><option>12</option><option>8</option></select> fps
+ 停格 <button class=ha data-h=1>全×1</button><button class=ha data-h=2>全×2</button><button class=ha data-h=3>全×3</button>
+ <button id=clr>全部取消勾選</button> <span id=dur style="font:bold 15px monospace;color:#9f9;margin-left:8px"></span> <button id=exp style="background:#c90;color:#000;font-weight:bold">⬇ 輸出</button>
+ <small>Enter＝播放/暫停・← →＝逐格・空白（或 X）＝勾/取消目前格・點縮圖＝勾掉／取消，按住拖過去＝一次勾多格（勾掉的格不播）・<b style="color:#9f9">停格：數字 1～9＝目前格凍結幾格（1＝不停），右鍵縮圖＝×1→×2→×3→×4 輪換</b></small>
+</div>
+<div id=main><div id=list></div>
+ <div id=view><img id=im><div id=info></div>
+  <div style="width:420px"><small>保留的格（給程式用）：</small><textarea id=kept rows=4 readonly></textarea></div></div>
+ <div id=strip></div>
+</div>
+<script src="player_list.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let A=null,off=new Set(),hold={},i=0,timer=null,playing=false,drag=null,left=0;
+const H=k=>hold[k]||1;
+document.addEventListener('pointerup',()=>{drag=null});
+const key=()=>'tivot_player_off_'+A.dir;
+function save(){try{localStorage.setItem(key(),JSON.stringify([...off]));localStorage.setItem(key()+'_hold',JSON.stringify(hold))}catch(e){}}
+function load(){try{off=new Set(JSON.parse(localStorage.getItem(key())||'[]'))}catch(e){off=new Set()}let sv=null;try{sv=localStorage.getItem(key()+'_hold')}catch(e){}if(sv){try{hold=JSON.parse(sv)}catch(e){hold={}}}else{hold={};(A.holds||[]).forEach((v,k)=>{if(v>1)hold[k]=v})}}
+function setHold(k,v){if(v<=1)delete hold[k];else hold[k]=v;save();mark();keptText()}
+function list(){const q=$('q').value.trim().toLowerCase(),L=$('list');L.innerHTML='';let g=null;
+ ANIMS.forEach((a,k)=>{if(q&&!a.name.toLowerCase().includes(q))return;if(CAT!=='全部'&&(a.cat||'其他')!==CAT)return;if(a.group!==g){g=a.group;const h=document.createElement('h4');h.textContent=g;L.appendChild(h)}
+  const c=document.createElement('div');c.className='c'+(A===a?' cur':'');c.id='c'+k;c.innerHTML=`<img loading=lazy src="${a.dir}/${a.frames[0]}"><div>${a.name}（${a.frames.length}）</div>`;
+  c.onclick=()=>{open(k);location.hash=a.dir};L.appendChild(c)})}
+$('q').oninput=list;
+let CAT='全部';try{CAT=localStorage.getItem('tivot_player_cat')||'全部'}catch(e){}
+(function(){const C=$('cats');['全部','敵','插畫','CI','其他'].forEach(c=>{const b=document.createElement('button');const n=c==='全部'?ANIMS.length:ANIMS.filter(a=>(a.cat||'其他')===c).length;b.textContent=c+'（'+n+'）';b.dataset.c=c;if(c===CAT)b.classList.add('on');
+ b.onclick=()=>{CAT=c;try{localStorage.setItem('tivot_player_cat',c)}catch(e){}C.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.c===c));list()};C.appendChild(b)})})();
+function open(k){stop();A=ANIMS[k];if(A.fps){const sel=$('base');const v=String(Math.round(A.fps));if(![...sel.options].some(o=>o.value===v)){const o=document.createElement('option');o.textContent=v;sel.appendChild(o)}sel.value=v}load();i=first();build();show();document.querySelectorAll('.c.cur').forEach(x=>x.classList.remove('cur'));const cc=$('c'+k);if(cc){cc.classList.add('cur');cc.scrollIntoView({block:'nearest'})}try{localStorage.setItem('tivot_player_last',A.dir)}catch(e){}}
+function kept(){return A.frames.map((_,k)=>k).filter(k=>!off.has(k))}
+function first(){return kept()[0]??0}
+function build(){const s=$('strip');s.innerHTML='';A.frames.forEach((f,k)=>{const d=document.createElement('div');d.className='t';d.id='t'+k;
+ d.innerHTML=`<img loading=lazy src="${A.dir}/${f}"><span>${k}</span><input type=checkbox title="勾＝不播"><b></b>`;
+ d.oncontextmenu=e=>{e.preventDefault();setHold(k,H(k)>=4?1:H(k)+1)};
+ d.querySelector('input').checked=off.has(k);
+ d.onpointerdown=e=>{if(e.button===2)return;e.preventDefault();stop();drag=!off.has(k);tog(k,drag);i=k;show()};
+ d.onpointerenter=()=>{if(drag===null)return;if(off.has(k)!==drag)tog(k,drag)};s.appendChild(d);new Image().src=`${A.dir}/${f}`});mark()}
+function tog(k,v){v?off.add(k):off.delete(k);save();mark();keptText()}
+function mark(){A.frames.forEach((_,k)=>{const d=$('t'+k);d.classList.toggle('off',off.has(k));d.classList.toggle('cur',k===i);d.querySelector('input').checked=off.has(k);const b=d.querySelector('b');b.textContent='×'+H(k);b.className='h'+H(k)});keptText()}
+function outN(){return kept().reduce((s,k)=>s+H(k),0)}
+function ranges(a){const r=[];for(const k of a){if(r.length&&r[r.length-1][1]===k-1)r[r.length-1][1]=k;else r.push([k,k])}return r.map(([a,b])=>a===b?`${a}`:`${a}-${b}`).join(', ')}
+function durText(){const f=+$('base').value*+$('sp').value,n=A.frames.length,m=kept().length;
+ const o=outN();$('dur').textContent=`原始 ${n} 格 ${(n/f).toFixed(2)} 秒 → 保留 ${m} 張・停格後 ${o} 格 ${(o/f).toFixed(2)} 秒（${f.toFixed(1)} fps）`}
+function keptText(){durText();const k=kept();const hs=k.filter(x=>H(x)>1).map(x=>`${x}×${H(x)}`).join(', ');$('kept').value=`${k.length} 張・輸出 ${outN()} 格（${(outN()/+$('base').value).toFixed(2)} 秒 @${$('base').value}fps）\n保留：${ranges(k)}\n停格：${hs||'無（全×1）'}\n去掉：${ranges([...off].sort((a,b)=>a-b))||'無'}`}
+function show(){$('im').src=`${A.dir}/${A.frames[i]}`;const fps=+$('base').value*+$('sp').value;
+ $('info').textContent=`${A.dir}　第 ${i} 格 / 0~${A.frames.length-1}${off.has(i)?'（已勾掉）':''}　停 ×${H(i)}　${fps.toFixed(1)} fps`;mark();
+ const d=$('t'+i);if(d)d.scrollIntoView({block:'nearest'})}
+function nextIdx(d){const k=kept();if(!k.length)return null;let p=k.findIndex(x=>x>=i);
+ if(d>0){const n=k.find(x=>x>i);if(n!==undefined)return n;return $('loop').checked?k[0]:null}
+ const pr=[...k].reverse().find(x=>x<i);if(pr!==undefined)return pr;return $('loop').checked?k[k.length-1]:null}
+function tick(){if(--left>0)return;const n=nextIdx(1);if(n===null){stop();return}i=n;left=H(i);show()}
+function play(){if(!kept().length)return;if(off.has(i)||nextIdx(1)===null&&!$('loop').checked)i=first();show();
+ left=H(i);playing=true;$('pp').textContent='⏸ 暫停';clearInterval(timer);timer=setInterval(tick,1000/(+$('base').value*+$('sp').value))}
+function stop(){playing=false;clearInterval(timer);timer=null;$('pp').textContent='▶ 播放'}
+function step(d){stop();const n=nextIdx(d);if(n!==null){i=n;show()}}
+
+$('pp').onclick=()=>playing?stop():play();$('pv').onclick=()=>step(-1);$('nx').onclick=()=>step(1);
+$('sp').oninput=()=>{$('spv').textContent=(+$('sp').value).toFixed(2)+'×';show();if(playing)play()};
+$('base').onchange=()=>{show();keptText();if(playing)play()};
+$('exp').onclick=async()=>{const k=kept();if(!k.length){alert('沒有保留的格');return}
+ const name=prompt(`輸出 ${k.length} 張（停格後 ${outN()} 格），資料夾名稱：`,A.name+'_cut');if(!name)return;
+ const ex=k.flatMap(x=>Array(H(x)).fill(x));
+ const body={dir:A.dir,name,keep:k,holds:k.map(H),frames:ex.map(x=>A.frames[x]),fps:+$('base').value*+$('sp').value};
+ if(location.protocol==='file:'){const b=new Blob([JSON.stringify(body,null,1)],{type:'application/json'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=name+'.json';a.click();alert('目前是直接開檔，只能下載清單 json。\n要直接輸出成資料夾，請用 http://localhost:8130/player.html 開');return}
+ try{const r=await (await fetch('/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+  alert(r.ok?`已輸出 ${r.count} 格：\n${r.path}`:'輸出失敗：'+r.error)}catch(e){alert('輸出失敗：'+e)}};
+$('clr').onclick=()=>{off.clear();save();mark()};
+document.addEventListener('keydown',e=>{if(e.target.tagName==='SELECT'||e.target.tagName==='INPUT')return;
+ if(e.key==='Enter'){e.preventDefault();playing?stop():play()}
+ else if(e.key===' '||e.key==='x'||e.key==='X'){e.preventDefault();tog(i,!off.has(i));show()}
+ else if(e.key==='ArrowRight'){e.preventDefault();step(1)}
+ else if(e.key==='ArrowLeft'){e.preventDefault();step(-1)}
+ else if(/^[1-9]$/.test(e.key)){setHold(i,+e.key);show()}});
+document.querySelectorAll('.ha').forEach(b=>b.onclick=()=>{const v=+b.dataset.h;hold={};if(v>1)kept().forEach(k=>hold[k]=v);save();mark();keptText()});
+try{const bs=localStorage.getItem('tivot_player_base');if(bs)$('base').value=bs}catch(e){}
+$('base').addEventListener('change',()=>{try{localStorage.setItem('tivot_player_base',$('base').value)}catch(e){}});
+$('spv').textContent='1.00×';
+let last=null;try{last=localStorage.getItem('tivot_player_last')}catch(e){}
+const h=decodeURIComponent(location.hash.slice(1)).replace(/^dir=/,'');if(h)last=h;
+list();const k0=Math.max(0,ANIMS.findIndex(a=>a.dir===last));open(k0);
+</script>

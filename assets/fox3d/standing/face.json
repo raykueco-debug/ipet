@@ -1,0 +1,30 @@
+{
+ "rect": [
+  0.06197723373770714,
+  0.23171676695346832,
+  0.9393193125724792,
+  0.6210724115371704
+ ],
+ "cols": 4,
+ "rows": 2,
+ "cells": {
+  "normal": 0,
+  "happy": 1,
+  "angry": 2,
+  "surprised": 3,
+  "smile": 4
+ },
+ "eyes": {
+  "cols": 4,
+  "rows": 2,
+  "cells": {
+   "normal": 0,
+   "happy": 1,
+   "angry": 2,
+   "surprised": 3,
+   "smile": 4,
+   "half": 5,
+   "closed": 6
+  }
+ }
+}

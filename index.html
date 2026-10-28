@@ -48,6 +48,10 @@
       <div class="shadow"></div>
     </div>
     <div id="fx"></div>
+    <div id="tailCtl" class="tail-ctl">
+      <button data-d="-1" aria-label="-">−</button><b id="tailN">1</b><button data-d="1" aria-label="+">＋</button>
+      <button data-d="0" class="auto" data-i18n="tailAuto">自動</button>
+    </div>
   </main>
 
   <nav class="actions">
@@ -97,6 +101,7 @@
   </div>
 </div>
 
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script src="i18n.js"></script>
 <script src="voice.js"></script>
 <script src="words.js"></script>

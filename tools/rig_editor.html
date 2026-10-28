@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<title>元件調整</title>
+<style>
+  :root { --bg: #fdf3e6; --panel: #fff; --ink: #4a2e2a; --line: #e8d5c0; --accent: #f08a3c; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px system-ui, "Noto Sans TC", sans-serif; }
+  body { display: flex; }
+  #panel { width: 280px; flex: none; padding: 16px; background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; }
+  #panel h1 { font-size: 18px; margin: 0 0 4px; }
+  #panel p.hint { margin: 0 0 14px; opacity: .7; line-height: 1.5; }
+  .group { margin: 0 0 16px; }
+  .group > b { display: block; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .row label { width: 56px; flex: none; }
+  .row input[type=range] { flex: 1; }
+  .row output { width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--ink); border-color: var(--ink); color: #fff; width: 100%; padding: 10px; }
+  #status { margin-top: 8px; min-height: 1.4em; opacity: .8; }
+  #view { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #fox { position: relative; width: min(56vh, 46vw); aspect-ratio: 1; }
+  #fox canvas.fox3d { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; }
+  #fox.picking canvas { cursor: crosshair; }
+  #tip { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 6px 12px; border-radius: 8px; display: none; }
+  #fox.picking ~ #tip { display: block; }
+  @media (max-width: 700px) { body { flex-direction: column-reverse; } #panel { width: 100%; border: 0; border-top: 1px solid var(--line); } #fox { width: 80vw; } }
+</style>
+<script>window.FOX3D_EDIT = true;</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+</head>
+<body>
+<div id="panel">
+  <h1>元件調整</h1>
+  <p class="hint">按「選接點」後在狐狸身上點一下，尾巴的根部（橘色 B 端）就會接到那裡。再用把手或滑桿微調，最後按儲存，App 就會照這個位置。</p>
+
+  <div class="group">
+    <b>模型</b>
+    <div class="row"><select id="model"><option value="standing">站姿</option><option value="sitting">坐姿</option></select></div>
+  </div>
+
+  <div class="group">
+    <b>接點</b>
+    <div class="btns">
+      <button id="pick">選接點</button>
+      <button id="gMove">移動把手</button>
+      <button id="gRotate">旋轉把手</button>
+      <button id="gOff" class="on">關把手</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <b>尾巴</b>
+    <div class="row"><label>數量</label><input type="range" id="count" min="1" max="9" step="1" value="1"><output></output></div>
+    <div class="row"><label>後傾</label><input type="range" id="back" min="-1.6" max="1.2" step="0.01"><output></output></div>
+    <div class="row"><label>扭轉</label><input type="range" id="twist" min="-1.2" max="1.2" step="0.01"><output></output></div>
+    <div class="row"><label>大小</label><input type="range" id="size" min="0.4" max="2.2" step="0.01"><output></output></div>
+    <div class="row"><label>側彎</label><input type="range" id="lean" min="-60" max="60" step="1"><output></output></div>
+    <div class="row"><label>展開</label><input type="range" id="spread" min="0" max="200" step="1"><output></output></div>
+    <div class="row"><label>間距</label><input type="range" id="step" min="4" max="40" step="1"><output></output></div>
+  </div>
+
+  <div class="group">
+    <b>預覽</b>
+    <div class="btns"><button id="anim">播放動作</button><button id="reset">還原這次的修改</button></div>
+  </div>
+
+  <button id="save" class="primary">儲存</button>
+  <div id="status"></div>
+</div>
+
+<div id="view">
+  <div id="fox"></div>
+  <div id="tip">在狐狸身上點一下，選擇尾巴的接點</div>
+</div>
+
+<script type="module">
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+const params = new URLSearchParams(location.search);
+if (!params.has('m')) { params.set('m', 'standing'); history.replaceState(null, '', '?' + params); }
+const $ = id => document.getElementById(id);
+$('model').value = params.get('m');
+$('model').onchange = () => { location.search = '?m=' + $('model').value; };
+
+await import('./fox3d.js');
+await Fox3D.ready;
+const F = Fox3D, { THREE, scene, camera, renderer, anchor, model } = F.parts;
+const KEYS = ['back', 'twist', 'size', 'lean', 'spread', 'step'];
+const saved = JSON.parse(JSON.stringify({ ...F.rig, anchor: anchor.position.toArray(), anchorRot: anchor.rotation.toArray().slice(0, 3) }));
+
+F.edit.frozen = true;
+F.restPose();
+F.set({ tails: 1 });
+const canvas = renderer.domElement;
+
+// camera: orbit around the fox
+const orbit = new OrbitControls(camera, canvas);
+orbit.target.set(0, 0.5, 0);
+camera.position.set(1.6, 0.9, 1.4);
+orbit.update();
+
+// gizmo on the tail root
+const gizmo = new TransformControls(camera, canvas);
+gizmo.setSpace('local');
+gizmo.setSize(0.7);
+scene.add(gizmo.getHelper());
+gizmo.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
+gizmo.addEventListener('objectChange', () => {
+  F.rig.anchor = anchor.position.toArray();
+  F.rig.anchorRot = anchor.rotation.toArray().slice(0, 3);
+  status('接點已移動，記得儲存');
+});
+function setGizmo(mode) {
+  ['gMove', 'gRotate', 'gOff'].forEach(id => $(id).classList.remove('on'));
+  if (!mode) { gizmo.detach(); $('gOff').classList.add('on'); return; }
+  gizmo.setMode(mode);
+  gizmo.attach(anchor);
+  $(mode === 'translate' ? 'gMove' : 'gRotate').classList.add('on');
+}
+$('gMove').onclick = () => setGizmo('translate');
+$('gRotate').onclick = () => setGizmo('rotate');
+$('gOff').onclick = () => setGizmo(null);
+
+// pick a joint: click the body, the tail root jumps there
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let picking = false;
+$('pick').onclick = () => {
+  picking = !picking;
+  $('pick').classList.toggle('on', picking);
+  $('fox').classList.toggle('picking', picking);
+};
+const underAnchor = o => { for (let p = o; p; p = p.parent) if (p === anchor) return true; return false; };
+canvas.addEventListener('pointerdown', e => {
+  if (!picking || e.button !== 0) return;
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const targets = [];
+  F.parts.fox.traverse(o => { if (o.isMesh && !underAnchor(o)) targets.push(o); });
+  const hit = ray.intersectObjects(targets, false)[0];
+  if (!hit) { status('沒點到狐狸，再點一次'); return; }
+  const p = anchor.parent.worldToLocal(hit.point.clone());
+  anchor.position.copy(p);
+  F.rig.anchor = p.toArray();
+  picking = false;
+  $('pick').classList.remove('on');
+  $('fox').classList.remove('picking');
+  setGizmo('rotate');
+  status('已接上，可用旋轉把手或「後傾」調方向');
+  e.stopPropagation();
+}, true);
+
+// sliders
+function bind(id, onInput) {
+  const el = $(id), out = el.nextElementSibling;
+  const show = () => { out.textContent = (+el.value).toFixed(el.step < 1 ? 2 : 0); };
+  el.addEventListener('input', () => { show(); onInput(+el.value); });
+  return { set(v) { el.value = v; show(); } };
+}
+const sliders = {};
+for (const k of KEYS) sliders[k] = bind(k, v => { F.rig[k] = v; F.rebuildTails(); });
+const count = bind('count', v => { F.set({ tails: v }); });
+function load(rig) {
+  KEYS.forEach(k => sliders[k].set(rig[k]));
+  count.set(1);
+}
+load(F.rig);
+
+$('anim').onclick = () => {
+  F.edit.frozen = !F.edit.frozen;
+  $('anim').classList.toggle('on', !F.edit.frozen);
+  $('anim').textContent = F.edit.frozen ? '播放動作' : '停止動作';
+  if (F.edit.frozen) F.restPose();
+};
+$('reset').onclick = () => {
+  Object.assign(F.rig, JSON.parse(JSON.stringify(saved)));
+  F.rebuildTails();
+  load(F.rig);
+  status('已還原到開啟時的設定');
+};
+
+$('save').onclick = async () => {
+  // joint in the fox's own space, so regenerating the model (bones move) doesn't move the tail
+  const fox = F.parts.fox;
+  fox.updateMatrixWorld(true);
+  const pos = fox.worldToLocal(anchor.getWorldPosition(new THREE.Vector3()));
+  const quat = fox.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(anchor.getWorldQuaternion(new THREE.Quaternion()));
+  const body = { anchorModel: pos.toArray().map(v => +v.toFixed(4)), anchorQuatModel: quat.toArray().map(v => +v.toFixed(5)) };
+  KEYS.forEach(k => { body[k] = F.rig[k]; });
+  try {
+    const res = await fetch('api/fox3d-rig?model=' + encodeURIComponent(model), { method: 'POST', body: JSON.stringify(body) }).then(r => r.json());
+    status(res.saved ? `已儲存到 ${res.saved}` : '儲存失敗：' + res.error);
+  } catch (err) { status('儲存失敗：' + err.message); }
+};
+
+function status(t) { $('status').textContent = t; }
+</script>
+</body>
+</html>

@@ -106,6 +106,20 @@ html, body {
 #petWrap.adult .pet-scale { transform: scale(1); }
 /* whole-fox art already encodes growth size */
 #petWrap.baked .pet-scale { transform: none; }
+/* 3D fox: fox3d.js scales the model per stage; canvas is larger than the box so fanned tails fit */
+#petWrap.r3d .pet-scale { transform: none; }
+.fox.three .fox-body, .fox.three .tails { display: none; }
+.fox.three.flip { transform: none; } /* the 3D fox turns to face its walking direction instead */
+/* 3D: drag the fox to turn it, drag the ground to lead it — no page scrolling under the finger */
+.fox.three { touch-action: none; cursor: grab; }
+#stage { touch-action: none; }
+/* tail count by hand (top-right of the stage); "auto" lights up while the weeks decide */
+.tail-ctl { position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; background: #ffffffcc; box-shadow: 0 2px 8px #0001; font-size: 14px; z-index: 5; }
+.tail-ctl button { width: 30px; height: 30px; border: 0; border-radius: 50%; background: #fff; color: #4a2e2a; font: inherit; font-size: 16px; cursor: pointer; }
+.tail-ctl b { min-width: 1.6em; text-align: center; color: #4a2e2a; }
+.tail-ctl button.auto { width: auto; padding: 0 10px; border-radius: 999px; font-size: 12px; background: #f08a3c; color: #fff; }
+.tail-ctl.manual button.auto { background: #fff; color: #4a2e2a; }
+.fox canvas.fox3d { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; pointer-events: none; }
 .shadow { width: 55%; height: 12px; margin: -14px auto 0; background: #0000001f; border-radius: 50%; }
 
 /* fox = tails layer behind + body sprite */

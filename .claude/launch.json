@@ -4,8 +4,20 @@
     {
       "name": "ipet",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["server.py", "8000"],
+      "runtimeArgs": [
+        "server.py",
+        "8000"
+      ],
       "port": 8000
+    },
+    {
+      "name": "anichk",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "tools/anichk/serve.py",
+        "8131"
+      ],
+      "port": 8131
     }
   ]
 }

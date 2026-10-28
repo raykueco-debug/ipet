@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<title>2D／3D 靈動度比較</title>
+<style>
+  :root { --bg: #fdf3e6; --panel: #fff; --ink: #4a2e2a; --line: #e8d5c0; --accent: #f08a3c; --sky: #cfe8fb; --grass: #a8dc8a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 15px system-ui, "Noto Sans TC", sans-serif; }
+  header { padding: 14px 16px 6px; }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; opacity: .7; }
+  .moods { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px 14px; }
+  .moods button { font: inherit; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  .moods button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .card h2 { margin: 0; padding: 10px 14px; font-size: 15px; border-bottom: 1px solid var(--line); }
+  .stage { position: relative; aspect-ratio: 1; background: linear-gradient(var(--sky), #fff7ea 70%, var(--grass) 70%); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .stage img { width: 74%; transform-origin: 50% 92%; animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.02, 0.98); } }
+  #fox { position: relative; width: 74%; aspect-ratio: 1; margin-top: 4%; touch-action: none; }
+  #fox canvas.fox3d { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; pointer-events: none; }
+  footer { padding: 0 16px 20px; opacity: .75; line-height: 1.6; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+</style>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+</head>
+<body>
+<header>
+  <h1>2D／3D 靈動度比較</h1>
+  <p>同一個表情：左邊是 2D 原圖，右邊是 3D 在演。滑鼠移動時 3D 會看著游標；在 3D 上左右拖曳可以轉動。</p>
+</header>
+<div class="moods" id="moods"></div>
+<div class="row">
+  <div class="card"><h2>2D 原圖</h2><div class="stage"><img id="sprite" alt=""></div></div>
+  <div class="card"><h2>3D</h2><div class="stage"><div id="fox" class="fox three"></div></div></div>
+</div>
+<footer>驗證項目：耳朵和尾巴的彈簧晃動、眼睛和頭跟著游標、開心／驚訝／生氣的演技（預備 → 誇張 → 回彈、擠壓拉伸）、漫畫符號與臉紅。<br>
+不會循環的表情（驚訝、生氣、好奇）每 2.5 秒重播一次。</footer>
+
+<script type="module">
+const MOODS = [
+  ['happy', '開心', 'assets/fox/t1/happy.png'],
+  ['surprised', '驚訝', 'assets/fox/t1/surprised.png'],
+  ['angry', '生氣', 'assets/fox/t1/angry.png'],
+  ['love', '喜歡', 'assets/fox/t1/d04/pet_happy.png'],
+  ['curious', '好奇', 'assets/fox/t1/puzzled.png'],
+  ['sad', '難過', 'assets/fox/t1/sulky.png'],
+  ['normal', '平常', 'assets/fox/t1/normal.png'],
+];
+const REPLAY = { surprised: 1, angry: 1, curious: 1 };
+const bar = document.getElementById('moods');
+let replay = 0;
+
+await import('./fox3d.js');
+await Fox3D.ready;
+
+function pick(name) {
+  const [, , img] = MOODS.find(m => m[0] === name);
+  document.getElementById('sprite').src = img;
+  bar.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === name));
+  Fox3D.set({ mood: name, tails: 1 });
+  Fox3D.perform(name === 'normal' ? null : name);
+  clearInterval(replay);
+  if (REPLAY[name]) replay = setInterval(() => Fox3D.perform(name), 2500);
+}
+for (const [name, label] of MOODS) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.dataset.m = name;
+  b.onclick = () => pick(name);
+  bar.appendChild(b);
+}
+pick('happy');
+</script>
+</body>
+</html>

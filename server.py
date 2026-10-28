@@ -15,6 +15,7 @@ Endpoints (all JSON unless noted):
   GET  /api/tts/status     {provider}
   GET  /api/voices         local voices + current choice (audition page)
   POST /api/voice-config   {lang, model, voice, speed}
+  POST /api/fox3d-rig?model=   tail attachment from tools/rig_editor.html -> assets/fox3d/<model>/rig.json
 
 TTS providers (TTS_PROVIDER=local|azure|openai forces one; otherwise the first available wins):
   local   Kokoro via sherpa-onnx, models in models/ – the same engine the iOS app can bundle (default)
@@ -278,6 +279,15 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"error": str(e)}, 400)
             threading.Thread(target=warm_lines, daemon=True).start()
             return self._json(cfg)
+
+        if u.path == "/api/fox3d-rig":  # tools/rig_editor.html → assets/fox3d/<model>/rig.json
+            model = parse_qs(u.query).get("model", [""])[0]
+            if not re.fullmatch(r"[a-z0-9_-]*", model):
+                return self._json({"error": "bad model"}, 400)
+            path = os.path.join(ROOT, "assets", "fox3d", model, "rig.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(body, f, ensure_ascii=False, indent=1)
+            return self._json({"saved": os.path.relpath(path, ROOT)})
 
         fam = load(fam_code)
         if u.path == "/api/schedule":
