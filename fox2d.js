@@ -15,7 +15,7 @@
   const ROOT = 'assets/fox/clips/';
   const FPS = 16;
   const MOODS = ['happy', 'love', 'surprised', 'curious', 'sad', 'angry'];
-  const ACTIONS = { look_around: 3, tilt_left: 2, tilt_right: 2, look_up: 2, yawn: 1.5, stretch: 1 }; // weights
+  const ACTIONS = { look_around: 3, tilt_left: 2, tilt_right: 2, look_up: 2, yawn: 1.5, stretch: 1, paw: 0 }; // weights (0: only on cue)
   const FACES = ['ahead', 'happy', 'up', 'back']; // walk loop variants; the plain loop plays most
   const WALK = ['normal_to_walk', 'normal_to_walk_r', 'walk_loop', 'walk_r_loop', 'walk_turn', 'walk_r_turn',
                 'walk_to_normal', 'walk_r_to_normal'];
@@ -37,6 +37,7 @@
   let cur = null, i = 0, hold = 0;
   let homeLoops = 0, nextIdle = 3, action = null; // idle actions at home
   let poked = false;  // a tap asked for an action: play one as soon as the fox is home
+  let cue = null;     // that action, when it was named (play())
   let rubbing = false; // a finger is rubbing the head
   let eating = false;  // a bowl is in front of it: lean down and eat (tools/wan_eat.sh)
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
@@ -68,7 +69,7 @@
   const mood = () => (eating && clips.eat_loop ? 'eat' : rubbing ? 'love' : want);
 
   function pickAction() {
-    let ready = Object.keys(ACTIONS).filter(a => clips[`normal_to_${a}`] && clips[`${a}_to_normal`]);
+    let ready = Object.keys(ACTIONS).filter(a => ACTIONS[a] && clips[`normal_to_${a}`] && clips[`${a}_to_normal`]);
     if (ready.length > 1) ready = ready.filter(a => a !== action); // never the same one twice in a row
     if (!ready.length) return null;
     let r = Math.random() * ready.reduce((n, a) => n + ACTIONS[a], 0);
@@ -105,9 +106,10 @@
     if (isWalk(at)) return `${at}_to_normal`;                    // stopped: turn to us and sit down
     if (isAction(at)) return `${at}_to_normal`;                 // actions always go back home
     if (at === 'normal') {
-      if (poked) { // tapped: an action first, whatever the mood
+      if (poked) { // tapped (or cued): an action first, whatever the mood
         poked = false;
-        action = pickAction();
+        action = cue && clips[`normal_to_${cue}`] && clips[`${cue}_to_normal`] ? cue : pickAction();
+        cue = null;
         if (action) return `normal_to_${action}`;
       }
       if (mood() !== 'normal') return `normal_to_${mood()}`;
@@ -180,7 +182,7 @@
     for (const c of WALK) await load(c);
     for (const m of MOODS) { await load(`${m}_loop`); await load(`normal_to_${m}`); await load(`${m}_to_normal`); }
     await load('love_loop_rub');
-    for (const c of ['normal_to_eat', 'eat_loop', 'eat_to_normal']) await load(c);
+    for (const c of ['normal_to_eat', 'eat_loop', 'eat_to_normal', 'normal_to_paw', 'paw_to_normal']) await load(c);
     for (const f of FACES) { await load(`walk_loop_${f}`); await load(`walk_r_loop_${f}`); }
   }
 
@@ -190,6 +192,8 @@
       if (want !== 'normal') { load(`normal_to_${want}`); load(`${want}_loop`); load(`${want}_to_normal`); }
     },
     poke() { poked = true; },       // a tap: a random idle action next (from any mood: home first)
+    play(a) { cue = a; poked = true; }, // that action next (e.g. 'paw' to bat the ball)
+    get canPlay() { return !!(clips.normal_to_paw && clips.paw_to_normal); },
     rub(on) { rubbing = !!on; },    // finger rubbing the head: the petted loop until it stops
     // the head follows the rubbing finger a little (x, y: finger offset from the head, about -1…1);
     // nudge() with no arguments lets it settle back

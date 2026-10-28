@@ -23,6 +23,7 @@ declare -A GO=(
   [look_up]='牠抬起頭往上看，好像看到天上有什麼東西'
   [yawn]='牠閉上眼睛、抬起頭，張大嘴巴打一個大大的哈欠'
   [stretch]='牠前腳往前伸、屁股翹高，舒服地伸一個大懶腰'
+  [paw]='牠開心地舉起一隻前腳，往前輕輕一撥，像在撥弄地上的小球'
 )
 declare -A BACK=(
   [look_around]='牠把頭轉回前方，恢復平常乖乖坐好的樣子'
@@ -31,6 +32,7 @@ declare -A BACK=(
   [look_up]='牠把頭放低看回前方，恢復平常乖乖坐好的樣子'
   [yawn]='牠闔上嘴巴、睜開眼睛，恢復平常乖乖坐好的樣子'
   [stretch]='牠收回前腳、坐回原位，恢復平常乖乖坐好的樣子'
+  [paw]='牠把舉起的前腳放下，恢復平常乖乖坐好的樣子'
 )
 run() { # input  suffix  prompt  end-image
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$1" --length 17 --fps 16 \

@@ -193,7 +193,13 @@
     // play with it a bit
     for (let k = 0, n = 3 + Math.floor(Math.random() * 3); k < n; k++) {
       if (run !== fetchRun) return;
-      setExpr('play', 1300);
+      if (Fox2D.canPlay) { // paw up: the ball goes when the paw is at the top
+        Fox2D.play('paw');
+        for (let i = 0; i < 60 && !(Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14); i++) {
+          await wait(50);
+          if (run !== fetchRun) return;
+        }
+      } else setExpr('play', 1300);
       const toFox = foxX - b.x;
       b.mode = 'free';
       b.vx = Math.abs(toFox) > 12 ? Math.sign(toFox) * 30 : rand(-35, 35);

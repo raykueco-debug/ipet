@@ -18,7 +18,7 @@ from scipy import ndimage
 
 IN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'assets', 'fox', 'wan_in')
 GREEN = (0, 255, 0)
-SCALE = {'look_up': 0.93, 'angry': 1.0}  # legs not measured well in these: scale from the fox's height instead
+SCALE = {'look_up': 0.93, 'angry': 1.0, 'paw': 0.92}  # legs not measured well in these: scale from the fox's height instead
 
 
 def legs(im):

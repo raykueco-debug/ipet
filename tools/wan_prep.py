@@ -31,6 +31,7 @@ POSES = {
     'tilt_right': 'assets/fox/t1/d03/tilt_right.png', 'look_up': 'assets/fox/t1/d03/look_up.png',
     'yawn': 'assets/fox/t1/d07/yawn.png', 'stretch': 'assets/fox/t1/d07/stretch.png',
     'walk': 'assets/fox/t1/d07/get_up.png',  # standing, side-on, facing left: the walk loop's anchor
+    'paw': 'assets/fox/t1/d03/paw_up.png',  # sitting, one front paw up: batting the ball
 }
 # facing right = the left picture flipped on the canvas, so the player can flip left-facing frames exactly
 FLIPPED = {'walk_r': 'walk'}
