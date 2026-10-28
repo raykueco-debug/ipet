@@ -116,6 +116,7 @@
       const faces = FACES.map(f => `${at}_loop_${f}`).filter(c => clips[c]);
       if (faces.length) return faces[Math.floor(Math.random() * faces.length)];
     }
+    if (MOODS.includes(at) && clips[`${at}_loop_2`] && Math.random() < 0.4) return `${at}_loop_2`; // a mood's other loop
     return `${at}_loop`;
   }
 
@@ -232,7 +233,7 @@
     const names = [
       ...Object.keys(ACTIONS).flatMap(a => [`normal_to_${a}`, `${a}_to_normal`]),
       ...WALK,
-      ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`]),
+      ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`, `${m}_loop_2`]),
       'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal', 'eat_loop_drink',
       ...Object.keys(ACTIONS).map(a => `${a}_loop`), // poses with a loop of their own (the rest just 404)
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',

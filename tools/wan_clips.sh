@@ -8,7 +8,7 @@
 #   <mood>_to_normal     mood → normal     17 frames, leaving it
 # A change from mood A to mood B plays A_to_normal then normal_to_B ("normal" is the hub).
 # Output: assets/fox/clips/<clip>/frame_XX.webp (keyed) + meta.json; check them in anichk (tools/anichk).
-# usage: [MOODS="curious sad"] bash tools/wan_clips.sh [seed] [loops|transitions|all|talk|home]
+# usage: [MOODS="curious sad"] bash tools/wan_clips.sh [seed] [loops|transitions|all|talk|home|moods2]
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1  # the tool prints ▶ ✔ ✘; the cp950 console crashed on them
 export TIVOT_GEN=512x512 TIVOT_FIT=1.0      # keep wan_prep.py's framing exactly (no re-crop, no re-scale)
@@ -57,6 +57,21 @@ if [ "$WHAT" = talk ]; then
   run "$IN/normal.png" _loop_talk 25 "${FOX}牠開心地對著你說話，小嘴巴一張一合，頭輕輕點動，表情生動。最後回到開始的姿勢。$KEEP"
   echo "=== normal_loop_listen $(date +%T)"
   run "$IN/normal.png" _loop_listen 25 "${FOX}牠專心地聽你說話，頭微微歪向一邊又回來，耳朵轉動，眼睛眨一眨。最後回到開始的姿勢。$KEEP"
+fi
+# a second loop for each mood (same picture), so a mood that lasts doesn't repeat one way
+if [ "$WHAT" = moods2 ]; then
+  declare -A MOVE2=(
+    [happy]='牠開心地笑著，頭左右輕輕歪動，尾巴大大地搖，耳朵抖動'
+    [love]='牠幸福地瞇著眼，臉頰輕輕往一邊蹭，身體慢慢搖，尾巴緩緩擺'
+    [surprised]='牠驚訝地眨眨大眼睛，耳朵抖一下，頭往後縮一點又回來'
+    [curious]='牠好奇地把頭歪向另一邊，鼻子動一動，耳朵往前豎'
+    [sad]='牠委屈地低著頭，耳朵垂著，偶爾抬眼看你一下，輕輕嘆氣'
+    [angry]='牠氣呼呼地鼓起臉頰，跺一下前腳，尾巴用力甩'
+  )
+  for m in happy love surprised curious sad angry; do
+    echo "=== ${m}_loop_2 $(date +%T)"
+    run "$IN/$m.png" _loop_2 25 "$FOX${MOVE2[$m]}。臉部表情維持${NAME[$m]}的樣子。最後回到開始的姿勢。$KEEP"
+  done
 fi
 # more home-pose loops, so the pose it is in most of the time doesn't repeat one way
 if [ "$WHAT" = home ]; then
