@@ -6,6 +6,7 @@
 #   walk_to_normal / walk_r_to_normal   stop → turn to us → sit down       25 frames
 #   walk_turn / walk_r_turn             turn round: left → right / right → left   17 frames
 #   walk[_r]_loop_<face>               walk loops that do something with the face mid-stride (same anchor)
+#   walk[_r]_loop_push                 standing: dip the head and push the ball with the nose (same anchor)
 # Every change of direction is an animation: nothing is flipped in the player.
 # The player moves the fox across the room while a walk loop plays.
 # usage: bash tools/wan_walk.sh [seed] [clip …]   (no clips: all)
@@ -75,5 +76,38 @@ for f in ahead happy up back; do
       run "$IN/$d.png" "_loop_$f" 25 "${FOX}牠側身朝畫面${side}邊，在原地踏步走路，像在跑步機上一樣，四隻腳交替輕快地邁步，${FACE[$f]}。身體位置不前進、不移動。最後回到開始的姿勢。$KEEP"
     fi
   done
+done
+# walking to / from the viewer (pictures walk_front, walk_back): for going deeper or nearer on the ground
+if want walk_front_loop; then
+  echo "=== walk_front_loop $(date +%T)"
+  run "$IN/walk_front.png" _loop 25 "${FOX}牠面向你，在原地踏步走路，像在跑步機上一樣，四隻腳交替輕快地邁步，身體隨步伐輕輕起伏，尾巴擺動。身體位置不前進、不移動、大小不變。最後回到開始的姿勢。$KEEP"
+fi
+if want walk_back_loop; then
+  echo "=== walk_back_loop $(date +%T)"
+  run "$IN/walk_back.png" _loop 25 "${FOX}牠背對你，在原地踏步走路，像在跑步機上一樣，四隻腳交替輕快地邁步，大尾巴左右擺動。身體位置不前進、不移動、大小不變。最後回到開始的姿勢。$KEEP"
+fi
+if want normal_to_walk_front; then
+  echo "=== normal_to_walk_front $(date +%T)"
+  run "$IN/normal.png" _to_walk_front 25 "${FOX}牠原本坐著，站起來，抬起一隻前腳準備朝你走過來。動作自然流暢。$KEEP" "$IN/walk_front.png"
+fi
+if want walk_front_to_normal; then
+  echo "=== walk_front_to_normal $(date +%T)"
+  run "$IN/walk_front.png" _to_normal 25 "${FOX}牠停下腳步，乖乖坐下，恢復平常乖乖坐好的樣子。動作自然流暢。$KEEP" "$IN/normal.png"
+fi
+if want normal_to_walk_back; then
+  echo "=== normal_to_walk_back $(date +%T)"
+  run "$IN/normal.png" _to_walk_back 25 "${FOX}牠原本面向你坐著，站起來，轉身背對你，準備往遠處走。動作自然流暢。$KEEP" "$IN/walk_back.png"
+fi
+if want walk_back_to_normal; then
+  echo "=== walk_back_to_normal $(date +%T)"
+  run "$IN/walk_back.png" _to_normal 25 "${FOX}牠原本背對你站著，轉過身來面向你，然後乖乖坐下。動作自然流暢。$KEEP" "$IN/normal.png"
+fi
+# nudging the ball: standing, a dip of the head and a push forward with the nose, back to standing
+for d in walk walk_r; do
+  side=左; [ $d = walk_r ] && side=右
+  if want ${d}_loop_push; then
+    echo "=== ${d}_loop_push $(date +%T)"
+    run "$IN/$d.png" _loop_push 25 "${FOX}牠側身朝畫面${side}邊站著，低下頭，用鼻子和額頭往前輕輕一頂，像在頂地上的大球玩耍，然後抬起頭站好。四隻腳留在原地。最後回到開始的姿勢。$KEEP"
+  fi
 done
 echo "=== all done $(date +%T)"

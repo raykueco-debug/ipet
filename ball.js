@@ -1,7 +1,8 @@
 /* A ball to throw. Drag it and let go: it flies on the 2.5D ground (left/right, depth and height), bounces,
-   rolls and stops — always settling the same way up, so the fox's pick-up always meets the same picture.
-   The fox fetches it, brings it back (it doesn't hand it over), plays with it a while, leaves it aside and asks
-   for the toys to be put away: only dropping the ball in the basket puts it back home.
+   rolls and slows to a stop on its own (a football: it looks the same whichever way up it stops).
+   The ball is too big to carry: the fox goes to it and plays — nudges it about with its nose, now and then bats
+   it with a paw — then sits by it and asks for the toys to be put away. It never brings it back: only the
+   player dropping it in the basket puts it home.
 
    World: x in % of the stage width, z = depth 0 (front) … 1 (back), h = height above the ground in % of the
    stage height (app.js: groundAt / sizeAt / layerAt). Art: assets/scene/toys/ball.png and basket.png once
@@ -10,7 +11,6 @@
   const G = 300, BOUNCE = 0.5, ROLL = 2.4, AIR = 0.15;   // gravity %/s², energy kept per bounce, friction /s
   const SIZE = 0.14;                                       // ball width as a share of the stage width, at z 0
   const BASKET = { x: 86, z: 0.04 };                       // where the basket stands
-  const MOUTH = { x: 0.49, y: 0.52 };                      // ball in the mouth: point in the fox picture (walk pose)
   const stage = document.getElementById('stage');
 
   const art = (name, drawn) => {
@@ -24,10 +24,11 @@
     return d;
   };
   const OUT = '#4a3a2a';
-  const ballEl = art('ball', `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="#ff6b5b" stroke="${OUT}" stroke-width="5"/>
-    <path d="M6 50 Q50 30 94 50 Q50 70 6 50Z" fill="#fff6e8" stroke="${OUT}" stroke-width="4"/>
-    <path d="M50 38 l4 8 9 1 -7 6 2 9 -8 -5 -8 5 2 -9 -7 -6 9 -1Z" fill="#ffd84d"/>
-    <circle cx="32" cy="26" r="7" fill="#ffffff" opacity=".7"/></svg>`);
+  const ballEl = art('ball', `<svg viewBox="0 0 100 100"><defs><clipPath id="ballClip"><circle cx="50" cy="50" r="45"/></clipPath></defs>
+    <circle cx="50" cy="50" r="46" fill="#fdfdf8"/>
+    <g clip-path="url(#ballClip)"><polygon points="50.0,35.0 64.3,45.4 58.8,62.1 41.2,62.1 35.7,45.4" fill="#2b2b33"/><line x1="50.0" y1="35.0" x2="50.0" y2="23.0" stroke="#2b2b33" stroke-width="2.5"/><line x1="64.3" y1="45.4" x2="75.7" y2="41.7" stroke="#2b2b33" stroke-width="2.5"/><line x1="58.8" y1="62.1" x2="65.9" y2="71.8" stroke="#2b2b33" stroke-width="2.5"/><line x1="41.2" y1="62.1" x2="34.1" y2="71.8" stroke="#2b2b33" stroke-width="2.5"/><line x1="35.7" y1="45.4" x2="24.3" y2="41.7" stroke="#2b2b33" stroke-width="2.5"/><polygon points="57.1,4.3 61.4,17.7 50.0,26.0 38.6,17.7 42.9,4.3" fill="#2b2b33"/><polygon points="91.3,29.2 95.7,42.6 84.2,50.9 72.8,42.6 77.2,29.2" fill="#2b2b33"/><polygon points="78.2,69.4 82.6,82.8 71.2,91.1 59.7,82.8 64.1,69.4" fill="#2b2b33"/><polygon points="35.9,69.4 40.3,82.8 28.8,91.1 17.4,82.8 21.8,69.4" fill="#2b2b33"/><polygon points="22.8,29.2 27.2,42.6 15.8,50.9 4.3,42.6 8.7,29.2" fill="#2b2b33"/></g>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#4a3a2a" stroke-width="5"/>
+    <path d="M22 30 a34 34 0 0 1 22 -16" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none" opacity=".8"/></svg>`);
   const shadowEl = document.createElement('div');
   shadowEl.className = 'toy-shadow';
   stage.appendChild(shadowEl);
@@ -37,7 +38,7 @@
 
   const b = { x: BASKET.x, z: BASKET.z, h: 0, vx: 0, vz: 0, vh: 0, spin: 0, mode: 'home' };
   let fetchRun = 0; // bumps when a fetch is called off (the ball was grabbed)
-  let busy = false;  // fetching / playing: the fox doesn't wander off meanwhile
+  let busy = false;  // playing with it: the fox doesn't wander off meanwhile
 
   const W = () => stage.clientWidth, H = () => stage.clientHeight;
   function place(elm, x, z, h, w) {
@@ -48,20 +49,9 @@
   }
   function render() {
     const w = W() * SIZE * sizeAt(b.z);
-    if (b.mode === 'mouth') { // in the fox's mouth: a point of its picture
-      const r = document.getElementById('fox').getBoundingClientRect(), s = stage.getBoundingClientRect();
-      const bw = r.width * 0.3;
-      ballEl.style.left = ((r.left + r.width * MOUTH.x - s.left) / s.width) * 100 + '%';
-      ballEl.style.bottom = ((s.bottom - (r.top + r.height * MOUTH.y) - bw * 0.35) / s.height) * 100 + '%';
-      ballEl.style.width = bw + 'px';
-      ballEl.style.zIndex = layerAt(foxZ) + 2;
-      ballEl.style.transform = 'translateX(-50%)';
-      shadowEl.style.opacity = 0;
-      return;
-    }
     const home = b.mode === 'home';
-    place(ballEl, b.x, b.z, home ? 3.5 : b.h, w * (home ? 0.8 : 1));
-    if (home) ballEl.style.zIndex = layerAt(BASKET.z); // sits in the basket, behind its front rim
+    place(ballEl, b.x, b.z, home ? 5 : b.h, w * (home ? 0.75 : 1));
+    if (home) ballEl.style.zIndex = layerAt(BASKET.z) + 2; // sits in the basket's mouth, its top showing
     ballEl.style.transform = `translateX(-50%) rotate(${b.spin}deg)`;
     place(shadowEl, b.x, b.z, 0, w * Math.max(0.4, 1 - b.h / 30));
     shadowEl.style.zIndex = layerAt(b.z);
@@ -93,19 +83,16 @@
   }
   setInterval(step, 1000 / 60); // a fixed clock, like fox2d.js (rAF stops while the page is hidden)
 
-  function settle() { // stopped: turn the same way up (every throw ends on one picture) and tell the fox
+  function settle() { // rolled to a stop (a football looks the same whichever way up it stops)
     b.mode = 'rest';
     b.vx = b.vz = b.vh = 0;
-    b.spin = 0;
-    ballEl.style.transition = 'transform .25s ease-out';
-    setTimeout(() => (ballEl.style.transition = ''), 260);
     if (b.after) { const f = b.after; b.after = null; f(); }
   }
 
   // grab and throw: the finger's speed when it lets go is the throw; upwards on the screen = deeper
   let drag = null;
   ballEl.addEventListener('pointerdown', e => {
-    if (b.mode === 'mouth' || !window.Fox2D) return;
+    if (!window.Fox2D) return;
     e.stopPropagation();
     try { ballEl.setPointerCapture(e.pointerId); } catch (err) {} // (no capture for a synthetic pointer)
     callOff();
@@ -123,7 +110,6 @@
     const s = stage.getBoundingClientRect();
     b.x = Math.max(4, Math.min(96, ((e.clientX - s.left) / s.width) * 100));
     b.h = Math.max(0, ((s.bottom - e.clientY) / s.height) * 100 - groundAt(b.z) - 4);
-    b.spin = 0;
   }
   const letGo = e => {
     if (!drag) return;
@@ -147,7 +133,7 @@
   function putAway() {
     const wasOut = b.mode !== 'home';
     b.mode = 'home';
-    b.x = BASKET.x; b.z = BASKET.z; b.h = 0; b.spin = 0;
+    b.x = BASKET.x; b.z = BASKET.z; b.h = 0;
     basketEl.classList.remove('ask');
     clearInterval(remind);
     if (wasOut && asked) {
@@ -160,63 +146,70 @@
     }
   }
 
-  // the fox's part
+  // the fox's part: it plays with the ball (too big to carry) — goes to it, nudges it about with its nose,
+  // now and then sits and bats it with a paw — and leaves it where it ends up for the player to tidy away
   const wait = ms => new Promise(r => setTimeout(r, ms));
   let asked = false, remind = 0;
   function callOff() { // the ball was grabbed: whatever the fox was doing with it, stop
     fetchRun++;
     busy = false;
     if (walkTarget) { walkTarget = null; Fox2D.stop(); }
-    if (b.mode === 'mouth') b.mode = 'rest';
   }
   const sat = () => Fox2D.state.clip === 'normal_loop';
-  async function untilSat(run) { for (let k = 0; k < 60 && !sat(); k++) { await wait(100); if (run !== fetchRun) return false; } return run === fetchRun; }
-  const walkThere = (x, z, run) => new Promise(ok => { if (!walk2d(x, z, () => ok(run === fetchRun))) ok(false); });
+  async function until(test, run, ms = 6000) {
+    for (let k = 0; k < ms / 50 && !test(); k++) { await wait(50); if (run !== fetchRun) return false; }
+    return run === fetchRun;
+  }
+  const walkThere = (x, z, run, keep) => new Promise(ok => { if (!walk2d(x, z, () => ok(run === fetchRun), keep)) ok(false); });
+  const rolled = run => until(() => b.mode === 'rest' || b.mode === 'home', run, 5000);
 
   async function fetch() {
     const run = ++fetchRun;
     busy = true;
-    try { await fetchAndPlay(run); } finally { if (run === fetchRun) busy = false; }
+    try { await play(run); } finally { if (run === fetchRun) busy = false; }
   }
-  async function fetchAndPlay(run) {
+  async function play(run) {
     if (!S.hatched || S.sleeping || !Fox2D.canWalk) return;
     while (eating) { await wait(500); if (run !== fetchRun) return; }
-    // go to the ball: stand right behind it, so it is under the fox's mouth
-    if (!(await walkThere(b.x, Math.min(1, b.z + 0.04), run))) return;
-    b.mode = 'mouth'; // (a pick-up clip goes here once it is made)
-    // carry it back to the middle — not to the player — and sit
-    if (!(await walkThere(50 + rand(-12, 12), 0.2 + Math.random() * 0.15, run))) return;
-    if (!(await untilSat(run))) return;
-    b.mode = 'free';
-    b.x = foxX; b.z = Math.max(0, foxZ - 0.06); b.h = 4; b.vx = rand(-6, 6); b.vz = -0.05; b.vh = 10;
-    await wait(1200);
-    // play with it a bit
     for (let k = 0, n = 3 + Math.floor(Math.random() * 3); k < n; k++) {
-      if (run !== fetchRun) return;
-      if (Fox2D.canPlay) { // paw up: the ball goes when the paw is at the top
+      if (!(await rolled(run))) return;
+      const sitAndBat = k > 0 && Fox2D.canPlay && Math.random() < 0.3;
+      // come up to the ball from the side the fox is on; its head (the middle of its picture) over the ball
+      const from = foxX >= b.x ? 1 : -1, s = sizeAt(b.z);
+      if (!(await walkThere(b.x + from * (sitAndBat ? 2 : 4) * s, Math.min(1, b.z + 0.04), run, !sitAndBat))) return;
+      if (sitAndBat) { // sit, paw up: the ball goes when the paw is at the top
+        if (!(await until(sat, run))) return;
         Fox2D.play('paw');
-        for (let i = 0; i < 60 && !(Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14); i++) {
-          await wait(50);
-          if (run !== fetchRun) return;
-        }
-      } else setExpr('play', 1300);
-      const toFox = foxX - b.x;
-      b.mode = 'free';
-      b.vx = Math.abs(toFox) > 12 ? Math.sign(toFox) * 30 : rand(-35, 35);
-      b.vz = rand(-0.15, 0.15); b.vh = rand(20, 45);
-      await wait(1500 + Math.random() * 800);
+        if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 4000))) return;
+        kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
+      } else if (Fox2D.canPush) { // standing: dip the head and push it with the nose
+        Fox2D.nudge_ball();
+        if (!(await until(() => Fox2D.state.pushing && Fox2D.state.frame >= 12, run, 5000))) return;
+        kick(-from, 40, 10);
+      } else { // (no push clip yet)
+        setExpr('play', 1200);
+        await wait(500);
+        kick(-from, 40, 10);
+      }
+      await wait(600);
     }
-    if (run !== fetchRun) return;
-    // done: push it aside and ask for the toys to be put away
-    b.mode = 'free';
-    b.vx = (b.x < 50 ? -1 : 1) * rand(40, 60); b.vz = rand(-0.2, 0.1); b.vh = 15;
-    await wait(1800);
-    if (run !== fetchRun || b.mode === 'home') return;
+    if (!(await rolled(run))) return;
+    // had enough: sit down by it and ask for the toys to be put away
+    Fox2D.stop();
+    if (!(await until(sat, run))) return;
+    if (b.mode === 'home') return;
     asked = true;
     say(t('tidyAsk'), 3200);
     basketEl.classList.add('ask');
     clearInterval(remind);
     remind = setInterval(() => { if (b.mode !== 'home' && b.mode !== 'held' && !S.sleeping) say(t('tidyAsk'), 3000); }, 45000);
+  }
+  function kick(dir, speed, up) { // a nudge: this way, a bit random, away from the walls
+    b.mode = 'free';
+    if ((b.x < 15 && dir < 0) || (b.x > 85 && dir > 0)) dir = -dir;
+    b.vx = dir * speed * rand(0.7, 1.2);
+    b.vz = rand(-0.2, 0.2);
+    b.vh = up * rand(0.5, 1);
   }
 
   window.Ball = { get state() { return { ...b }; }, get busy() { return busy; }, putAway };

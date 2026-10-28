@@ -32,6 +32,7 @@ const Learn = (() => {
     S.stats.fun = clamp(S.stats.fun + (big ? 15 : 6));
     addBond(big ? 5 : 2);
     setExpr('happy', 2500);
+    if (big) window.Fox2D?.play('jump_joy');
     save();
     render();
   }
@@ -89,6 +90,7 @@ const Learn = (() => {
         b.classList.add('right');
         if (quiz.tries === 0) quiz.score++;
         $('#quizMsg').textContent = t('quizRight');
+        window.Fox2D?.play('nod'); // the 2D fox nods: yes!
         reward(false);
         speakEn(`Yes! ${w.w}!`).then(() => {
           quiz.i++;
@@ -101,6 +103,7 @@ const Learn = (() => {
         void b.offsetWidth;
         b.classList.add('wrong');
         $('#quizMsg').textContent = t('quizWrong');
+        window.Fox2D?.play('shake_no');
         speakEn(w.w);
       }
     };

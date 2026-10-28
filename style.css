@@ -96,6 +96,9 @@ html, body {
 .scene .layer { position: absolute; left: -12%; right: -12%; bottom: 0; height: 100%; transition: filter 1s; }
 .scene .layer svg, .scene .layer img { position: absolute; bottom: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom; }
 #stage.night .scene .layer { filter: brightness(.45) saturate(.6); }
+#stage.night .scene .layer-sky { opacity: 0; }
+.prop { position: absolute; transform: translateX(-50%); pointer-events: none; transition: filter 1s; }
+#stage.night .prop { filter: brightness(.45) saturate(.6); }
 /* toys (ball.js): placed on the 2.5D ground; the ball is grabbed and thrown */
 .toy { position: absolute; transform: translateX(-50%); touch-action: none; }
 .toy svg, .toy img { display: block; width: 100%; height: auto; pointer-events: none; }

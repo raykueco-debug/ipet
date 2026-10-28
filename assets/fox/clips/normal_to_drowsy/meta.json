@@ -1,0 +1,32 @@
+{
+ "name": "normal_to_drowsy",
+ "mode": "idle",
+ "style": "default",
+ "seed": 7,
+ "frames": [
+  "frame_00.webp",
+  "frame_01.webp",
+  "frame_02.webp",
+  "frame_03.webp",
+  "frame_04.webp",
+  "frame_05.webp",
+  "frame_06.webp",
+  "frame_07.webp",
+  "frame_08.webp",
+  "frame_09.webp",
+  "frame_10.webp",
+  "frame_11.webp",
+  "frame_12.webp",
+  "frame_13.webp",
+  "frame_14.webp",
+  "frame_15.webp",
+  "frame_16.webp"
+ ],
+ "fps": 16,
+ "width": 480,
+ "duration_ms": 1062.5,
+ "bytes": 404006,
+ "wan_seconds": 96,
+ "prompt": "一隻Q版的小狐狸（橘色的毛、米白色的臉頰和胸口、深褐色的耳尖與腳掌、蓬鬆的大尾巴有白色尾尖），在純綠色背景前的原地。牠坐著，漸漸覺得好睏，眼睛慢慢閉上，頭輕輕往下點。動作自然流暢。畫面裡只有這隻狐狸，沒有枕頭、沒有被子、沒有手、沒有任何特效符號（沒有 Z 字、沒有泡泡）。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。",
+ "rev": 1793203262
+}

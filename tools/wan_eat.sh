@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Eating, with the local Wan 2.2 tool — see tools/wan_clips.sh. Only the fox is in the picture: the bowl is a
 # separate layer the app puts in front of its mouth, so any food can go in it without new clips.
-#   normal_to_eat    sit → lean down to a bowl that isn't drawn          25 frames, its own ending
-#   (its last frame becomes assets/fox/wan_in/eat.png, the eating picture — tools/wan_frame.py)
+#   normal_to_eat    sit → lean down to a bowl that isn't drawn          25 frames, ends on eat.png
+#   (eat.png: GPT sheet assets/source/gpt/grid_01.png — Wan alone never leaned down far enough)
 #   eat_loop         munching with the head down                          25 → 24-frame loop
 #   eat_to_normal    head up, lick the lips, sit as before                25 frames
 # usage: bash tools/wan_eat.sh [seed]
@@ -23,11 +23,8 @@ run() { # input  suffix  prompt  [end-image]
     --seed "$SEED" --out "$OUT" --suffix "$2" --prompt "$3" "${end[@]}" 2>&1 | tail -3
 }
 cd "$COMFY/tivot_wan" || exit 1
-if [ ! -f "$IN/eat.png" ]; then
-  echo "=== normal_to_eat $(date +%T)"
-  run "$IN/normal.png" _to_eat "${FOX}牠開心地低下頭，把臉湊向自己腳前方地上的位置，像要吃面前碗裡的食物，頭停在低處。動作自然流暢。$KEEP"
-  python "$IPET/tools/wan_frame.py" normal_to_eat -1 eat || exit 1
-fi
+echo "=== normal_to_eat $(date +%T)"
+run "$IN/normal.png" _to_eat "${FOX}牠開心地低下頭，把臉湊向自己腳前方地上的位置，像要吃面前碗裡的食物，眼睛瞇起來。動作自然流暢。$KEEP" "$IN/eat.png"
 echo "=== eat_loop $(date +%T)"
 run "$IN/eat.png" _loop "${FOX}牠低著頭，開心地一口一口吃著面前的食物，嘴巴咀嚼、頭輕輕上下點動，耳朵放鬆，尾巴開心地慢慢搖。最後回到開始的姿勢。$KEEP"
 echo "=== eat_to_normal $(date +%T)"

@@ -250,6 +250,7 @@ function petPos() {
 function renderTails() {
   const n = tailCount();
   if (n === renderedTails) return;
+  if (renderedTails > 0 && n > renderedTails) window.Fox2D?.play('proud'); // a new tail: chest out
   renderedTails = n;
   el.tails.innerHTML = '';
   // baked art draws every tail itself; D01 sprites already draw one
@@ -396,6 +397,7 @@ async function eat(kind) {
   if (S.meals.meat && S.meals.veg && !S.meals.both) { // meat and veggies on the same day: a little party
     S.meals.both = true;
     addBond(5);
+    if (anim) Fox2D.play('jump_joy');
     say(t('balanced'), 3000);
     for (let k = 0; k < 5; k++) setTimeout(() => spawnFx(pick(['💗', '✨', '🌟']), p.x + rand(-14, 14), p.y), k * 180);
   } else {
@@ -446,6 +448,7 @@ const actions = {
     S.stats.clean = 100;
     addBond(1);
     setExpr('love', 1600);
+    window.Fox2D?.play('shake_dry'); // all clean: a good shake
     for (let i = 0; i < 8; i++) setTimeout(() => spawnFx('🫧', rand(15, 85), rand(45, 85)), i * 90);
     say(t('cleanDone'));
     save();
@@ -454,6 +457,7 @@ const actions = {
     if (S.sleeping) {
       S.sleeping = false;
       say(S.stats.energy < 50 ? t('stillSleepy') : t('morning'));
+      window.Fox2D?.play('wave');
       setExpr(S.stats.energy < 50 ? 'tired' : 'happy', 1500);
     } else {
       if (S.stats.energy > 80) { say(t('notSleepy')); setExpr('play', 1500); return; }
@@ -531,6 +535,7 @@ function bindRub() {
 /* ================= behaviour loop ================= */
 function wander() {
   if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil || window.Ball?.busy) return;
+  if (window.Fox2D && S.stats.hunger < 30 && Math.random() < 0.35) { Fox2D.play('hungry'); return; } // paws on its tummy
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
@@ -581,10 +586,10 @@ function placeFox() {
 /* 2D fox: it stands up, turns and walks in its own clips (fox2d.js), so the room position moves here, step by
    step, and only while a walk loop is playing — not while it gets up, turns round or sits down. It walks
    side-on even when it goes deeper or nearer (it slants across the ground and shrinks / grows). */
-function walk2d(x, z = foxZ, then) {
+function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing (stepping on the spot), don't sit
   if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
   if (eating) return true; // stays at its bowl
-  walkTarget = { x, z: clamp(z * 100) / 100, then };
+  walkTarget = { x, z: clamp(z * 100) / 100, then, keep };
   el.petWrap.style.transition = 'none';
   if (!walkClock) walkClock = setInterval(walkStep, 50);
   walkStep();
@@ -594,9 +599,9 @@ function walkStep() {
   if (walkTarget == null) return;
   const dx = walkTarget.x - foxX, dz = (walkTarget.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
   if (dist < 0.4) {
-    const then = walkTarget.then;
+    const { then, keep } = walkTarget;
     walkTarget = null;
-    Fox2D.stop();
+    if (!keep) Fox2D.stop();
     clearInterval(walkClock);
     walkClock = 0;
     if (then) then();
@@ -751,6 +756,7 @@ function hatch() {
       $('#intro').classList.add('hidden');
       render();
       say(t('hello', { name }), 3000);
+      window.Fox2D?.play('wave');
       setExpr('happy', 2500);
     }, 450);
   }, 1200);
@@ -795,6 +801,7 @@ function bind() {
     placeFox();
     const js = document.createElement('script');
     js.src = 'fox2d.js';
+    js.onload = () => Fox2D.ready.then(() => { if (S.hatched && !S.sleeping) Fox2D.play('wave'); }); // hello when the app opens
     document.head.appendChild(js);
   }
   if (RENDER_3D) {

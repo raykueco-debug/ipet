@@ -32,6 +32,25 @@ POSES = {
     'yawn': 'assets/fox/t1/d07/yawn.png', 'stretch': 'assets/fox/t1/d07/stretch.png',
     'walk': 'assets/fox/t1/d07/get_up.png',  # standing, side-on, facing left: the walk loop's anchor
     'paw': 'assets/fox/t1/d03/paw_up.png',  # sitting, one front paw up: batting the ball
+    'drowsy': 'assets/fox/t1/d08/eyes_closed.png',  # sitting, nodding off
+    'sleep': 'assets/fox/t1/d08/sleep_curl.png',     # curled up asleep
+    # GPT sheet assets/source/gpt/grid_01.png (tools/grid_split.py): eating and cute idles
+    'eat': 'assets/fox/t1/g01/eat.png', 'lick': 'assets/fox/t1/g01/lick.png', 'scratch': 'assets/fox/t1/g01/scratch.png',
+    'chase_tail': 'assets/fox/t1/g01/chase_tail.png', 'belly': 'assets/fox/t1/g01/belly.png',
+    'sneeze': 'assets/fox/t1/g01/sneeze.png', 'play_bow': 'assets/fox/t1/g01/play_bow.png', 'sniff': 'assets/fox/t1/g01/sniff.png',
+    # GPT sheet assets/source/gpt/grid_02.png: greeting, learning (yes / no / thinking), bath, cosy
+    'wave': 'assets/fox/t1/g02/wave.png', 'jump_joy': 'assets/fox/t1/g02/jump_joy.png', 'nod': 'assets/fox/t1/g02/nod.png',
+    'shake_no': 'assets/fox/t1/g02/shake_no.png', 'think': 'assets/fox/t1/g02/think.png', 'shake_dry': 'assets/fox/t1/g02/shake_dry.png',
+    'bored': 'assets/fox/t1/g02/bored.png', 'hug_tail': 'assets/fox/t1/g02/hug_tail.png', 'shy': 'assets/fox/t1/g02/shy.png',
+    # GPT sheet assets/source/gpt/grid_03.png: feelings and play
+    'clap': 'assets/fox/t1/g03/clap.png', 'peekaboo': 'assets/fox/t1/g03/peekaboo.png', 'blow_kiss': 'assets/fox/t1/g03/blow_kiss.png',
+    'hungry': 'assets/fox/t1/g03/hungry.png', 'shiver': 'assets/fox/t1/g03/shiver.png', 'proud': 'assets/fox/t1/g03/proud.png',
+    'dance': 'assets/fox/t1/g03/dance.png', 'beg': 'assets/fox/t1/g03/beg.png', 'roll': 'assets/fox/t1/g03/roll.png',
+    # GPT sheet assets/source/gpt/grid_04.png: walking to / from the viewer, the scene around it
+    'walk_front': 'assets/fox/t1/g04/walk_front.png', 'walk_back': 'assets/fox/t1/g04/walk_back.png',
+    'sit_back': 'assets/fox/t1/g04/sit_back.png', 'rest': 'assets/fox/t1/g04/rest.png', 'look_back': 'assets/fox/t1/g04/look_back.png',
+    'sleep_belly': 'assets/fox/t1/g04/sleep_belly.png', 'stretch_up': 'assets/fox/t1/g04/stretch_up.png',
+    'look_down_l': 'assets/fox/t1/g04/look_down_l.png', 'look_down_r': 'assets/fox/t1/g04/look_down_r.png',
 }
 # facing right = the left picture flipped on the canvas, so the player can flip left-facing frames exactly
 FLIPPED = {'walk_r': 'walk'}
