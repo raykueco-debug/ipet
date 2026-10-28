@@ -469,6 +469,7 @@ const actions = {
       if (S.stats.energy > 80) { say(t('notSleepy')); setExpr('play', 1500); return; }
       S.sleeping = true;
       say(t('goodnight'));
+      walk2d(BED.x, BED.z + 0.02); // off to its bed first (2D fox), then it dozes off and curls up
     }
     save();
     render();
@@ -581,6 +582,7 @@ const sizeAt = z => 1 - DEPTH.shrink * z;
 const layerAt = z => 10 + Math.round((1 - z) * 80);                // z-index
 const zFromY = y => { const r = el.stage.getBoundingClientRect(); return clamp(((r.bottom - y) / r.height * 100 - DEPTH.near) / (DEPTH.far - DEPTH.near) * 100) / 100; };
 let foxX = 50, foxZ = 0;
+const BED = { x: 20, z: 0.5 }; // its cushion in the scene (scene.js draws it here): it goes there to sleep
 function placeFox() {
   el.petWrap.style.left = foxX + '%';
   if (RENDER !== 'anim') return;

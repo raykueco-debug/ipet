@@ -109,7 +109,8 @@
   const PROPS = [ // picture, x %, depth, width as a share of the stage width (at depth 0)
     ['pine', 20, 1.25, 0.26], ['pine', 80, 1.3, 0.24], ['tree', 6, 1.12, 0.46], ['tree', 95, 1.08, 0.5],
     ['bush', 32, 1.05, 0.22], ['bush', 68, 1.06, 0.2], ['flowers', 58, 0.75, 0.13],
-    ['stump', 11, 0.3, 0.2], ['rock', 93, 0.45, 0.16], ['mushrooms', 70, 0.12, 0.12], ['flowers', 26, 0.02, 0.15],
+    ['stump', 8, 0.18, 0.18], ['rock', 93, 0.45, 0.16], ['mushrooms', 70, 0.12, 0.12], ['flowers', 40, 0.02, 0.15],
+    ['bed', BED.x, BED.z + 0.04, 0.34], ['water', BED.x + 17, BED.z, 0.11],
   ];
   Promise.all([...new Set(PROPS.map(p => p[0]))].map(n => new Promise((ok, no) => {
     const im = new Image(); im.onload = () => ok(); im.onerror = no; im.src = `assets/scene/props/${n}.png`;
@@ -126,7 +127,7 @@
       d.style.left = x + '%';
       d.style.bottom = groundAt(z) - 1.5 + '%';
       d.style.width = stage.clientWidth * w * sizeAt(z) + 'px';
-      d.style.zIndex = layerAt(z);
+      d.style.zIndex = Math.max(1, layerAt(z)); // past the back of the ground still above the drawn layers
     });
     place();
     addEventListener('resize', place);

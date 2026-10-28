@@ -57,16 +57,27 @@
       const meta = await fetch(ROOT + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null));
       if (!meta) return null;
       const v = meta.rev ? '?v=' + meta.rev : ''; // a new revision (tools/clip_fill.py) skips cached frames
-      const frames = meta.frames.map(f => { const im = new Image(); im.src = ROOT + name + '/' + f + v; return im; });
-      // wait for the first frames (onload, not decode(): decode() can hang while the page is in the background)
-      if (wait) await Promise.all(frames.slice(0, 2).map(im => new Promise(ok => {
-        if (im.complete) return ok();
-        im.onload = im.onerror = ok;
-        setTimeout(ok, 3000);
-      })));
+      // pictures are fetched only when the clip is needed (fetch()): ~150 clips × ~20 frames at once jammed the
+      // server and would cost a tablet some 60 MB up front
+      const frames = meta.frames.map(f => { const im = new Image(); im.dataset.src = ROOT + name + '/' + f + v; return im; });
       clips[name] = { name, frames, exits: meta.exits || [] };
+      if (wait) await fetchFrames(clips[name], 2);
     } catch (e) { clips[name] = null; }
     return clips[name];
+  }
+
+  // start downloading a clip's pictures; resolves once the first `upTo` (all by default) are in
+  function fetchFrames(clip, upTo = Infinity) {
+    const ims = clip.frames.map(im => {
+      if (!im.src) im.src = im.dataset.src;
+      return im;
+    }).slice(0, upTo);
+    // onload, not decode(): decode() can hang while the page is in the background
+    return Promise.all(ims.map(im => new Promise(ok => {
+      if (im.complete) return ok();
+      im.addEventListener('load', ok); im.addEventListener('error', ok);
+      setTimeout(ok, 8000);
+    })));
   }
 
   const isLoop = name => name.includes('_loop');
@@ -151,6 +162,7 @@
   function switchTo(name, skip) {
     const target = clips[name];
     if (!target) return false;
+    fetchFrames(target); // (already there, mostly: see init's prefetch)
     cur = target;
     i = skip && target.frames.length > 1 ? 1 : 0;
     return true;
@@ -160,8 +172,8 @@
     const name = next(cur.name);
     if (name === cur.name) { i = 0; return; } // keep looping
     if (switchTo(name, skip)) return;
-    // that clip isn't there yet: jump straight to a loop we have
-    for (const alt of [`${mood()}_loop`, 'normal_loop']) if (switchTo(alt, false)) return;
+    // that clip isn't there yet: keep looping where the fox is (no jump) until it is; else back home
+    for (const alt of [`${endsOn(cur.name)}_loop`, 'normal_loop']) if (switchTo(alt, false)) return;
     i = 0;
   }
 
@@ -200,8 +212,8 @@
     await load('normal_loop', true);
     switchTo('normal_loop', false);
     setInterval(tick, 1000 / FPS); // a fixed clock (rAF stops while the page is hidden)
-    // the rest in the background (their frames download on their own; draw() keeps the last picture until a
-    // frame is in), six lists at a time: what plays soonest first
+    // the rest in the background: their frame lists six at a time (small), then their pictures one clip at a
+    // time; a clip needed before its pictures are in fetches them at once, and draw() keeps the last picture
     const names = [
       ...Object.keys(ACTIONS).flatMap(a => [`normal_to_${a}`, `${a}_to_normal`]),
       ...WALK,
@@ -217,6 +229,8 @@
     let next = 0;
     const worker = async () => { while (next < names.length) await load(names[next++]); };
     await Promise.all(Array.from({ length: 6 }, worker));
+    // then their pictures, one clip at a time, in the same order (what plays soonest first) — not waited for
+    (async () => { for (const n of names) if (clips[n]) await fetchFrames(clips[n]); })();
   }
 
   window.Fox2D = {
