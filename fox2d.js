@@ -46,6 +46,7 @@
   let cue = null;     // that action, when it was named (play())
   let rubbing = false; // a finger is rubbing the head
   let eating = false;  // a bowl is in front of it: lean down and eat (tools/wan_eat.sh)
+  let talking = false; // its speech bubble is up: the home loop with the mouth moving
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
   let push = false;   // standing at the ball: nudge it with the nose next (walk[_r]_loop_push)
 
@@ -72,7 +73,8 @@
   const endsOn = name => (isLoop(name) ? name.split('_loop')[0]
     : name.endsWith('_turn') ? (name === 'walk_turn' ? 'walk_r' : 'walk') : name.split('_to_')[1]);
   const isAction = a => a in ACTIONS;
-  const isWalk = a => a === 'walk' || a === 'walk_r';
+  const VIEWS = ['walk', 'walk_r', 'walk_front', 'walk_back']; // side-on left / right, toward the viewer, away
+  const isWalk = a => VIEWS.includes(a);
   const mood = () => (eating && clips.eat_loop ? 'eat' : rubbing ? 'love' : want);
 
   function pickAction() {
@@ -86,6 +88,10 @@
   // which loop to play on picture `at` (walk loops: now and then one that does something with the face)
   function loopFor(at) {
     if (at === 'love' && rubbing && clips.love_loop_rub) return 'love_loop_rub';
+    if (at === 'normal' && talking && clips.normal_loop_talk) return 'normal_loop_talk';
+    if (at === 'normal' && !talking && clips.normal_loop_listen && Math.random() < 0.12) return 'normal_loop_listen';
+    if (at === 'sleep' && clips.sleep_to_sleep_belly && clips.sleep_belly_to_sleep && Math.random() < 0.12) return 'sleep_to_sleep_belly';
+    if (at === 'sleep_belly') return clips.sleep_belly_loop && Math.random() < 0.75 ? 'sleep_belly_loop' : 'sleep_belly_to_sleep';
     if (at === 'sleep' && clips.sleep_loop_dream && Math.random() < 0.3) return 'sleep_loop_dream';
     if (isWalk(at) && Math.random() < 0.4) {
       const faces = FACES.map(f => `${at}_loop_${f}`).filter(c => clips[c]);
@@ -99,7 +105,7 @@
     const at = endsOn(name);
     if (go) return at === go && !(push && clips[`${go}_loop_push`]);
     if (isWalk(at)) return false;
-    if (at === 'normal') return !poked && mood() === 'normal';
+    if (at === 'normal') return !poked && mood() === 'normal' && (name === 'normal_loop_talk') === (talking && !!clips.normal_loop_talk);
     if (name === 'love_loop_rub') return rubbing;
     return !poked && at === mood() && !(at === 'love' && rubbing && clips.love_loop_rub);
   }
@@ -109,7 +115,12 @@
     const at = endsOn(name);
     if (go) { // walking: home first, stand up facing the way to go, turn round when it changes
       if (isWalk(at) && at === go && push && clips[`${go}_loop_push`]) { push = false; return `${go}_loop_push`; }
-      if (isWalk(at)) return at === go ? loopFor(go) : `${at}_turn`;
+      if (isWalk(at)) { // facing the wrong way: turn round (a clip from this view to that one, or by sitting down)
+        if (at === go) return loopFor(go);
+        if (clips[`${at}_to_${go}`]) return `${at}_to_${go}`;
+        if (clips[`${at}_turn`] && endsOn(`${at}_turn`) === go) return `${at}_turn`;
+        return `${at}_to_normal`;
+      }
       return at === 'normal' ? `normal_to_${go}` : `${at}_to_normal`;
     }
     if (isWalk(at)) return `${at}_to_normal`;                    // stopped: turn to us and sit down
@@ -129,8 +140,9 @@
         action = pickAction();
         if (action) return `normal_to_${action}`;
       }
-      return 'normal_loop';
+      return loopFor('normal');
     }
+    if (at === 'sleep_belly') return mood() === 'sleep' ? loopFor('sleep_belly') : 'sleep_belly_to_sleep'; // roll back first
     if (at === 'drowsy' && mood() === 'sleep' && !poked) return 'drowsy_to_sleep';
     return at === mood() && !poked ? loopFor(at) : `${at}_to_normal`;
   }
@@ -195,8 +207,14 @@
     await load('love_loop_rub');
     for (const c of ['normal_to_eat', 'eat_loop', 'eat_to_normal', 'normal_to_paw', 'paw_to_normal']) await load(c);
     for (const c of ['normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop',
-                     'sleep_loop_dream', 'sleep_to_normal']) await load(c);
+                     'sleep_loop_dream', 'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep',
+                     'normal_loop_talk', 'normal_loop_listen']) await load(c);
     for (const f of [...FACES, 'push']) { await load(`walk_loop_${f}`); await load(`walk_r_loop_${f}`); }
+    for (const v of ['walk_front', 'walk_back']) {
+      for (const c of [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`]) await load(c);
+      for (const w of ['walk', 'walk_r']) { await load(`${w}_to_${v}`); await load(`${v}_to_${w}`); }
+    }
+    await load('walk_front_to_walk_back'); await load('walk_back_to_walk_front');
   }
 
   window.Fox2D = {
@@ -210,6 +228,7 @@
     nudge_ball() { push = true; },  // standing at the ball (walking, not moving): push it with the nose next
     get canPush() { return !!(clips.walk_loop_push && clips.walk_r_loop_push); },
     rub(on) { rubbing = !!on; },    // finger rubbing the head: the petted loop until it stops
+    talk(on) { talking = !!on; },   // speech bubble up / down
     // the head follows the rubbing finger a little (x, y: finger offset from the head, about -1…1);
     // nudge() with no arguments lets it settle back
     nudge(x, y) {
@@ -221,6 +240,11 @@
     go(dir) { go = dir; },          // start walking / turn round ('walk' left, 'walk_r' right)
     stop() { go = null; },          // stop, turn to us and sit
     get canWalk() { return WALK.every(c => clips[c]); },
+    // toward / away from the viewer: walk loops, ways in and out, and turns to and from side-on
+    get canWalkDepth() {
+      return ['walk_front', 'walk_back'].every(v => clips[`${v}_loop`] && clips[`normal_to_${v}`] && clips[`${v}_to_normal`] &&
+        clips[`walk_to_${v}`] && clips[`${v}_to_walk`] && clips[`walk_r_to_${v}`] && clips[`${v}_to_walk_r`]);
+    },
     get canEat() { return ['normal_to_eat', 'eat_loop', 'eat_to_normal'].every(c => clips[c]); },
     get state() {
       return { clip: cur?.name, frame: i, want, action, go, rubbing, eating: cur?.name === 'eat_loop',

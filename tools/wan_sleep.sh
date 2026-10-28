@@ -8,6 +8,7 @@
 #   sleep_loop          asleep: slow breathing, tail twitch            25 → 24-frame loop
 #   sleep_loop_dream    asleep, a dream: paws twitch, a smile          25 → 24-frame loop (same picture)
 #   sleep_to_normal     wakes, stretches, sits as before               25 frames
+#   sleep_to_sleep_belly / sleep_belly_loop / sleep_belly_to_sleep   rolls onto its back in its sleep and back
 # usage: bash tools/wan_sleep.sh [seed] [clip …]   (no clips: all)
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
@@ -43,4 +44,10 @@ want sleep_loop_dream && { echo "=== sleep_loop_dream $(date +%T)"
   run "$IN/sleep.png" _loop_dream 25 "${FOX}牠捲成一團睡著，正在做美夢，嘴角露出微笑，小腳掌輕輕抽動了幾下，耳朵抖一抖，然後又安穩地睡。最後回到開始的姿勢。$KEEP"; }
 want sleep_to_normal && { echo "=== sleep_to_normal $(date +%T)"
   run "$IN/sleep.png" _to_normal 25 "${FOX}牠睡醒了，睜開眼睛，抬起頭，伸了個懶腰，然後坐起來，恢復平常乖乖坐好的樣子。動作自然流暢。$KEEP" "$IN/normal.png"; }
+want sleep_to_sleep_belly && { echo "=== sleep_to_sleep_belly $(date +%T)"
+  run "$IN/sleep.png" _to_sleep_belly 25 "${FOX}牠睡著睡著，慢慢翻了個身，變成肚子朝上、四腳彎彎地仰睡，還在熟睡。動作自然流暢。$KEEP" "$IN/sleep_belly.png"; }
+want sleep_belly_loop && { echo "=== sleep_belly_loop $(date +%T)"
+  run "$IN/sleep_belly.png" _loop 25 "${FOX}牠肚子朝上仰睡，肚子隨著慢慢的呼吸輕輕起伏，小腳偶爾抖一下，睡得很香。最後回到開始的姿勢。$KEEP"; }
+want sleep_belly_to_sleep && { echo "=== sleep_belly_to_sleep $(date +%T)"
+  run "$IN/sleep_belly.png" _to_sleep 25 "${FOX}牠在睡夢中翻回身，把身體捲成一團，用尾巴圍住自己，繼續睡。動作自然流暢。$KEEP" "$IN/sleep.png"; }
 echo "=== all done $(date +%T)"

@@ -220,8 +220,14 @@ function mood() {
   return 'normal';
 }
 
+let sayTalk = 0;
 function say(text, ms = 2600) {
   el.bubble.textContent = text;
+  if (window.Fox2D) { // the 2D fox's mouth moves while its bubble is up
+    Fox2D.talk(true);
+    clearTimeout(sayTalk);
+    sayTalk = setTimeout(() => Fox2D.talk(false), Math.min(ms, 600 + text.length * 120));
+  }
   // keep the bubble inside the stage when the fox stands near an edge
   el.bubble.style.setProperty('--bx', '0px');
   const b = el.bubble.getBoundingClientRect(), s = el.stage.getBoundingClientRect(), pad = 8;
@@ -607,8 +613,11 @@ function walkStep() {
     if (then) then();
     return;
   }
-  // facing: by the sideways part; going almost straight in or out it keeps the way it faces
-  const facing = Math.abs(dx) > 1 ? (dx < 0 ? 'walk' : 'walk_r') : Fox2D.state.go || (dx < 0 ? 'walk' : 'walk_r');
+  // facing: mostly deeper / nearer → its back / its front (when those clips are there), else side-on by the
+  // sideways part; a short way straight in or out keeps the way it faces
+  const deep = Math.abs(dz) > Math.abs(dx) * 1.5 && Math.abs(dz) > 3 && Fox2D.canWalkDepth;
+  const facing = deep ? (dz > 0 ? 'walk_back' : 'walk_front')
+    : Math.abs(dx) > 1 ? (dx < 0 ? 'walk' : 'walk_r') : Fox2D.state.go || (dx < 0 ? 'walk' : 'walk_r');
   Fox2D.go(facing);
   if (!Fox2D.state.walking) return;
   const step = Math.min(dist, WALK_SPEED * 0.05 * sizeAt(foxZ)); // farther away it looks slower

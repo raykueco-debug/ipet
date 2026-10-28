@@ -102,6 +102,15 @@ if want walk_back_to_normal; then
   echo "=== walk_back_to_normal $(date +%T)"
   run "$IN/walk_back.png" _to_normal 25 "${FOX}牠原本背對你站著，轉過身來面向你，然後乖乖坐下。動作自然流暢。$KEEP" "$IN/normal.png"
 fi
+# turning between side-on, toward the viewer and away (walking on, deeper or nearer): <from>_to_<to>
+declare -A VIEW=([walk]='側身朝畫面左邊' [walk_r]='側身朝畫面右邊' [walk_front]='面向你' [walk_back]='背對你')
+for pair in walk:walk_front walk_front:walk walk_r:walk_front walk_front:walk_r walk:walk_back walk_back:walk             walk_r:walk_back walk_back:walk_r walk_front:walk_back walk_back:walk_front; do
+  f=${pair%%:*}; t=${pair##*:}
+  if want ${f}_to_$t; then
+    echo "=== ${f}_to_$t $(date +%T)"
+    run "$IN/$f.png" "_to_$t" 17 "${FOX}牠原本${VIEW[$f]}站著，原地轉身，變成${VIEW[$t]}站好。四隻腳留在原地。動作自然流暢。$KEEP" "$IN/$t.png"
+  fi
+done
 # nudging the ball: standing, a dip of the head and a push forward with the nose, back to standing
 for d in walk walk_r; do
   side=左; [ $d = walk_r ] && side=右

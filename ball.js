@@ -182,7 +182,7 @@
         Fox2D.play('paw');
         if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 4000))) return;
         kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
-      } else if (Fox2D.canPush) { // standing: dip the head and push it with the nose
+      } else if (Fox2D.canPush && ['walk', 'walk_r'].includes(Fox2D.state.go)) { // side-on: dip the head and push it with the nose
         Fox2D.nudge_ball();
         if (!(await until(() => Fox2D.state.pushing && Fox2D.state.frame >= 12, run, 5000))) return;
         kick(-from, 40, 10);
