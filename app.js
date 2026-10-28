@@ -543,6 +543,9 @@ function bindRub() {
 function wander() {
   if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil || window.Ball?.busy) return;
   if (window.Fox2D && S.stats.hunger < 30 && Math.random() < 0.35) { Fox2D.play('hungry'); return; } // paws on its tummy
+  if (window.Fox2D?.canEat && Math.random() < 0.08) { // a drink at its water bowl (scene.js: beside the bed)
+    if (walk2d(BED.x + 17, BED.z + 0.03, () => { Fox2D.drink(true); setTimeout(() => Fox2D.drink(false), 4000 + rand(0, 3000)); })) return;
+  }
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
@@ -728,6 +731,7 @@ function receiveGift(ev) {
     addBond(3);
     setExpr('eat', 1800);
     say(t('giftFrom', { from: ev.from || t('parents'), e: f.e }), 3000);
+    window.Fox2D?.play('delight'); // a present! paws on its cheeks
     save();
     setTimeout(res, 2200);
   }, 650));

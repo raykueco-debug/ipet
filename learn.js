@@ -32,7 +32,7 @@ const Learn = (() => {
     S.stats.fun = clamp(S.stats.fun + (big ? 15 : 6));
     addBond(big ? 5 : 2);
     setExpr('happy', 2500);
-    if (big) window.Fox2D?.play('jump_joy');
+    if (big) window.Fox2D?.play(Math.random() < 0.5 ? 'cheer' : 'jump_joy');
     save();
     render();
   }

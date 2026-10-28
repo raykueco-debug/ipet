@@ -5,7 +5,7 @@
 #   <action>_to_normal   action pose → home     17 frames
 # The home loop (normal_loop) stays its own clip, so it keeps looping; the player drops into an action now
 # and then and comes back. Only the fox in the picture: no hands, bowls, toys or effect marks.
-# usage: [ACTS="yawn tilt_left"] bash tools/wan_actions.sh [seed]
+# usage: [ACTS="yawn tilt_left"] [LOOPS="rest bored"] bash tools/wan_actions.sh [seed]   (ACTS="" for loops only)
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
 export TIVOT_GEN=512x512 TIVOT_FIT=1.0
@@ -49,6 +49,15 @@ declare -A GO=(
   [dance]='牠用後腳站起來，舉起前腳，開心地扭來扭去跳舞'
   [beg]='牠用後腳站起來，把前腳合在胸前，眨著閃亮的大眼睛撒嬌'
   [roll]='牠往旁邊一倒，側躺著開心地打滾，笑得好開心'
+  [present_l]='牠開心地把一隻前腳往左邊伸出去，像在介紹旁邊的東西給你看'
+  [present_r]='牠開心地把一隻前腳往右邊伸出去，像在介紹旁邊的東西給你看'
+  [cheer]='牠開心地把兩隻前腳高高舉起來歡呼，眼睛笑瞇瞇'
+  [giggle]='牠用一隻前腳摀著嘴，偷偷地笑個不停'
+  [wink]='牠調皮地對你眨一隻眼睛，露出可愛的笑容'
+  [cover_ears]='牠用兩隻前腳摀住耳朵，眼睛緊閉，有點被嚇到'
+  [sing]='牠抬起頭閉上眼睛，張開嘴巴開心地唱歌，身體輕輕搖擺'
+  [sorry]='牠低下頭、耳朵垂下來，兩隻前腳合在一起，不好意思地道歉'
+  [delight]='牠驚喜地用兩隻前腳捧著臉頰，眼睛睜得大大的閃閃發亮'
   [sit_back]='牠轉過身背對你坐著，抬頭望向遠方的森林'
   [rest]='牠轉向畫面左邊，慢慢趴下來放鬆休息，頭還抬著'
   [look_back]='牠站起來轉向畫面左邊，再回頭看著你微笑'
@@ -89,6 +98,15 @@ declare -A BACK=(
   [dance]='牠放下前腳坐好，恢復平常乖乖坐好的樣子'
   [beg]='牠放下前腳坐好，恢復平常乖乖坐好的樣子'
   [roll]='牠翻身坐起來，恢復平常乖乖坐好的樣子'
+  [present_l]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [present_r]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [cheer]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [giggle]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [cover_ears]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [delight]='牠放下前腳，恢復平常乖乖坐好的樣子'
+  [wink]='牠睜開眼睛，恢復平常乖乖坐好的樣子'
+  [sing]='牠唱完歌，低下頭看著你，恢復平常乖乖坐好的樣子'
+  [sorry]='牠抬起頭，耳朵豎起來，恢復平常乖乖坐好的樣子'
   [sit_back]='牠轉回來面向你坐好，恢復平常乖乖坐好的樣子'
   [rest]='牠撐起身體坐起來，轉回前方，恢復平常乖乖坐好的樣子'
   [look_back]='牠轉回前方坐下，恢復平常乖乖坐好的樣子'
@@ -101,10 +119,25 @@ run() { # input  suffix  prompt  end-image
     --seed "$SEED" --out "$OUT" --suffix "$2" --prompt "$3" --end "$4" 2>&1 | tail -3
 }
 cd "$COMFY/tivot_wan" || exit 1
-for a in ${ACTS:-look_around tilt_left tilt_right look_up yawn stretch}; do
+for a in ${ACTS-look_around tilt_left tilt_right look_up yawn stretch}; do
   echo "=== normal_to_$a $(date +%T)"
   run "$IN/normal.png" "_to_$a" "${FOX}牠原本平常地坐著，${GO[$a]}。動作自然流暢。$KEEP" "$IN/$a.png"
   echo "=== ${a}_to_normal $(date +%T)"
   run "$IN/$a.png" _to_normal "${FOX}${BACK[$a]}。動作自然流暢。$KEEP" "$IN/normal.png"
+done
+# a loop on an action's own picture, so the fox stays in that pose a while instead of freezing (LOOPS="rest …")
+declare -A HOLD=(
+  [rest]='牠側趴著放鬆休息，慢慢地呼吸，尾巴輕輕擺動，耳朵偶爾轉一下'
+  [sit_back]='牠背對你坐著望向遠方的森林，耳朵輕輕轉動，尾巴慢慢擺動'
+  [bored]='牠下巴靠在前腳上趴著，眼睛眨一眨，尾巴有一下沒一下地拍拍地面'
+  [hug_tail]='牠抱著自己的大尾巴，幸福地用臉頰蹭一蹭尾巴，左右輕輕搖'
+  [belly]='牠肚子朝上躺著，四隻腳在空中開心地扭來扭去'
+  [dance]='牠用後腳站著，舉起前腳，左右扭動身體開心地跳舞'
+  [think]='牠前腳放在下巴上思考，眼睛往上看，頭輕輕歪來歪去'
+  [beg]='牠用後腳站著，前腳合在胸前，眨著大眼睛輕輕上下晃動撒嬌'
+)
+for a in ${LOOPS:-}; do
+  echo "=== ${a}_loop $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/$a.png" --length 25 --fps 16 --seed "$SEED"     --out "$OUT" --suffix _loop --prompt "${FOX}${HOLD[$a]}。最後回到開始的姿勢。$KEEP" 2>&1 | tail -3
 done
 echo "=== all done $(date +%T)"

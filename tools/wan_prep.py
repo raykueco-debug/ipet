@@ -51,6 +51,10 @@ POSES = {
     'sit_back': 'assets/fox/t1/g04/sit_back.png', 'rest': 'assets/fox/t1/g04/rest.png', 'look_back': 'assets/fox/t1/g04/look_back.png',
     'sleep_belly': 'assets/fox/t1/g04/sleep_belly.png', 'stretch_up': 'assets/fox/t1/g04/stretch_up.png',
     'look_down_l': 'assets/fox/t1/g04/look_down_l.png', 'look_down_r': 'assets/fox/t1/g04/look_down_r.png',
+    # GPT sheet assets/source/gpt/grid_05.png: presenting a word card, cheering, little expressions
+    'present_l': 'assets/fox/t1/g05/present_l.png', 'present_r': 'assets/fox/t1/g05/present_r.png', 'cheer': 'assets/fox/t1/g05/cheer.png',
+    'giggle': 'assets/fox/t1/g05/giggle.png', 'wink': 'assets/fox/t1/g05/wink.png', 'cover_ears': 'assets/fox/t1/g05/cover_ears.png',
+    'sing': 'assets/fox/t1/g05/sing.png', 'sorry': 'assets/fox/t1/g05/sorry.png', 'delight': 'assets/fox/t1/g05/delight.png',
 }
 # facing right = the left picture flipped on the canvas, so the player can flip left-facing frames exactly
 FLIPPED = {'walk_r': 'walk'}
