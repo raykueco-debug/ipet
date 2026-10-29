@@ -304,6 +304,10 @@
                pushing: !!cur && cur.name.endsWith('_loop_push'),
                running: !!cur && cur.name.endsWith('_loop_run'),
                // a walk loop playing (legs going), and its frames to where it can be left
+               // the way it faces: -1 side-on left, 1 side-on right, 0 toward / away from us (by the picture it is on
+               // its way to: a move's way in counts as the move)
+               facing: !cur ? 0 : (a => a === 'walk_r' || (a.endsWith('_r') && MOVES.includes(a.slice(0, -2))) ? 1
+                 : a === 'walk' || MOVES.includes(a) ? -1 : 0)(endsOn(cur.name)),
                stride: !!cur && /^walk(_r|_front|_back)?_loop/.test(cur.name) && !cur.name.endsWith('_push'),
                strideLeft: cur ? (cur.exits.find(k => k >= i) ?? cur.frames.length - 1) - i : 0 };
     },
