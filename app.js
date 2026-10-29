@@ -454,6 +454,7 @@ async function eat(kind) {
 }
 
 const actions = {
+  game() { save(); location.href = 'runner.html'; }, // the mini game (runner.js)
   feed() {
     if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat, veggies or water? (eat: too full)
     if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }

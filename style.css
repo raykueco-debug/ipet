@@ -225,7 +225,7 @@ body.admin .ff { display: inline-block; }
 @keyframes zzz { to { transform: translate(30px, -110px) scale(1.4); opacity: 0; } }
 
 /* ---------- actions ---------- */
-.actions { flex: none; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.actions { flex: none; display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .actions button {
   border: 0; background: var(--card); color: var(--ink);
   border-radius: 18px; padding: 10px 0 8px;

@@ -63,7 +63,10 @@
   // mishaps: into a ditch and out (down into it, hanging struggling, pulling up, climbing out: back_crouch_to_back_hang
   // + back_hang_loop + back_hang_to_back_pull + back_pull_to_back_crouch), and tripping (back_crouch_to_back_crouch_trip)
   const mishaps = { fall: [], trip: [] };
-  let FALL_S = 2; // into a ditch and out: seconds (its clips' length), the music paused meanwhile
+  // into a ditch and out, short and snappy (an old console game's pitfall): down in a blink, a beat at the edge, up and
+  // out — its clips at double speed, the music paused meanwhile
+  const FALL_FPS = 30;
+  let FALL_S = 1;
   async function clipFrames(clip) {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return null;
@@ -74,11 +77,10 @@
     slide = (await clipFrames('back_crouch_loop_slide')) || [];
     mishaps.trip = (await clipFrames('back_crouch_to_back_crouch_trip')) || [];
     const fall = [];
-    for (const c of ['back_crouch_to_back_hang', 'back_hang_loop', 'back_hang_to_back_pull', 'back_pull_to_back_crouch']) {
-      const f = await clipFrames(c); if (!f) { fall.length = 0; break; } fall.push(...f);
-    }
+    const sink = await clipFrames('back_crouch_to_back_hang'), out = sink && await clipFrames('back_pull_to_back_crouch');
+    if (sink && out) fall.push(...sink, ...Array(5).fill(sink.at(-1)), ...out); // (down, a beat hanging there, out)
     mishaps.fall = fall.length ? fall : (await clipFrames('back_crouch_to_back_crouch_fall')) || [];
-    if (mishaps.fall.length) FALL_S = mishaps.fall.length / 16;
+    if (mishaps.fall.length) FALL_S = mishaps.fall.length / FALL_FPS;
     const up = await clipFrames('back_crouch_to_back_air'), down = up && await clipFrames('back_air_to_back_crouch');
     if (up && down) { frames = [...up, ...down.slice(1, -1)]; pouncing = true; return; }
     for (const clip of ['walk_back_loop_run', 'walk_back_loop']) { const f = await clipFrames(clip); if (f) { frames = f; return; } }
@@ -141,7 +143,7 @@
     return { ...c, start: Music.now() + LEAD_IN, sched: 0, lane: 0, x: 0, jump: -1, glide: false,
       played: 0, combo: 0, frame: 0, flash: [], says: [], trees: [], dist: 0, presses: [], tapped: -9, jumped: -9, stumble: -1, dust: [] };
   };
-  const songT = () => Music.now() - run.start;
+  const songT = () => run.frozen ?? Music.now() - run.start; // (frozen: in a ditch, the music's time stands still)
   const pick = a => a[Math.floor(Math.random() * a.length)];
 
   // the three keys (and A / S / D or ← ↓ → on a computer; space = all three)
@@ -190,6 +192,7 @@
       if (kind === 'fall') { // the music stops: what was set to come is called off, and set again once it's out
         Music.hush();
         const now = songT();
+        run.frozen = now; // (exactly still: no drifting road while it's down there)
         run.sched = run.backs.findIndex(b => b.t > now); if (run.sched < 0) run.sched = run.backs.length;
         run.says.push({ text: '加油！爬上來！', t: -0.6 });
       }
@@ -213,7 +216,7 @@
   function step(dt) {
     // in a ditch: the music's clock stands still (so the road, the notes, everything) until it is out
     const paused = run.mishap?.kind === 'fall';
-    if (paused) run.start += dt;
+    if (!paused && run.frozen != null) { run.start = Music.now() - run.frozen; run.frozen = null; } // out: on from there
     const now = songT();
     run.glide = run.marks.some(m => m.type === 'roll' && now >= m.t - 0.1 && now <= m.t1 + 0.1);
     if (run.glide) run.lane = 0; // (a glide runs down the middle)
