@@ -58,6 +58,9 @@
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
   let push = false;   // standing at the ball: nudge it with the nose next (walk[_r]_loop_push)
   let move = null;    // standing at the ball: that ball-play move next (walk_to_<move>, walk_r_to_<move>_r)
+  // the ball held up (watch()): it sits looking up (the look_up picture) and its head follows the ball — gaze
+  // -1 (far left) … 1 (far right), shown by scrubbing look_up_loop_look_l / _r (tools/wan_look.sh)
+  let watching = false, gaze = 0;
   let running = false; // after the ball: the bounding run (walk[_r]_loop_run) instead of walking
 
   async function load(name, wait = false) { // wait: until its first frames are in (the first clip only)
@@ -96,7 +99,8 @@
   const isAction = a => a in ACTIONS;
   const VIEWS = ['walk', 'walk_r', 'walk_front', 'walk_back']; // side-on left / right, toward the viewer, away
   const isWalk = a => VIEWS.includes(a);
-  const mood = () => ((eating || drinking) && clips.eat_loop ? 'eat' : rubbing ? 'love' : want);
+  const mood = () => (watching && clips.normal_to_look_up ? 'look_up'
+    : (eating || drinking) && clips.eat_loop ? 'eat' : rubbing ? 'love' : want);
 
   function pickAction() {
     let ready = Object.keys(ACTIONS).filter(a => ACTIONS[a] && clips[`normal_to_${a}`] && clips[`${a}_to_normal`]);
@@ -107,6 +111,8 @@
   }
 
   // which loop to play on picture `at` (walk loops: now and then one that does something with the face)
+  const LOOK = { l: 'look_up_loop_look_l', r: 'look_up_loop_look_r' };
+  const looking = () => Math.abs(gaze) > 0.12 && clips[LOOK[gaze < 0 ? 'l' : 'r']];
   function loopFor(at) {
     if (at === 'love' && rubbing && clips.love_loop_rub) return 'love_loop_rub';
     if (at === 'eat' && drinking && clips.eat_loop_drink) return 'eat_loop_drink';
@@ -143,6 +149,8 @@
   // the clip that follows the one that just ended, on the way to what we want
   function next(name) {
     const at = endsOn(name);
+    // looking up at the ball held up: into a look clip (frame 0 is this picture), where the head follows it
+    if (at === 'look_up' && watching && clips[LOOK.r]) return LOOK[gaze < 0 && clips[LOOK.l] ? 'l' : 'r'];
     if (MOVES.includes(at.replace(/_r$/, ''))) return `${at}_to_${at.endsWith('_r') ? 'walk_r' : 'walk'}`; // a move: stand again
     if (go) { // walking: home first, stand up facing the way to go, turn round when it changes
       if (isWalk(at) && at === go && push && clips[`${go}_loop_push`]) { push = false; return `${go}_loop_push`; }
@@ -201,6 +209,7 @@
 
   function advance() {
     if (!cur) return;
+    if (cur === clips[LOOK.l] || cur === clips[LOOK.r]) return lookStep();
     if (i < cur.frames.length - 1) {
       // a loop that no longer fits leaves early at an exit frame (same picture as its start)
       if (isLoop(cur.name) && cur.exits.includes(i) && !stays(cur.name)) return leave(true);
@@ -213,13 +222,25 @@
       if (!isLoop(cur.name) && clips[`${act}_loop`]) { holdLoops = 1 + (Math.random() < 0.5 ? 1 : 0); switchTo(`${act}_loop`, true); return; }
       if (isLoop(cur.name) && --holdLoops > 0 && !poked) { i = 0; return; }
     }
-    if (isAction(endsOn(cur.name)) && !isLoop(cur.name) && !cur.held) { // pause on the action pose before going home
+    if (isAction(endsOn(cur.name)) && !isLoop(cur.name) && !cur.held && !(watching && act === 'look_up')) { // pause on the action pose before going home
       cur.held = true;
       hold = 6 + Math.floor(Math.random() * 7);
       return;
     }
     cur.held = false;
     leave(!isLoop(cur.name)); // a transition's last frame is the next clip's first; a loop already dropped it
+  }
+
+  // a look clip isn't played, it's scrubbed: the frame for the gaze, a frame or two a tick (the head turns, it
+  // doesn't jump), back through the middle (frame 0, the look_up picture) to turn to the other side
+  function lookStep() {
+    const side = cur === clips[LOOK.l] ? 'l' : 'r', g = watching ? gaze : 0;
+    const want = (g < 0 ? 'l' : 'r') === side ? Math.round(Math.min(1, Math.abs(g)) * (cur.frames.length - 1)) : 0;
+    if (i !== want) { i += Math.sign(want - i) * Math.min(2, Math.abs(want - i)); return; }
+    if (i > 0 || watching && !looking()) return; // holding the look (ahead: the look_up picture itself)
+    // facing ahead again: the other side's clip, or (the ball let go) back to sitting as usual
+    if (watching) { switchTo(LOOK[gaze < 0 ? 'l' : 'r'], false); return; }
+    switchTo('look_up_to_normal', false) || switchTo('normal_loop', false);
   }
 
   function draw() {
@@ -244,7 +265,7 @@
     const names = [ // walking and the ball first: a ball thrown right away is chased right away
       ...WALK, 'walk_loop_run', 'walk_r_loop_run',
       ...MOVES.flatMap(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r']),
-      'normal_to_paw', 'paw_to_normal',
+      'normal_to_paw', 'paw_to_normal', 'normal_to_look_up', 'look_up_to_normal', 'look_up_loop_look_l', 'look_up_loop_look_r',
       ...Object.keys(ACTIONS).flatMap(a => [`normal_to_${a}`, `${a}_to_normal`]),
       ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`, `${m}_loop_2`]),
       'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal', 'eat_loop_drink',
@@ -252,6 +273,7 @@
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
       'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen', 'normal_loop_ears', 'normal_loop_tail', 'normal_loop_blink', 'normal_loop_sway',
       ...[...FACES, 'push', 'run'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]), 'walk_front_loop_push',
+      'look_up_loop_look_l', 'look_up_loop_look_r',
       ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
         `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
       'walk_front_to_walk_back', 'walk_back_to_walk_front',
@@ -291,7 +313,10 @@
     drink(on) { drinking = !!on; }, // at the water bowl: lap until it's had enough
     go(dir) { go = dir; },          // start walking / turn round ('walk' left, 'walk_r' right)
     stop() { go = null; },
-    run(on) { running = !!on; },    // chasing the ball: run, not walk
+    run(on) { running = !!on; },
+    watch(on) { watching = !!on; if (!on) gaze = 0; }, // the ball held up: look up at it, the head after it
+    look(g) { gaze = Math.max(-1, Math.min(1, g)); },
+    get canWatch() { return !!(clips.normal_to_look_up && clips.look_up_to_normal && clips[LOOK.r]); },    // chasing the ball: run, not walk
     get canWalk() { return WALK.every(c => clips[c]); },
     // toward / away from the viewer: walk loops, ways in and out, and turns to and from side-on
     get canWalkDepth() {

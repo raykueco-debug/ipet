@@ -168,6 +168,7 @@
     try { ballEl.setPointerCapture(e.pointerId); } catch (err) {} // (no capture for a synthetic pointer)
     callOff();
     b.mode = 'held';
+    watchIt(true);
     drag = [{ t: performance.now(), x: e.clientX, y: e.clientY }];
     hold(e);
   }, true);
@@ -177,13 +178,24 @@
     if (drag.length > 8) drag.shift();
     hold(e);
   });
+  // held up: the fox sits looking up at it, all eager, and its head follows the ball (fox2d.js watch / look)
+  let watched = false;
+  function watchIt(on) { // (again on each move of the ball held: its clips may come in meanwhile)
+    if (on && (watched || !window.Fox2D?.canWatch || !S.hatched || S.sleeping || eating)) return;
+    watched = on;
+    if (on) { if (walkTarget) { walkTarget = null; Fox2D.stop(); } Fox2D.run(false); }
+    window.Fox2D?.watch(on);
+  }
   function hold(e) { // follow the finger, at the depth it was at (below the stage too, on the way to the button)
     const s = stage.getBoundingClientRect();
     b.x = Math.max(4, Math.min(96, ((e.clientX - s.left) / s.width) * 100));
     b.h = Math.max(0, ((s.bottom - e.clientY) / s.height) * 100 - groundAt(b.z) - 4);
+    if (b.mode === 'held') watchIt(true);
+    if (window.Fox2D) Fox2D.look((b.x - foxX) / 35); // its head after it: 35 % to a side is as far as it turns
   }
   const letGo = e => {
     if (!drag) return;
+    watchIt(false); // let go: off after it (or it's put away)
     const s = stage.getBoundingClientRect(), a = drag[0], z = drag[drag.length - 1], dt = Math.max(0.016, (z.t - a.t) / 1000);
     const vx = ((z.x - a.x) / s.width) * 100 / dt, vy = ((a.y - z.y) / s.height) * 100 / dt; // %/s, up = +
     drag = null;
@@ -202,6 +214,7 @@
     if (b.mode !== 'home' || !window.Fox2D || !S.hatched || S.sleeping) return;
     e.preventDefault();
     b.mode = 'held';
+    watchIt(true);
     b.z = 0; // out of the button: at the very front, nearest the player
     drag = [{ t: performance.now(), x: e.clientX, y: e.clientY }];
     const move = ev => { drag.push({ t: performance.now(), x: ev.clientX, y: ev.clientY }); if (drag.length > 8) drag.shift(); hold(ev); };
@@ -210,6 +223,7 @@
       const moved = Math.hypot(ev.clientX - drag[0].x, ev.clientY - drag[0].y) > 20;
       if (moved) return letGo(ev);
       drag = null; // a tap: it drops in front of the fox, and the fox goes for it
+      watchIt(false);
       b.mode = 'free';
       b.x = Math.max(10, Math.min(90, foxX + rand(-12, 12))); b.z = Math.max(0, foxZ - 0.08); b.h = 40;
       b.vx = rand(-10, 10); b.vz = 0; b.vh = 0;

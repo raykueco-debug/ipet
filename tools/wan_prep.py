@@ -29,6 +29,8 @@ OUT = os.path.join(ROOT, 'assets', 'fox', 'wan_in')
 POSES = {
     'look_around': 'assets/fox/t1/d03/look_around.png', 'tilt_left': 'assets/fox/t1/d03/tilt_left.png',
     'tilt_right': 'assets/fox/t1/d03/tilt_right.png', 'look_up': 'assets/fox/t1/d03/look_up.png',
+    # GPT sheet assets/source/gpt/look_01.png (drawn from look_up): the head turned far left / right after the ball
+    'look_far_l': 'assets/fox/t1/l01/far_l.png', 'look_far_r': 'assets/fox/t1/l01/far_r.png',
     'yawn': 'assets/fox/t1/d07/yawn.png', 'stretch': 'assets/fox/t1/d07/stretch.png',
     'walk': 'assets/fox/t1/d07/get_up.png',  # standing, side-on, facing left: the walk loop's anchor
     'paw': 'assets/fox/t1/d03/paw_up.png',  # sitting, one front paw up: batting the ball
