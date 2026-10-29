@@ -178,7 +178,7 @@
     if (drag.length > 8) drag.shift();
     hold(e);
   });
-  // held up: the fox sits looking up at it, all eager, and its head follows the ball (fox2d.js watch / look)
+  // taken up: the fox drops into its ready-to-pounce crouch and its head follows the ball (fox2d.js watch / look)
   let watched = false;
   function watchIt(on) { // (again on each move of the ball held: its clips may come in meanwhile)
     if (on && (watched || !window.Fox2D?.canWatch || !S.hatched || S.sleeping || eating)) return;
@@ -195,11 +195,10 @@
   }
   const letGo = e => {
     if (!drag) return;
-    watchIt(false); // let go: off after it (or it's put away)
     const s = stage.getBoundingClientRect(), a = drag[0], z = drag[drag.length - 1], dt = Math.max(0.016, (z.t - a.t) / 1000);
     const vx = ((z.x - a.x) / s.width) * 100 / dt, vy = ((a.y - z.y) / s.height) * 100 / dt; // %/s, up = +
     drag = null;
-    if (overHome(z.x, z.y)) return putAway();
+    if (overHome(z.x, z.y)) { watchIt(false); return putAway(); }
     b.mode = 'free';
     b.vx = Math.max(-160, Math.min(160, vx * 0.7));
     b.vz = Math.max(-0.8, Math.min(2.2, vy * 0.012));
@@ -223,7 +222,6 @@
       const moved = Math.hypot(ev.clientX - drag[0].x, ev.clientY - drag[0].y) > 20;
       if (moved) return letGo(ev);
       drag = null; // a tap: it drops in front of the fox, and the fox goes for it
-      watchIt(false);
       b.mode = 'free';
       b.x = Math.max(10, Math.min(90, foxX + rand(-12, 12))); b.z = Math.max(0, foxZ - 0.08); b.h = 40;
       b.vx = rand(-10, 10); b.vz = 0; b.vh = 0;
@@ -239,6 +237,7 @@
     return x > r.left - m && x < r.right + m && y > r.top - m * 2 && y < r.bottom + m;
   }
   function putAway() {
+    watchIt(false);
     const wasOut = b.mode !== 'home';
     b.mode = 'home';
     b.h = 0;
@@ -326,9 +325,20 @@
     return rolled(run);
   }
 
+  // thrown while it watched it held up: its head follows it a moment in the air (till it first lands), then off
+  async function follow(run) {
+    if (!watched) return;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 600 && !(performance.now() - t0 > 300 && b.h === 0) && run === fetchRun) {
+      Fox2D.look((b.x - foxX) / 35);
+      await wait(50);
+    }
+    watchIt(false);
+  }
   async function fetch() {
     const run = ++fetchRun;
     busy = true;
+    await follow(run);
     pacing();
     try { await play(run); } finally { if (run === fetchRun) { busy = false; clearInterval(pace); Fox2D.run(false); } }
   }

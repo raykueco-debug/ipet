@@ -379,6 +379,34 @@ function showBowl(kind, n) {
   el.bowl.classList.remove('out');
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
+// just opened: its eating clips may still be on the way — a few seconds' wait for them rather than none
+async function eatClips() { for (let k = 0; RENDER === 'anim' && window.Fox2D && !Fox2D.canEat && k < 50; k++) await wait(100); }
+// a drink (the feed menu's water): its water bowl in front of it, it laps a while
+async function drink() {
+  if (eating) return;
+  eating = true;
+  walkTarget = null;
+  userWalkUntil = Date.now() + 20000;
+  el.bowl.innerHTML = '<img src="assets/scene/props/water.png" alt="">';
+  el.bowl.hidden = false;
+  el.bowl.classList.remove('out');
+  await eatClips();
+  const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
+  if (anim) {
+    Fox2D.drink(true);
+    await wait(4000 + rand(0, 2000));
+    Fox2D.drink(false);
+  } else { setExpr('eat', 3000); await wait(3000); }
+  S.stats.fun = clamp(S.stats.fun + 2);
+  addBond(1);
+  save();
+  say(pick(t('drinkYum')));
+  await wait(1200);
+  el.bowl.classList.add('out');
+  await wait(300);
+  el.bowl.hidden = true;
+  eating = false;
+}
 async function eat(kind) {
   if (eating) return;
   if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }
@@ -386,6 +414,7 @@ async function eat(kind) {
   walkTarget = null;
   userWalkUntil = Date.now() + 20000;
   showBowl(kind, 3);
+  await eatClips();
   const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
   if (anim) { // lean down to the bowl first
     Fox2D.eat(true);
@@ -426,8 +455,8 @@ async function eat(kind) {
 
 const actions = {
   feed() {
+    if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat, veggies or water? (eat: too full)
     if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }
-    if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat or veggies?
     const f = pick(FOODS);
     const p = petPos();
     spawnFx(f.e, p.x, p.y + 8, 'drop');
@@ -549,10 +578,6 @@ function bindRub() {
 function wander() {
   if (!S.hatched || S.sleeping || expr || Date.now() < userWalkUntil || window.Ball?.busy) return;
   if (window.Fox2D && S.stats.hunger < 30 && Math.random() < 0.35) { Fox2D.play('hungry'); return; } // paws on its tummy
-  if (window.Fox2D?.canEat && Math.random() < 0.08) { // a drink at its water bowl (scene.js: beside the bed)
-    // its head (left of its middle when it bends down) over the bowl
-    if (walk2d(BED.x + 23, BED.z + 0.03, () => { Fox2D.drink(true); setTimeout(() => Fox2D.drink(false), 4000 + rand(0, 3000)); })) return;
-  }
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
@@ -595,11 +620,10 @@ const zFromY = y => { const r = el.stage.getBoundingClientRect(); return clamp((
 let foxX = 50, foxZ = 0;
 const BED = { x: 20, z: 0.5 }; // its cushion in the scene (scene.js draws it here): it goes there to sleep
 // things on the ground the fox and the ball meet (scene.js draws them; x %, z, and their half size on the ground
-// rx %, rz): a soft one is walked over and gives under a weight (the bed); a solid one, h % high, is walked
-// round and the ball bounces off it (the water bowl)
+// rx %, rz): a soft one is walked over and gives under a weight (the bed); a solid one, h % high, would be
+// walked round and bounce the ball off it
 const THINGS = [
   { name: 'bed', x: BED.x, z: BED.z + 0.04, rx: 13, rz: 0.08, soft: true },
-  { name: 'water', x: BED.x + 17, z: BED.z, rx: 5, rz: 0.05, h: 5 },
 ];
 const within = (t, x, z, mx = 0, mz = 0) => ((x - t.x) / (t.rx + mx)) ** 2 + ((z - t.z) / (t.rz + mz)) ** 2 < 1;
 const pressed = { fox: 0, ball: 0 }; // how far each sinks into a soft thing now (% of the stage height; scene.js)
@@ -633,7 +657,7 @@ function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing, do
 // the way there going round the solid things on the ground: for each one in the way, one or two points around it
 // (in front, behind, at its sides or corners) — the shortest way with no leg through it
 function roundThings(x, z, fx = foxX, fz = foxZ) {
-  const clear = (t, a, b) => { // (from close by it, like the drinking spot: only through it counts)
+  const clear = (t, a, b) => { // (from close by it: only through it counts)
     const [mx, mz] = within(t, a.x, a.z, 4, 0.05) || within(t, b.x, b.z, 4, 0.05) ? [0.5, 0.01] : [4, 0.05];
     for (let k = 1; k < 20; k++) if (within(t, a.x + (b.x - a.x) * k / 20, a.z + (b.z - a.z) * k / 20, mx, mz)) return false;
     return true;
@@ -855,7 +879,7 @@ function bind() {
   el.foodPick.querySelectorAll('button').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
     el.foodPick.hidden = true;
-    eat(b.dataset.food);
+    if (b.dataset.food === 'water') drink(); else eat(b.dataset.food);
   }));
   bindRub();
   bindWalk();

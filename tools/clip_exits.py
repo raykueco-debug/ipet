@@ -4,7 +4,8 @@ usage: python tools/clip_exits.py            → writes "exits" into assets/fox/
 
 A loop starts on its anchor picture; the player may leave it after frame k only if frame k looks like that
 picture (the next clip starts on it). "Looks like" = differs from frame 0 no more than a normal step between
-two neighbouring frames of the same loop, so the cut is as smooth as playing on.
+two neighbouring frames of the same loop, so the cut is as smooth as playing on. "near" (within 2½ steps) are
+the frames it may leave at in a hurry.
 """
 import glob
 import json
@@ -28,8 +29,10 @@ def main():
         F = [frame(os.path.join(clip, f)) for f in meta['frames']]
         step = np.median([np.abs(F[k + 1] - F[k]).mean() for k in range(len(F) - 1)])
         meta['exits'] = [k for k in range(1, len(F) - 1) if np.abs(F[k] - F[0]).mean() <= step]
+        # near: close enough for a hurry (the ball taken up: the fox answers now, a small pop rather than a wait)
+        meta['near'] = [k for k in range(1, len(F) - 1) if np.abs(F[k] - F[0]).mean() <= 2.5 * step]
         json.dump(meta, open(meta_path, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-        print(f'{os.path.basename(clip):24s} step {step:.2f}  exits {meta["exits"]}')
+        print(f'{os.path.basename(clip):24s} step {step:.2f}  exits {meta["exits"]}  near {len(meta["near"])}')
 
 
 if __name__ == '__main__':

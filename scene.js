@@ -117,7 +117,7 @@
     ['bush', 32, 1.05, 0.22], ['bush', 68, 1.06, 0.2],
     // decoration stays at the back and the far sides: the ground in front, where the fox and the ball go, is clear
     ['mushrooms', 58, 1.02, 0.1], ['flowers', 44, 1.0, 0.11], ['stump', 90, 0.95, 0.15], ['rock', 76, 1.0, 0.12],
-    ['bed', BED.x, BED.z + 0.04, 0.34], ['water', BED.x + 17, BED.z, 0.11],
+    ['bed', BED.x, BED.z + 0.04, 0.34], // (its water comes in a bowl when it is given a drink: app.js drink)
   ];
   Promise.all([...new Set(PROPS.map(p => p[0]))].map(n => new Promise((ok, no) => {
     const im = new Image(); im.onload = () => ok(); im.onerror = no; im.src = `assets/scene/props/${n}.png`;

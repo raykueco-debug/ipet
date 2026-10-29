@@ -6,6 +6,7 @@
 #                     assets/source/gpt/look_01.png): the head and eyes turn to follow something to the left /
 #                     right, still looking up — not played but scrubbed: fox2d.js shows the frame for
 #                     where the ball is (frame 0 = the look_up picture)                 25 frames
+#   look_up_to_walk / look_up_to_walk_r   up and off after the ball thrown: straight onto its feet, side-on
 # usage: bash tools/wan_look.sh [seed] [clip …]   (no clips: all)
 set -u
 export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
@@ -27,5 +28,13 @@ for d in l r; do
   echo "=== look_up_loop_look_$d $(date +%T)"
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/look_up.png" --length 25 --fps 16 \
     --seed "$SEED" --out "$OUT" --suffix "_loop_look_$d" --end "$IN/look_far_$d.png" --prompt "${FOX}牠坐著抬頭往上看，滿臉期待，眼睛盯著上方慢慢往畫面${side}邊移動的東西，頭和眼睛一起慢慢轉向畫面${side}邊、仍然抬頭往上看，一直轉到最${side}邊停住。身體坐著不動，表情一直很期待開心。動作平順、等速。$KEEP" 2>&1 | tail -3
+done
+# off after the ball at once: from looking up, straight up onto its feet and side-on (no sitting back first)
+SIDE='側身的時候，頭和臉始終是正側面、朝著前進的方向，不回頭、不轉頭看鏡頭。'
+for d in walk walk_r; do
+  side=左; [ $d = walk_r ] && side=右
+  want look_up_to_$d || continue
+  echo "=== look_up_to_$d $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/look_up.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_$d" --end "$IN/$d.png" --prompt "${FOX}牠原本坐著抬頭往上看，看到球飛出去，馬上興奮地站起來，把身體轉向畫面${side}邊，四隻腳站好準備衝出去。動作快速、自然流暢。$SIDE$KEEP" 2>&1 | tail -3
 done
 echo "=== all done $(date +%T)"
