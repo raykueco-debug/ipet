@@ -6,7 +6,8 @@
    A part is written as tokens "pitch:length" (length in sixteenths; "C4+E4+G4:8" a chord, "-:4" a rest, "|" only
    for reading); bar: its sixteenths. In the lead, "^" before a note makes it one to jump for; runs of quick notes (sixteenths, three or
    more) become a roll to tap through.
-   window.Music: SONGS, parse(text) → [{ t (16ths), len, midi[] , jump }], unlock(), now(), play(midi, gain, when). */
+   window.Music: SONGS, parse(text) → [{ t (16ths), len, midi[] , jump }], unlock(), now(), play(midi, gain, when),
+   hush() (the notes set to come, called off). */
 (function () {
   const SONGS = [
     { name: '給愛麗絲（貝多芬）', sixteenth: 0.17, times: 3, bar: 6,
@@ -47,6 +48,7 @@
     if (ac.state === 'suspended') ac.resume();
   }
   const now = () => (ac ? ac.currentTime : performance.now() / 1000);
+  let coming = []; // notes set to start later: { when, oscs }
   function play(midi, gain = 0.5, when = 0) {
     if (!ac) return;
     const t = Math.max(ac.currentTime, when), f = 440 * 2 ** ((midi - 69) / 12);
@@ -59,6 +61,7 @@
     env.gain.exponentialRampToValueAtTime(gain * 0.35, t + 0.25);
     env.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
     tone.connect(env).connect(out);
+    const oscs = [];
     for (const [mul, type, amp, cents] of [[1, 'triangle', 0.6, 0], [1, 'sine', 0.5, 4], [2, 'sine', 0.25, -3], [3, 'sine', 0.1, 2], [4, 'sine', 0.05, 0]]) {
       const o = ac.createOscillator(), a = ac.createGain();
       o.type = type;
@@ -68,7 +71,16 @@
       o.connect(a).connect(tone);
       o.start(t);
       o.stop(t + 2.3);
+      oscs.push(o);
     }
+    if (t > ac.currentTime + 0.01) coming.push({ when: t, oscs });
+    coming = coming.filter(c => c.when > ac.currentTime);
   }
-  window.Music = { SONGS, parse, unlock, now, play };
+  // the music paused: the notes set to start from now on don't (those already ringing ring out)
+  function hush() {
+    if (!ac) return;
+    for (const c of coming) if (c.when > ac.currentTime) for (const o of c.oscs) { try { o.stop(); } catch (e) {} }
+    coming = [];
+  }
+  window.Music = { SONGS, parse, unlock, now, play, hush };
 })();

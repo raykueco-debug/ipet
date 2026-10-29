@@ -8,7 +8,8 @@
    the keys together (two or all three), for the accents and the notes that end a phrase.
    The way is set with things in it, and the notes are the way past them: rocks in the other lanes as a note comes
    (follow the notes and they are dodged), a ditch across the road at a jump, bars on posts across a glide (gliding,
-   tapping, the fox ducks under them). Running into one is only a stumble.
+   tapping, the fox ducks under them). Tripping on one is only a stumble; into a ditch, everything stops — the road,
+   the music — while the fox scrambles out, and then goes on from there.
    Laid out to be won: wide timing, never a note right after a jump or too close to the last one to reach (those
    play themselves), and a miss costs only its own note.
    World: x in lanes (-1, 0, 1; the edges ±1.6), z ahead of the fox; seen from just behind it. */
@@ -59,7 +60,8 @@
   // the fox, bounding away pounce after pounce, a pounce every half bar (back_crouch_to_back_air +
   // back_air_to_back_crouch, tools/wan_run.sh) — or, until those are there, its running-away loop
   let frames = [], slide = [], pouncing = false; // (slide: back_crouch_loop_slide, gliding under the bars)
-  const mishaps = { fall: [], trip: [] };          // into a ditch and out of it; tripping (back_crouch_to_back_crouch_fall / _trip)
+  const mishaps = { fall: [], trip: [] };
+  const FALL_S = 2;                                // into a ditch and out: seconds, the music paused          // into a ditch and out of it; tripping (back_crouch_to_back_crouch_fall / _trip)
   async function clipFrames(clip) {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return null;
@@ -137,7 +139,7 @@
   // the three keys (and A / S / D or ← ↓ → on a computer; space = all three)
   const keys = [...document.querySelectorAll('.key')];
   function press(lane) {
-    if (!run) return;
+    if (!run || run.mishap?.kind === 'fall') return; // (in a ditch: climbing out first)
     const now = songT(), key = keys[lane + 1];
     key?.classList.add('down');
     setTimeout(() => key?.classList.remove('down'), 110);
@@ -175,7 +177,15 @@
   });
 
   function bump(kind) { // (a mishap's own clip when there is one, else a wobble)
-    if (!run.mishap && mishaps[kind]?.length) run.mishap = { kind, t: 0 };
+    if (!run.mishap && mishaps[kind]?.length) {
+      run.mishap = { kind, t: 0 };
+      if (kind === 'fall') { // the music stops: what was set to come is called off, and set again once it's out
+        Music.hush();
+        const now = songT();
+        run.sched = run.backs.findIndex(b => b.t > now); if (run.sched < 0) run.sched = run.backs.length;
+        run.says.push({ text: '加油！爬上來！', t: -0.6 });
+      }
+    }
     else if (run.stumble < 0) run.stumble = 0;
     run.bumps = (run.bumps || 0) + 1;
     window.__bumps = run.bumps; // (for trying a chart out, with ?bot=1)
@@ -193,6 +203,9 @@
   }
 
   function step(dt) {
+    // in a ditch: the music's clock stands still (so the road, the notes, everything) until it is out
+    const paused = run.mishap?.kind === 'fall';
+    if (paused) run.start += dt;
     const now = songT();
     run.glide = run.marks.some(m => m.type === 'roll' && now >= m.t - 0.1 && now <= m.t1 + 0.1);
     if (run.glide) run.lane = 0; // (a glide runs down the middle)
@@ -200,7 +213,7 @@
     if (run.jump >= 0 && (run.jump += dt) > JUMP_S) run.jump = -1;
     // a pounce every half bar (8 sixteenths), in time with the music — from the start, before it begins too
     run.frame = (now + LEAD_IN) / (8 * run.s16) * (frames.length || 1);
-    run.dist += SCROLL * dt;
+    if (!paused) run.dist += SCROLL * dt;
     // ?bot=1: it plays itself, every key on its beat (to try a chart: a fair one comes out near 100%)
     if (params.has('bot')) for (const m of run.marks) {
       if (m.done) continue;
@@ -214,14 +227,14 @@
     }
     // the things in the way, as they reach the fox: past them, or a stumble (no more than that)
     if (run.stumble >= 0 && (run.stumble += dt) > 0.6) run.stumble = -1;
-    if (run.mishap && (run.mishap.t += dt) * 16 >= Math.max(1, mishaps[run.mishap.kind].length)) run.mishap = null;
+    if (run.mishap && (run.mishap.t += dt) >= (run.mishap.kind === 'fall' ? FALL_S : mishaps[run.mishap.kind].length / 16)) run.mishap = null;
     const ducking = now - run.tapped < 0.45;
     for (const o of run.things) {
       if (o.met || now < o.t) continue;
       o.met = true;
       // (a ditch: in the air over it; a bar: tapping as it comes)
       const past = o.type === 'ditch' ? o.t - run.jumped > 0.04 && o.t - run.jumped < JUMP_S - 0.04 : o.type === 'bar' ? ducking : run.lane !== o.lane; // (the lane it's going to: a key on the beat is in time)
-      if (!past) { o.smash = 0; bump(o.type === 'ditch' ? 'fall' : 'trip'); }
+      if (!past) { if (o.type !== 'ditch') o.smash = 0; bump(o.type === 'ditch' ? 'fall' : 'trip'); } // (knocked over; a ditch stays: it's in it)
     }
     // the lead's notes gone by untaken: silent, the music goes on
     for (const m of run.marks) {
@@ -230,7 +243,7 @@
       if (m.t - now < -(m.type === 'jump' ? JUMP_WIN : WIN.good)) { m.done = true; m.missed = true; run.combo = 0; }
     }
     while (run.trees.length < 26) run.trees.push({ side: Math.random() < 0.5 ? -1 : 1, off: 1.9 + Math.random() * 1.6, z: (run.trees.at(-1)?.z ?? 0) + 2 + Math.random() * 4, k: 0.8 + Math.random() * 0.6 });
-    for (const tr of run.trees) tr.z -= SCROLL * dt;
+    if (!paused) for (const tr of run.trees) tr.z -= SCROLL * dt;
     run.trees = run.trees.filter(tr => tr.z > -CAM * 0.8);
     // gliding: sand and dust thrown up from under it, out to the sides and back, falling and fading
     if (run.glide) for (let k = 0; k < 3; k++) run.dust.push({ x: run.x + (Math.random() - 0.5) * 0.5, h: 0, z: 0.2,
@@ -241,6 +254,7 @@
     run.flash = run.flash.filter(f => f.t < 0.4);
     for (const s of run.says) s.t += dt;
     run.says = run.says.filter(s => s.t < 0.7).slice(-2);
+
     if (now > run.length + 1.5) end();
   }
 
@@ -382,23 +396,21 @@
     // gliding: low on the ground, held in its crouch (the first frame); else pouncing on — up through the first half
     // of the loop, down through the second
     const mis = run.mishap && mishaps[run.mishap.kind];
-    const f = mis ? mis[Math.min(mis.length - 1, Math.floor(run.mishap.t * 16))]
+    const f = mis ? mis[Math.min(mis.length - 1, Math.floor(run.mishap.t * (run.mishap.kind === 'fall' ? mis.length / FALL_S : 16)))]
       : run.glide ? (slide.length ? slide[Math.floor(songT() * 16) % slide.length] : frames[0]) : frames[Math.floor(run.frame) % (frames.length || 1)];
     if (!f || !f.complete || !f.naturalWidth) return;
     const u = (run.frame % (frames.length || 24)) / (frames.length || 24);
     const hop = run.jump >= 0 || run.glide || mis ? 0 : pouncing ? Math.sin(Math.PI * u) : Math.abs(Math.sin(u * Math.PI * 4));
-    if (run.mishap?.kind === 'fall') { // in the ditch: its hole at its feet, its near wall hiding what has sunk below it
-      g.fillStyle = '#3e2a1e'; g.beginPath(); g.ellipse(p.x, p.y - size * 0.03, size * 0.36, size * 0.09, 0, 0, 7); g.fill();
-    }
     g.save();
     // in the ditch: down into it fast, scrabbling at its edge, then up and out (the clip only wriggles: the drop is here)
     let sink = 0;
     if (run.mishap?.kind === 'fall') {
-      const k = run.mishap.t * 16 / Math.max(1, mis.length);
-      sink = k < 0.15 ? k / 0.15 : k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4);
-      g.beginPath(); g.rect(0, 0, W, p.y - size * 0.03); g.clip();
+      const k = run.mishap.t / FALL_S;
+      sink = k < 0.12 ? k / 0.12 : k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4);
+      // (the ditch it is in stands still under it: its near edge hides what is down in it)
+      g.beginPath(); g.rect(0, 0, W, project(run.x, -0.7).y); g.clip();
     }
-    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07) + sink * size * 0.4);
+    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07) + sink * size * 0.62);
     if (sink === 1) g.rotate(Math.sin(run.mishap.t * 22) * 0.06); // (scrabbling)
     if (run.glide) { g.rotate(Math.sin(songT() * 10) * 0.04); if (!slide.length) g.scale(1.1, 0.7); } // (low, a little sway as it glides under)
     if (run.stumble >= 0) g.rotate(Math.sin(run.stumble * 20) * 0.15);
