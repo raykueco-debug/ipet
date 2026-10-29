@@ -348,6 +348,21 @@
     try { await play(run); } finally { if (run === fetchRun) { busy = false; clearInterval(pace); Fox2D.run(false); } }
   }
   // one go at the ball lying still: get to it, face it, and the move that fits where it lies — true if it hit it
+  // the pounce carries it forward: over its leap (a share of its way in, eased: slow off, quickest in the air,
+  // slow landing) the fox moves this far the way it faces — the one move where it goes without walking
+  const LEAP = 0.18; // of its box
+  async function leapIn(clip, dist, run) {
+    if (!(await until(() => Fox2D.state.clip === clip, run, 4000))) return;
+    let done = 0;
+    while (Fox2D.state.clip === clip && run === fetchRun) {
+      const u = Math.min(1, Math.max(0, (Fox2D.state.frame / Fox2D.state.frames - 0.3) / 0.5));
+      const to = dist * (1 - Math.cos(u * Math.PI)) / 2;
+      foxX = Math.max(4, Math.min(96, foxX + to - done));
+      done = to;
+      placeFox();
+      await wait(30);
+    }
+  }
   async function playOnce(run) {
     const paw = Fox2D.canPlay && Fox2D.state.view === 'normal' && !Fox2D.state.go && Math.abs(b.x - foxX) < 0.3 * foxW()
       && Math.abs(b.z - foxZ) < 0.1 && b.z < foxZ;
@@ -357,7 +372,11 @@
     const onTheRun = Fox2D.state.running || dashing && Fox2D.state.go;
     const kind = plan !== 'side' ? plan : moves.length && (onTheRun || Math.random() < 0.75) ? 'move' : Fox2D.canPush ? 'push' : 'move';
     dashing = onTheRun && kind === 'move'; // (and on running the last bit)
-    if (!(await walkThere(spotFor(b, plan), run, plan !== 'paw'))) return false;
+    const m = kind !== 'move' ? null : onTheRun && moves.includes('pounce') && Math.random() < 0.8 ? 'pounce' : pick(moves);
+    // a pounce leaps: it starts that much further back, and lands with its muzzle at the ball
+    const leap = m === 'pounce' ? LEAP * boxAt(b.z) : 0, spot = spotFor(b, plan);
+    if (leap) spot.x = Math.max(4, Math.min(96, spot.x + Math.sign(spot.x - b.x) * leap));
+    if (!(await walkThere(spot, run, plan !== 'paw'))) return false;
     if (b.mode !== 'rest') return false; // it got away meanwhile: after it again
     // where it stands for it: it may still be on its last stride there (walk2d says so as that stride begins)
     const at = walkTarget?.last ? { x: walkTarget.x, z: walkTarget.z } : { x: foxX, z: foxZ };
@@ -383,17 +402,19 @@
       done = () => Fox2D.state.clip === 'paw_to_normal';
     } else { // side-on: it faces the ball first (gets up / turns round that way; the move is queued first, so
       // that goes straight into it), then hits it with what is on its head's side
-      const muzzle = at.x + dir * 0.37 * w;
+      const muzzle = at.x + dir * (0.37 * w + leap);
       if (Math.abs(b.x - muzzle) > r + 0.12 * w || Math.abs(b.z - at.z) > 0.1) return false;
       const head = (reach, speed, up) => () => { // the way the frame playing faces: never a hit on the tail's side
         const f = Fox2D.state.facing;
         return f ? { x: foxX + f * 0.37 * foxW(), z: foxZ, rx: reach * foxW(), rz: 0.08, h: 40, vx: f * speed, vz: rand(-0.25, 0.25), vh: up } : null;
       };
       if (kind === 'move') {
-        const m = onTheRun && moves.includes('pounce') && Math.random() < 0.8 ? 'pounce' : pick(moves), rr = dir > 0 ? '_r' : '';
+        const rr = dir > 0 ? '_r' : '';
         const [speed, up, reach] = { pounce: [55, 85, 0.2], swipe: [50, 18, 0.16], bat: [30, 8, 0.16], header: [35, 75, 0.15] }[m];
-        strike = { clips: [`${g}_to_${m}${rr}`, `${m}${rr}_to_${g}`], from: 0.35, zone: head(reach, speed, up) };
+        // (a pounce hits as it lands, at the end of its leap; the others as the paw / head gets there)
+        strike = { clips: [`${g}_to_${m}${rr}`, `${m}${rr}_to_${g}`], from: m === 'pounce' ? 0.65 : 0.35, zone: head(reach, speed, up) };
         Fox2D.ballMove(m);
+        if (leap) leapIn(`${g}_to_${m}${rr}`, dir * leap, run);
         done = () => Fox2D.state.clip === `${m}${rr}_to_${g}` && Fox2D.state.frame >= 4;
       } else {
         strike = { clips: [`${g}_loop_push`], from: 0.3, zone: head(0.12, 38, 8) };
