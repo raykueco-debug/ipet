@@ -18,7 +18,7 @@ const RENDER = (() => {
 const RENDER_3D = RENDER === '3d';
 
 // stats change per (virtual) hour
-const RATES_AWAKE = { hunger: -6, fun: -5, energy: -4, clean: -3 };
+const RATES_AWAKE = { hunger: -6, fun: -5, energy: -3, clean: -3 };
 const RATES_SLEEP = { hunger: -3, fun: -1, energy: +18, clean: -1 };
 const MAX_CATCHUP_H = 48;
 

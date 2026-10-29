@@ -436,7 +436,7 @@
     if (S.stats.energy < 15) { Fox2D.play('yawn'); say(t('tooTired')); return; } // too tired: a yawn, the ball just lies there
     while (eating) { await wait(500); if (run !== fetchRun) return; }
     S.stats.fun = clamp(S.stats.fun + 15);
-    S.stats.energy = clamp(S.stats.energy - 8);
+    S.stats.energy = clamp(S.stats.energy - 2); // (a little each throw: a child throws it again and again)
     addBond(2);
     save();
     // a few hits, after it each time it goes; tries that didn't reach it don't count (a few, then it stops)
