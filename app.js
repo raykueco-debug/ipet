@@ -682,6 +682,13 @@ function roundThings(x, z, fx = foxX, fz = foxZ) {
 // so the fox stops as its last stride begins — that stride carries it the rest of the way (slower, when the way
 // is short) — and a stride under way when it is called off plays out moving on.
 let walkDir = null; // the last step (x %, z) while walking
+// how fast it goes: as fast as the feet of the loop playing (its own pace: the planted feet drift by so much a
+// frame, tools/clip_stride.py — so they never slide), else the set speeds
+function paceNow() {
+  const p = Fox2D.state.pace;
+  if (p) return p / 480 * (el.petWrap.offsetWidth / el.stage.clientWidth * 100) * 16; // % of the stage a second
+  return WALK_SPEED * (Fox2D.state.running ? RUN_FASTER : 1);
+}
 function walkStep() {
   const st = Fox2D.state;
   const move = (x, z) => { foxX += x; foxZ += z; walkDir = { x, z }; placeFox(); };
@@ -689,7 +696,7 @@ function walkStep() {
     if (st.stride && walkDir) {
       const w = walkTarget; // on its last stride: just onto the spot; called off: on as it was going
       // never more in a step than a stride takes it (a step short rather than a slide)
-      const cap = WALK_SPEED * (st.running ? RUN_FASTER : 1) * 0.05 * sizeAt(foxZ);
+      const cap = paceNow() * 0.05 * sizeAt(foxZ);
       if (w) {
         const dx = w.x - foxX, dz = w.z - foxZ, n = Math.max(1, st.strideLeft * 1.25);
         const k = Math.min(1, cap / (Math.hypot(dx / n, (dz / n) * DEPTH.across) || 1));
@@ -705,7 +712,7 @@ function walkStep() {
   const goal = walkTarget.via?.[0] || walkTarget;
   let dx = goal.x - foxX, dz = (goal.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
   if (goal !== walkTarget && dist < 2) { walkTarget.via.shift(); return walkStep(); } // round it: on to the next
-  const speed = WALK_SPEED * (Fox2D.state.running ? RUN_FASTER : 1);
+  const speed = paceNow();
   const step = Math.min(dist, speed * 0.05 * sizeAt(foxZ)); // farther away it looks slower
   const arrive = () => {
     const { then, keep } = walkTarget;

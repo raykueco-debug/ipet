@@ -74,7 +74,7 @@
       // pictures are fetched only when the clip is needed (fetch()): ~150 clips × ~20 frames at once jammed the
       // server and would cost a tablet some 60 MB up front
       const frames = meta.frames.map(f => { const im = new Image(); im.dataset.src = ROOT + name + '/' + f + v; return im; });
-      clips[name] = { name, frames, exits: meta.exits || [], near: meta.near || [] };
+      clips[name] = { name, frames, exits: meta.exits || [], near: meta.near || [], pace: meta.speed || 0 };
       if (wait) await fetchFrames(clips[name], 2);
     } catch (e) { clips[name] = null; }
     return clips[name];
@@ -339,6 +339,7 @@
                walking: !!go && !!cur && cur.name.startsWith(`${go}_loop`) && !cur.name.endsWith('_push'),
                pushing: !!cur && cur.name.endsWith('_loop_push'),
                running: !!cur && cur.name.endsWith('_loop_run'),
+               pace: cur?.pace || 0, // how fast its feet go (px of its 480 picture a frame: tools/clip_stride.py), 0 unknown
                // a walk loop playing (legs going), and its frames to where it can be left
                // the way it faces: -1 side-on left, 1 side-on right, 0 toward / away from us (by the picture it is on
                // its way to: a move's way in counts as the move)

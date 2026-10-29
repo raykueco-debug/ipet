@@ -60,8 +60,10 @@
   // the fox, bounding away pounce after pounce, a pounce every half bar (back_crouch_to_back_air +
   // back_air_to_back_crouch, tools/wan_run.sh) — or, until those are there, its running-away loop
   let frames = [], slide = [], pouncing = false; // (slide: back_crouch_loop_slide, gliding under the bars)
+  // mishaps: into a ditch and out (down into it, hanging struggling, pulling up, climbing out: back_crouch_to_back_hang
+  // + back_hang_loop + back_hang_to_back_pull + back_pull_to_back_crouch), and tripping (back_crouch_to_back_crouch_trip)
   const mishaps = { fall: [], trip: [] };
-  const FALL_S = 2;                                // into a ditch and out: seconds, the music paused          // into a ditch and out of it; tripping (back_crouch_to_back_crouch_fall / _trip)
+  let FALL_S = 2; // into a ditch and out: seconds (its clips' length), the music paused meanwhile
   async function clipFrames(clip) {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return null;
@@ -70,7 +72,13 @@
   }
   (async () => {
     slide = (await clipFrames('back_crouch_loop_slide')) || [];
-    for (const k of ['fall', 'trip']) mishaps[k] = (await clipFrames(`back_crouch_to_back_crouch_${k}`)) || [];
+    mishaps.trip = (await clipFrames('back_crouch_to_back_crouch_trip')) || [];
+    const fall = [];
+    for (const c of ['back_crouch_to_back_hang', 'back_hang_loop', 'back_hang_to_back_pull', 'back_pull_to_back_crouch']) {
+      const f = await clipFrames(c); if (!f) { fall.length = 0; break; } fall.push(...f);
+    }
+    mishaps.fall = fall.length ? fall : (await clipFrames('back_crouch_to_back_crouch_fall')) || [];
+    if (mishaps.fall.length) FALL_S = mishaps.fall.length / 16;
     const up = await clipFrames('back_crouch_to_back_air'), down = up && await clipFrames('back_air_to_back_crouch');
     if (up && down) { frames = [...up, ...down.slice(1, -1)]; pouncing = true; return; }
     for (const clip of ['walk_back_loop_run', 'walk_back_loop']) { const f = await clipFrames(clip); if (f) { frames = f; return; } }
@@ -402,16 +410,9 @@
     const u = (run.frame % (frames.length || 24)) / (frames.length || 24);
     const hop = run.jump >= 0 || run.glide || mis ? 0 : pouncing ? Math.sin(Math.PI * u) : Math.abs(Math.sin(u * Math.PI * 4));
     g.save();
-    // in the ditch: down into it fast, scrabbling at its edge, then up and out (the clip only wriggles: the drop is here)
-    let sink = 0;
-    if (run.mishap?.kind === 'fall') {
-      const k = run.mishap.t / FALL_S;
-      sink = k < 0.12 ? k / 0.12 : k < 0.6 ? 1 : Math.max(0, 1 - (k - 0.6) / 0.4);
-      // (the ditch it is in stands still under it: its near edge hides what is down in it)
-      g.beginPath(); g.rect(0, 0, W, project(run.x, -0.7).y); g.clip();
-    }
-    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07) + sink * size * 0.62);
-    if (sink === 1) g.rotate(Math.sin(run.mishap.t * 22) * 0.06); // (scrabbling)
+    // in the ditch (its clips: down, hanging at its edge, out): what has gone down into it is hidden by the ground
+    if (run.mishap?.kind === 'fall') { g.beginPath(); g.rect(0, 0, W, p.y - 2); g.clip(); }
+    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07));
     if (run.glide) { g.rotate(Math.sin(songT() * 10) * 0.04); if (!slide.length) g.scale(1.1, 0.7); } // (low, a little sway as it glides under)
     if (run.stumble >= 0) g.rotate(Math.sin(run.stumble * 20) * 0.15);
     g.drawImage(f, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in the clip's frames)

@@ -55,4 +55,19 @@ if want back_crouch_to_back_crouch_trip; then
   echo "=== back_crouch_to_back_crouch_trip $(date +%T)"
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch_trip" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你，被絆了一下，身體往前一顛、差點跌倒，屁股和尾巴往上一翹又落下，晃了晃站穩，回到原本壓低的姿勢。背對你。動作自然流暢、有點可愛的慌張。$KEEP" 2>&1 | tail -3
 fi
+# into a ditch and out (GPT sheet assets/source/gpt/fall_01.png: back_hang — only its head and front paws on the
+# edge, at the bottom of the picture, the rest down in the ditch below it; back_pull — elbows on the edge):
+# down into it, hanging there struggling, pulling up, climbing out back into its crouch
+run2() { # input  suffix  end-image|-  prompt
+  local end=(); [ "$3" != - ] && end=(--end "$3")
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$1" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "$2" "${end[@]}" --prompt "$4" 2>&1 | tail -3
+}
+want back_crouch_to_back_hang && { echo "=== back_crouch_to_back_hang $(date +%T)"
+  run2 "$IN/back_crouch.png" _to_back_hang "$IN/back_hang.png" "${FOX}牠背對你，一腳踩空，整個身體往下掉進前面的洞裡，往畫面下方沉下去，最後只剩頭和兩隻往上伸的前腳攀在畫面下方的邊緣上。背對你。動作快、自然流暢。$KEEP"; }
+want back_hang_loop && { echo "=== back_hang_loop $(date +%T)"
+  run2 "$IN/back_hang.png" _loop - "${FOX}牠背對你，掉在洞裡，只露出頭和兩隻前腳攀在畫面下方的邊緣上，用力掙扎、左右扭動、頭晃來晃去、前腳努力扒著邊緣，想爬上去。背對你。最後回到開始的姿勢。$KEEP"; }
+want back_hang_to_back_pull && { echo "=== back_hang_to_back_pull $(date +%T)"
+  run2 "$IN/back_hang.png" _to_back_pull "$IN/back_pull.png" "${FOX}牠背對你，前腳攀著邊緣，用力把身體往上撐，手肘撐到邊緣上，胸口和身體升上來，一隻後腳抬起。背對你。動作自然流暢。$KEEP"; }
+want back_pull_to_back_crouch && { echo "=== back_pull_to_back_crouch $(date +%T)"
+  run2 "$IN/back_pull.png" _to_back_crouch "$IN/back_crouch.png" "${FOX}牠背對你，手肘撐在邊緣上，後腳往上一蹬，整個身體爬上來，回到地面上壓低身體的姿勢，甩甩身體，準備繼續跑。背對你。動作自然流暢。$KEEP"; }
 echo "=== all done $(date +%T)"
