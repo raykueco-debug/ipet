@@ -35,23 +35,32 @@
   addEventListener('resize', resize);
   resize();
   const horizon = () => H * 0.32, ground0 = () => H * 0.9, laneW = () => Math.min(W * 0.28, H * 0.2);
+  // a little round world: the ground bends away from the fox — far off it sinks, and off to the sides too, so
+  // the horizon is a gentle arc and things come up over it
+  const BEND = [0.05, 0.1]; // of the screen's height: sunk at the far end, at the screen's edges
   function project(x, z) { // → screen x, y and scale
     const s = CAM / (CAM + Math.max(-CAM * 0.9, z));
-    return { x: W / 2 + x * laneW() * s, y: horizon() + (ground0() - horizon()) * s, s };
+    const sx = W / 2 + x * laneW() * s, far = Math.max(0, z) / FAR, side = Math.min(1, Math.abs(sx - W / 2) / (W / 2));
+    // (only ever down, and only away from the fox: the ground under it stays put)
+    return { x: sx, y: horizon() + (ground0() - horizon()) * s + H * (BEND[0] * far * far + BEND[1] * side * side * Math.max(0, 1 - s)), s };
   }
 
-  // the fox: its running-away clip (walk_back_loop_run, tools/wan_run.sh) — or, until that is there, its
-  // walking-away one played fast — at the run's pace
-  const frames = [];
-  let pace = 1;
+  // the fox, bounding away pounce after pounce: up from its crouch and down into it again (back_crouch_to_back_air
+  // + back_air_to_back_crouch, tools/wan_run.sh) — or, until those are there, its running-away loop bounced by the
+  // code — at the run's pace
+  let frames = [], pace = 1, pouncing = false;
+  async function clipFrames(clip) {
+    const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
+    if (!r?.ok) return null;
+    const m = await r.json();
+    return m.frames.map(f => { const im = new Image(); im.src = `assets/fox/clips/${clip}/${f}?v=${m.rev || 1}`; return im; });
+  }
   (async () => {
+    const up = await clipFrames('back_crouch_to_back_air'), down = up && await clipFrames('back_air_to_back_crouch');
+    if (up && down) { frames = [...up, ...down.slice(1, -1)]; pace = 0.75; pouncing = true; return; }
     for (const [clip, k] of [['walk_back_loop_run', 1], ['walk_back_loop', 1.4]]) {
-      const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
-      if (!r?.ok) continue;
-      const m = await r.json();
-      for (const f of m.frames) { const im = new Image(); im.src = `assets/fox/clips/${clip}/${f}?v=${m.rev || 1}`; frames.push(im); }
-      pace = k;
-      return;
+      const f = await clipFrames(clip);
+      if (f) { frames = f; pace = k; return; }
     }
   })();
 
@@ -156,15 +165,21 @@
     const b = biome(), hy = horizon();
     const sky = g.createLinearGradient(0, 0, 0, hy);
     sky.addColorStop(0, b.sky[0]); sky.addColorStop(1, b.sky[1]);
-    g.fillStyle = sky; g.fillRect(0, 0, W, hy + 1);
+    g.fillStyle = sky; g.fillRect(0, 0, W, H); // (down behind the arc of the ground)
     if (b.name === 'night') for (let k = 0; k < 40; k++) { g.fillStyle = '#fff8'; g.fillRect((k * 97.3) % W, (k * 53.1) % hy, 2, 2); }
-    g.fillStyle = b.ground; g.fillRect(0, hy, W, H - hy);
-    // the road, with its edges and stripes coming at the fox
-    const L = project(-1.6, FAR), R = project(1.6, FAR), l0 = project(-1.6, -CAM * 0.6), r0 = project(1.6, -CAM * 0.6);
+    // the ground: its far edge an arc (the round world), the sky down to it
+    const edgeAt = sx => project((sx - W / 2) / laneW() / (CAM / (CAM + FAR)), FAR).y; // (the world x seen at sx out there)
+    g.fillStyle = b.ground;
+    g.beginPath(); g.moveTo(0, H);
+    for (let k = 0; k <= 24; k++) g.lineTo(W * k / 24, edgeAt(W * k / 24));
+    g.lineTo(W, H); g.closePath(); g.fill();
+    // the road, bending down with the ground, its edges and stripes coming at the fox
+    const zs = []; for (let k = 0; k <= 30; k++) zs.push(-CAM * 0.6 + (FAR + CAM * 0.6) * (k / 30) ** 1.6);
+    const left = zs.map(z => project(-1.6, z)), right = zs.map(z => project(1.6, z));
     g.fillStyle = b.road;
-    g.beginPath(); g.moveTo(L.x, L.y); g.lineTo(R.x, R.y); g.lineTo(r0.x, H); g.lineTo(l0.x, H); g.closePath(); g.fill();
+    g.beginPath(); left.forEach((p, k) => k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); [...right].reverse().forEach(p => g.lineTo(p.x, p.y)); g.closePath(); g.fill();
     g.strokeStyle = b.edge; g.lineWidth = 6;
-    g.beginPath(); g.moveTo(L.x, L.y); g.lineTo(l0.x, H); g.moveTo(R.x, R.y); g.lineTo(r0.x, H); g.stroke();
+    for (const side of [left, right]) { g.beginPath(); side.forEach((p, k) => k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.stroke(); }
     g.fillStyle = '#ffffff55';
     for (let z = -(run.z % 4); z < FAR; z += 4) for (const x of [-0.5, 0.5]) {
       const a = project(x, z), c = project(x, z + 1.6);
@@ -221,11 +236,13 @@
     g.fillStyle = '#0002'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - air * 0.3), size * 0.05, 0, 0, 7); g.fill();
     const f = frames[Math.floor(run.frame) % (frames.length || 1)];
     if (!f || !f.complete || !f.naturalWidth) return;
-    // a bounding run: up off the ground twice a loop, a little squash as it lands (the clip itself only trots)
-    const ph = (run.frame / (frames.length || 24)) * Math.PI * 4, hop = run.jump >= 0 || run.duck >= 0 ? 0 : Math.abs(Math.sin(ph));
+    // pouncing on: up through the first half of the loop, down through the second; (a trot: bounced twice a
+    // loop, a little squash as it lands)
+    const u = (run.frame % (frames.length || 24)) / (frames.length || 24), busy = run.jump >= 0 || run.duck >= 0;
+    const hop = busy ? 0 : pouncing ? Math.sin(Math.PI * u) : Math.abs(Math.sin(u * Math.PI * 4));
     g.save();
-    g.translate(p.x, p.y - air * size * 0.45 - hop * size * 0.07);
-    if (run.jump < 0 && run.duck < 0) g.scale(1 + (1 - hop) * 0.04, 1 - (1 - hop) * 0.06);
+    g.translate(p.x, p.y - air * size * 0.45 - hop * size * (pouncing ? 0.16 : 0.07));
+    if (!busy && !pouncing) g.scale(1 + (1 - hop) * 0.04, 1 - (1 - hop) * 0.06);
     if (run.stumble >= 0) { g.rotate(Math.sin(run.stumble * 18) * 0.18); g.globalAlpha = Math.floor(run.stumble * 10) % 2 ? 0.5 : 1; }
     if (run.duck >= 0) g.scale(1.12, 0.62);
     if (run.boost >= 0) { g.shadowColor = '#ffb347'; g.shadowBlur = 30; }
