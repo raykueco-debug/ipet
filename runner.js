@@ -81,6 +81,7 @@
           i = j; continue;
         }
         const n = ns[i], t = (off + n.t) * s16, prev = marks.at(-1);
+        if (n.len < 1) { backs.push({ t, midi: n.midi }); i++; continue; } // a grace note: it plays itself
         // its lane by its pitch (higher to the right), but only a lane at a time when they come close
         const want = Math.round(((n.midi[0] - low) / Math.max(1, high - low)) * 2 - 1), gap = prev ? t - (prev.t1 || prev.t) : 9;
         lane += Math.max(gap < 0.35 ? -1 : -2, Math.min(gap < 0.35 ? 1 : 2, want - lane));
@@ -89,13 +90,14 @@
       }
     }
     const total = marks.reduce((a, m) => a + (m.type === 'roll' ? m.notes.length : 1), 0);
+    backs.sort((a, b) => a.t - b.t);
     return { marks, backs, total, length: lead.length * song.times * s16, name: song.name, s16 };
   }
 
   // game state
   let run = null;
   const fresh = () => {
-    const c = chart(pick(Music.SONGS));
+    const c = chart(Music.SONGS[+params.get('song')] || pick(Music.SONGS)); // (?song=n: that one)
     return { ...c, start: Music.now() + LEAD_IN, sched: 0, lane: 0, x: 0, jump: -1, boost: -1, boostsLeft: tails,
       played: 0, combo: 0, frame: 0, flash: [], says: [], trees: [], dist: 0 };
   };

@@ -31,13 +31,13 @@ if want walk_back_loop_run; then
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/walk_back.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_loop_run" --prompt "${FOX}牠背對你，在原地全速往前跑，像小狗開心地奔跑一樣一蹦一蹦：後腳用力蹬地、前腳往前伸，身體一彈一彈地上下起伏，大尾巴在身後左右大大地甩動，耳朵往後貼。身體位置不前進、不移動、大小不變，像在跑步機上。最後回到開始的姿勢。$KEEP" 2>&1 | tail -3
 fi
 # bounding away from us, pounce after pounce, for the mini game: from the crouch up into the air and down into
-# the crouch again (pictures back_crouch / back_air, GPT sheet assets/source/gpt/back_02.png: both front legs, one each side)
+# the crouch again (pictures back_crouch / back_air, GPT sheet assets/source/gpt/back_03.png: the front legs together in the middle, just peeking out between the back legs)
 if want back_crouch_to_back_air; then
   echo "=== back_crouch_to_back_air $(date +%T)"
-  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_air" --end "$IN/back_air.png" --prompt "${FOX}牠背對你壓低身體、兩隻前腳對稱地伸在身體兩側，後腳用力一蹬，往前上方高高撲跳起來，兩隻前腳對稱地往前伸、尾巴翹高，背對你。左右兩邊的前腳一樣看得到。動作有力、自然流暢。$KEEP" 2>&1 | tail -3
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_air" --end "$IN/back_air.png" --prompt "${FOX}牠背對你壓低身體，後腳用力一蹬，往前上方高高撲跳起來，後腳收起、尾巴翹高，背對你。前腳併在身體中間、被身體擋住，只從兩條後腿之間露出一點點，不會伸到身體兩側。動作有力、自然流暢。$KEEP" 2>&1 | tail -3
 fi
 if want back_air_to_back_crouch; then
   echo "=== back_air_to_back_crouch $(date +%T)"
-  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_air.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你在空中，兩隻前腳對稱地往前伸，往前落地，兩隻前腳同時著地，身體壓低蓄力準備再撲，背對你。左右兩邊的前腳一樣看得到。動作有力、自然流暢。$KEEP" 2>&1 | tail -3
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_air.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你在空中，往前落地，身體壓低蓄力準備再撲，背對你。前腳併在身體中間、被身體擋住，只從兩條後腿之間露出一點點，不會伸到身體兩側。動作有力、自然流暢。$KEEP" 2>&1 | tail -3
 fi
 echo "=== all done $(date +%T)"

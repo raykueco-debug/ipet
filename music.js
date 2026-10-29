@@ -22,6 +22,10 @@
   const NAMES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const midiOf = p => { const m = /^([A-G])(#|b)?(-?\d)$/.exec(p); return 12 * (+m[3] + 1) + NAMES[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
   function parse(text) {
+    if (Array.isArray(text)) { // already notes (from a MIDI file)
+      const notes = text.map(([t, len, midi, jump]) => ({ t, len, midi: [midi], jump: !!jump }));
+      return { notes, length: Math.max(...notes.map(n => n.t + n.len)) };
+    }
     const out = [];
     let t = 0;
     for (const tok of text.split(/\s+/)) {
