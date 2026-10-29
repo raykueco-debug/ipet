@@ -17,11 +17,11 @@
   .orbs { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; }
   .time { flex: 1; height: 12px; background: #ffffff99; border-radius: 99px; overflow: hidden; }
   .time i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ffd56b, #ff8a65); border-radius: 99px; }
-  .boost { position: fixed; right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); width: 92px; height: 92px;
-    border-radius: 50%; border: 0; background: radial-gradient(circle at 40% 35%, #fff3c4, var(--glow) 60%, #ff7a3d);
-    box-shadow: 0 6px 18px #ff7a3d66; font-size: 38px; color: #fff; font-weight: 900; }
-  .boost:disabled { filter: grayscale(1) opacity(.5); }
-  .boost b { position: absolute; left: 0; right: 0; bottom: -26px; font-size: 15px; color: var(--ink); text-shadow: 0 1px 0 #fff; }
+  .keys { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 10px 12px max(14px, env(safe-area-inset-bottom)); }
+  .key { height: min(16vh, 110px); border: 0; border-radius: 22px; box-shadow: 0 6px 0 #0002; touch-action: none; }
+  .key:nth-child(1) { background: #ff9f6b; } .key:nth-child(2) { background: #ffd34d; } .key:nth-child(3) { background: #7cc7ff; }
+  .key.down { transform: translateY(4px); box-shadow: 0 2px 0 #0002; filter: brightness(1.15); }
   .card { position: fixed; inset: 0; display: grid; place-items: center; background: #0003; }
   .card[hidden] { display: none; }
   .card > div { background: var(--card); border-radius: 24px; padding: 26px 24px; width: min(88vw, 360px); text-align: center;
@@ -37,14 +37,13 @@
 <body>
 <canvas id="game"></canvas>
 <div class="hud"><span class="orbs">🎵 <span id="orbs">0</span></span><div class="time"><i id="timeBar"></i></div></div>
-<button class="boost" id="boost" aria-label="加速">⚡<b id="boostLeft"></b></button>
+<div class="keys"><button class="key" aria-label="左"></button><button class="key" aria-label="中"></button><button class="key" aria-label="右"></button></div>
 <div class="card" id="start"><div>
   <h1>🦊 狐火奔跑</h1>
   <p>音樂會一直播，跟著節奏把旋律撿回來！</p>
-  <p>🎵 吃：音符到腳下時在那條路上（點左右換路）</p>
-  <p>⤴ 跳：大音符到時往上滑</p>
-  <p>〰 連打：光帶經過時一直點</p>
-  <p>⚡ 幾條尾巴就有幾次：3 秒內音符自己彈</p>
+  <p>🎵 吃：音符到腳下時，按那條路的鍵（也就閃過石頭）</p>
+  <p>⤴ 跳：橫木頭和大音符來時，三個鍵一起按</p>
+  <p>〰 滑行：光帶經過時一直點，鑽過樹枝</p>
   <button id="go">開始！</button>
 </div></div>
 <div class="card" id="end" hidden><div>

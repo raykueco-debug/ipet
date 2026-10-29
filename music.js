@@ -4,18 +4,18 @@
    brighter at first, the way a piano string rings.
 
    A part is written as tokens "pitch:length" (length in sixteenths; "C4+E4+G4:8" a chord, "-:4" a rest, "|" only
-   for reading). In the lead, "^" before a note makes it one to jump for; runs of quick notes (sixteenths, four or
+   for reading); bar: its sixteenths. In the lead, "^" before a note makes it one to jump for; runs of quick notes (sixteenths, three or
    more) become a roll to tap through.
    window.Music: SONGS, parse(text) → [{ t (16ths), len, midi[] , jump }], unlock(), now(), play(midi, gain, when). */
 (function () {
   const SONGS = [
-    { name: '給愛麗絲（貝多芬）', sixteenth: 0.17, times: 3,
+    { name: '給愛麗絲（貝多芬）', sixteenth: 0.17, times: 3, bar: 6,
       lead: 'E5:1 D#5:1 | E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 | A4:6 | B4:6 | ^C5:4 E5:1 D#5:1 | E5:1 D#5:1 E5:1 B4:1 D5:1 C5:1 | A4:6 | B4:6 | ^A4:6',
       back: '-:2 | -:6 | A2:1 E3:1 A3:1 C4:1 E4:1 A4:1 | E2:1 E3:1 G#3:1 E4:1 G#4:1 B4:1 | A2:1 E3:1 A3:1 E4:1 -:2 | -:6 | A2:1 E3:1 A3:1 C4:1 E4:1 A4:1 | E2:1 E3:1 G#3:1 E4:1 C5:1 B4:1 | A2:1 E3:1 A3:1 -:3' },
-    { name: '歡樂頌（貝多芬）', sixteenth: 0.13, times: 2,
+    { name: '歡樂頌（貝多芬）', sixteenth: 0.13, times: 2, bar: 16,
       lead: 'E5:4 E5:4 F5:4 ^G5:4 | G5:4 F5:4 E5:4 D5:4 | C5:4 C5:4 D5:4 E5:4 | E5:6 D5:2 D5:8 | E5:4 E5:4 F5:4 ^G5:4 | G5:4 F5:4 E5:4 D5:4 | C5:4 C5:4 D5:4 E5:4 | D5:6 C5:2 ^C5:8',
       back: 'C3:4 G3:4 E3:4 G3:4 | G2:4 G3:4 B2:4 G3:4 | C3:4 G3:4 E3:4 G3:4 | G2:4 D3:4 B2:4 D3:4 | C3:4 G3:4 E3:4 G3:4 | G2:4 G3:4 B2:4 G3:4 | C3:4 G3:4 E3:4 G3:4 | G2:4 B2:4 C3+E3+G3:8' },
-    { name: '小星星（莫札特變奏曲的主題）', sixteenth: 0.12, times: 2,
+    { name: '小星星（莫札特變奏曲的主題）', sixteenth: 0.12, times: 2, bar: 16,
       lead: 'C5:4 C5:4 G5:4 G5:4 ^A5:4 A5:4 G5:8 | F5:4 F5:4 E5:4 E5:4 D5:4 D5:4 C5:8 | G5:4 G5:4 F5:4 F5:4 E5:4 E5:4 D5:8 | G5:4 G5:4 F5:4 F5:4 E5:4 E5:4 D5:8 | C5:4 C5:4 G5:4 G5:4 ^A5:4 A5:4 G5:8 | F5:4 F5:4 E5:4 E5:4 D5:4 D5:4 ^C5:8',
       back: 'C3+G3:8 C3+E3:8 | F3+A3:8 C3+G3:8 | F3+A3:8 C3+G3:8 | G2+F3:8 C3+E3:8 | C3+G3:8 F3+A3:8 | C3+G3:8 G2+B2:8 | C3+G3:8 F3+A3:8 | C3+G3:8 G2+B2:8 | C3+G3:8 C3+E3:8 | F3+A3:8 C3+G3:8 | F3+A3:8 C3+G3:8 | G2+F3:8 C3+E3:8' },
   ];
