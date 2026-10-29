@@ -306,19 +306,24 @@
   }
   const walkThere = (spot, run, keep) => new Promise(ok => { if (!goTo(spot, keep, () => ok(run === fetchRun))) ok(false); });
   let pace = 0;
+  let dashing = false; // going in for a pounce: it runs all the way in
   function pacing() { // runs while it's far, walks the last body length (slowing down as a real one does)
     clearInterval(pace);
     pace = setInterval(() => {
       const w = walkTarget?.via?.[0] || walkTarget;
-      Fox2D.run(!!w && Math.hypot(w.x - foxX, (w.z - foxZ) * DEPTH.across) > 0.9 * foxW());
+      Fox2D.run(!!w && (dashing || Math.hypot(w.x - foxX, (w.z - foxZ) * DEPTH.across) > 0.9 * foxW()));
     }, 100);
   }
   // stopped (or put away): false when it is still going after a while, or the fetch was called off
   const rolled = async run => (await until(() => b.mode === 'rest' || b.mode === 'home', run, 5000)) && b.mode !== 'free';
   async function chase(run) { // up at once, for where it will stop, while it still flies and rolls
     for (let k = 0; b.mode === 'free' && k < 40; k++) {
-      const p = restAt(), s = spotFor(p, planFor(p));
-      if (Math.hypot(s.x - foxX, (s.z - foxZ) * DEPTH.across) > 3 || Fox2D.state.go) walk2d(s.x, s.z);
+      // on to where it will be, staying up (no sitting down on the way: it goes straight into its move when it
+      // gets there); there before the ball has stopped, it sits and watches it
+      const p = restAt(), plan = planFor(p), s = spotFor(p, plan);
+      dashing = plan === 'side';
+      if (Math.hypot(s.x - foxX, (s.z - foxZ) * DEPTH.across) > 3) walk2d(s.x, s.z, null, true);
+      else if (!walkTarget && Fox2D.state.go) Fox2D.stop();
       await wait(250);
       if (run !== fetchRun) return false;
     }
@@ -348,7 +353,10 @@
       && Math.abs(b.z - foxZ) < 0.1 && b.z < foxZ;
     const plan = paw ? 'paw' : planFor(b);
     const moves = Fox2D.ballMoves.filter(m => m !== 'tail'); // (the tail sweep turns its back on the ball: not for this)
-    const kind = plan !== 'side' ? plan : moves.length && Math.random() < 0.75 ? 'move' : Fox2D.canPush ? 'push' : 'move';
+    // running in at it: a pounce, straight off the run (it is queued as the last stride begins, see below)
+    const onTheRun = Fox2D.state.running || dashing && Fox2D.state.go;
+    const kind = plan !== 'side' ? plan : moves.length && (onTheRun || Math.random() < 0.75) ? 'move' : Fox2D.canPush ? 'push' : 'move';
+    dashing = onTheRun && kind === 'move'; // (and on running the last bit)
     if (!(await walkThere(spotFor(b, plan), run, plan !== 'paw'))) return false;
     if (b.mode !== 'rest') return false; // it got away meanwhile: after it again
     // where it stands for it: it may still be on its last stride there (walk2d says so as that stride begins)
@@ -382,7 +390,7 @@
         return f ? { x: foxX + f * 0.37 * foxW(), z: foxZ, rx: reach * foxW(), rz: 0.08, h: 40, vx: f * speed, vz: rand(-0.25, 0.25), vh: up } : null;
       };
       if (kind === 'move') {
-        const m = pick(moves), rr = dir > 0 ? '_r' : '';
+        const m = onTheRun && moves.includes('pounce') && Math.random() < 0.8 ? 'pounce' : pick(moves), rr = dir > 0 ? '_r' : '';
         const [speed, up, reach] = { pounce: [55, 85, 0.2], swipe: [50, 18, 0.16], bat: [30, 8, 0.16], header: [35, 75, 0.15] }[m];
         strike = { clips: [`${g}_to_${m}${rr}`, `${m}${rr}_to_${g}`], from: 0.35, zone: head(reach, speed, up) };
         Fox2D.ballMove(m);
@@ -394,6 +402,7 @@
       }
       Fox2D.go(g);
     }
+    dashing = false;
     const k = strike;
     await until(() => k.hit || done(), run, 7000);
     if (strike === k) strike = null;
