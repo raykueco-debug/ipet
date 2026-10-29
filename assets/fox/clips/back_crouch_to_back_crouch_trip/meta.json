@@ -1,0 +1,44 @@
+{
+ "name": "back_crouch_to_back_crouch_trip",
+ "mode": "idle",
+ "style": "default",
+ "seed": 7,
+ "frames": [
+  "frame_00.webp",
+  "frame_01.webp",
+  "frame_02.webp",
+  "frame_03.webp",
+  "frame_04.webp",
+  "frame_05.webp",
+  "frame_06.webp",
+  "frame_07.webp",
+  "frame_08.webp",
+  "frame_09.webp",
+  "frame_10.webp",
+  "frame_11.webp"
+ ],
+ "fps": 16,
+ "width": 480,
+ "duration_ms": 1562.5,
+ "bytes": 493638,
+ "wan_seconds": 111,
+ "prompt": "一隻Q版的小狐狸（橘色的毛、米白色的臉頰和胸口、深褐色的耳尖與腳掌、蓬鬆的大尾巴有白色尾尖），在純綠色背景前。牠背對你，被絆了一下，身體往前一顛、差點跌倒，屁股和尾巴往上一翹又落下，晃了晃站穩，回到原本壓低的姿勢。背對你。動作自然流暢、有點可愛的慌張。側身的時候，頭和臉始終是正側面、朝著前進的方向，不回頭、不轉頭看鏡頭。畫面裡只有這隻狐狸，沒有手、沒有碗、沒有玩具、沒有任何特效符號。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。",
+ "rev": 1793288446,
+ "trimmed": {
+  "from": 25,
+  "kept": [
+   0,
+   6,
+   7,
+   8,
+   9,
+   11,
+   12,
+   14,
+   15,
+   16,
+   18,
+   24
+  ]
+ }
+}

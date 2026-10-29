@@ -40,4 +40,19 @@ if want back_air_to_back_crouch; then
   echo "=== back_air_to_back_crouch $(date +%T)"
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_air.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你在空中，往前落地，身體壓低蓄力準備再撲，背對你。前腳併在身體中間、被身體擋住，只從兩條後腿之間露出一點點，不會伸到身體兩側。動作有力、自然流暢。$KEEP" 2>&1 | tail -3
 fi
+# sliding under the bars in the mini game: low in its crouch, gliding along on its belly, from behind
+if want back_crouch_loop_slide; then
+  echo "=== back_crouch_loop_slide $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_loop_slide" --prompt "${FOX}牠背對你，身體壓得很低、肚子貼著地面往前滑行，耳朵往後貼平，大尾巴往後水平拖著隨風飄動，身體微微左右晃，很開心。前腳併在身體中間、被身體擋住，只從兩條後腿之間露出一點點。身體位置不前進、大小不變。最後回到開始的姿勢。$KEEP" 2>&1 | tail -3
+fi
+# the mini game's mishaps, from behind, back to its crouch after: missed a ditch — down into it, the front paws on its
+# edge, scrambling out (the ditch is the game's: it hides the fox's lower half meanwhile); tripped on something
+if want back_crouch_to_back_crouch_fall; then
+  echo "=== back_crouch_to_back_crouch_fall $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch_fall" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你，一腳踩空往下掉，整個身體往下沉，只剩頭和兩隻前腳往上伸，前腳攀住上方的邊緣，然後用力撐起身體、後腳蹬著往上爬，爬回原本壓低的姿勢，甩甩頭。背對你。動作自然流暢。$KEEP" 2>&1 | tail -3
+fi
+if want back_crouch_to_back_crouch_trip; then
+  echo "=== back_crouch_to_back_crouch_trip $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/back_crouch.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_to_back_crouch_trip" --end "$IN/back_crouch.png" --prompt "${FOX}牠背對你，被絆了一下，身體往前一顛、差點跌倒，屁股和尾巴往上一翹又落下，晃了晃站穩，回到原本壓低的姿勢。背對你。動作自然流暢、有點可愛的慌張。$KEEP" 2>&1 | tail -3
+fi
 echo "=== all done $(date +%T)"
