@@ -37,7 +37,7 @@
   const horizon = () => H * 0.32, ground0 = () => H * 0.9, laneW = () => Math.min(W * 0.28, H * 0.2);
   // a little round world: the ground bends away from the fox — far off it sinks, and off to the sides too, so
   // the horizon is a gentle arc and things come up over it
-  const BEND = [0.05, 0.1]; // of the screen's height: sunk at the far end, at the screen's edges
+  const BEND = [0.03, 0.04]; // of the screen's height: sunk at the far end, at the screen's edges
   function project(x, z) { // → screen x, y and scale
     const s = CAM / (CAM + Math.max(-CAM * 0.9, z));
     const sx = W / 2 + x * laneW() * s, far = Math.max(0, z) / FAR, side = Math.min(1, Math.abs(sx - W / 2) / (W / 2));
