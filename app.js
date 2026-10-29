@@ -898,6 +898,7 @@ function bind() {
     S.locks = { ...S.locks, [b.dataset.ff]: !S.locks?.[b.dataset.ff] };
     render(); save();
   }));
+  $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runner.html'; }); // the mini game (runner.js)
   $('#renameBtn').addEventListener('click', () => {
     const n = prompt(t('renamePrompt'), S.name);
     if (n && n.trim()) { S.name = n.trim().slice(0, 10); save(); render(); }

@@ -25,4 +25,9 @@ for d in walk walk_r; do
   ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/$d.png" --length 25 --fps 16 \
     --seed "$SEED" --out "$OUT" --suffix "_loop_run" --prompt "${FOX}牠側身朝畫面${side}邊，在原地全速奔跑，像兔子一樣一蹦一蹦地跳躍前進：後腳用力一蹬，身體向${side}拉長伸展，四隻腳同時離地騰空，然後前腳先落地、後腳再收到前面，再蹬地跳起，跳了兩下。耳朵往後貼，大尾巴在身後水平飄起，嘴巴開開很興奮。身體位置不前進、不移動，像在跑步機上。最後回到開始的姿勢。$KEEP" 2>&1 | tail -3
 done
+# running away from us, for the mini game (runner.js): the fox seen from behind, its tail(s) in full view
+if want walk_back_loop_run; then
+  echo "=== walk_back_loop_run $(date +%T)"
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$IN/walk_back.png" --length 25 --fps 16     --seed "$SEED" --out "$OUT" --suffix "_loop_run" --prompt "${FOX}牠背對你，在原地全速往前跑，像小狗開心地奔跑一樣一蹦一蹦：後腳用力蹬地、前腳往前伸，身體一彈一彈地上下起伏，大尾巴在身後左右大大地甩動，耳朵往後貼。身體位置不前進、不移動、大小不變，像在跑步機上。最後回到開始的姿勢。$KEEP" 2>&1 | tail -3
+fi
 echo "=== all done $(date +%T)"
