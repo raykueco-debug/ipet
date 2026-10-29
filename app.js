@@ -556,7 +556,7 @@ function wander() {
   const cur = parseFloat(el.petWrap.style.left) || 50;
   const next = clamp(cur + rand(-35, 35), 22, 78);
   if (Math.abs(next - cur) < 6) return;
-  if (walk2d(next, Math.random() * 0.6)) return;
+  if (walk2d(next, Math.random() * 0.6) || RENDER === 'anim') return; // (2D fox: it only ever moves walking)
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.classList.add('walking');
   el.petWrap.style.left = next + '%';
@@ -570,7 +570,7 @@ function walkTo(pct, follow, z) {
   const next = clamp(pct, 15, 85);
   if (Math.abs(next - cur) < 1.5 && (z == null || Math.abs(z - foxZ) < 0.05)) return;
   userWalkUntil = Date.now() + 8000; // don't wander off right after being led somewhere
-  if (walk2d(next, z ?? foxZ)) return;
+  if (walk2d(next, z ?? foxZ) || RENDER === 'anim') return; // (2D fox: no sliding while its walk isn't in yet)
   const secs = follow ? 0.5 : Math.max(0.5, Math.abs(next - cur) / 22);
   el.fox.classList.toggle('flip', next < cur);
   el.petWrap.style.transitionDuration = secs + 's';
@@ -664,7 +664,13 @@ function walkStep() {
   if (walkTarget == null || walkTarget.last) {
     if (st.stride && walkDir) {
       const w = walkTarget; // on its last stride: just onto the spot; called off: on as it was going
-      if (w) { const dx = w.x - foxX, dz = w.z - foxZ, n = Math.max(1, st.strideLeft * 1.25); move(dx / n, dz / n); } else move(walkDir.x, walkDir.z);
+      // never more in a step than a stride takes it (a step short rather than a slide)
+      const cap = WALK_SPEED * (st.running ? RUN_FASTER : 1) * 0.05 * sizeAt(foxZ);
+      if (w) {
+        const dx = w.x - foxX, dz = w.z - foxZ, n = Math.max(1, st.strideLeft * 1.25);
+        const k = Math.min(1, cap / (Math.hypot(dx / n, (dz / n) * DEPTH.across) || 1));
+        move((dx / n) * k, (dz / n) * k);
+      } else move(walkDir.x, walkDir.z);
       return;
     }
     walkTarget = walkDir = null;
@@ -889,6 +895,7 @@ function bind() {
   bind();
   if (RENDER === 'anim') {
     el.fox.classList.add('anim2d');
+    el.petWrap.style.transition = 'none'; // it moves only by walking (walk2d), never by a CSS slide
     placeFox();
     const js = document.createElement('script');
     js.src = 'fox2d.js?v=' + el.ver?.textContent.slice(1); // the version, as on index.html's scripts
