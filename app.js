@@ -185,6 +185,7 @@ function simulate(now) {
   const r = S.sleeping ? RATES_SLEEP : RATES_AWAKE;
   for (const k in r) S.stats[k] = clamp(S.stats[k] + r[k] * h);
   S.stats.clean = clamp(S.stats.clean - S.poops.length * 2 * h);
+  holdLocks();
   if (!S.sleeping) {
     while (S.nextPoop <= now && S.poops.length < 4) {
       S.poops.push({ id: Math.random().toString(36).slice(2), x: rand(12, 88) });
@@ -287,12 +288,16 @@ function fanAngles(n) {
   return Array.from({ length: n }, (_, i) => start + (spread * i) / (n - 1)).sort((a, b) => Math.abs(b - 18) - Math.abs(a - 18));
 }
 
+// the admin's FF locks: a locked stat stays full (FF, the top value) whatever happens to it
+function holdLocks() { for (const k in S.locks || {}) if (S.locks[k]) S.stats[k] = 100; }
 function render() {
+  holdLocks();
   for (const k in S.stats) {
     const v = S.stats[k];
     const bar = document.querySelector(`.stat[data-k="${k}"] .bar i`);
     bar.style.width = v + '%';
     bar.className = v < 25 ? 'low' : v < 50 ? 'mid' : '';
+    document.querySelector(`.ff[data-ff="${k}"]`)?.classList.toggle('on', !!S.locks?.[k]);
   }
   el.name.textContent = S.name || t('foxName');
   const n = tailCount(), wk = weeks();
@@ -853,6 +858,16 @@ function bind() {
   $('#nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') hatch(); });
   $('#menuBtn').addEventListener('click', () => $('#menu').classList.remove('hidden'));
   $('#closeMenu').addEventListener('click', () => $('#menu').classList.add('hidden'));
+  // admin mode (from the menu, or ?admin=1; remembered on this device): the FF lock by each stat
+  const admin = on => { document.body.classList.toggle('admin', on); try { localStorage.setItem('ipet-admin', on ? '1' : ''); } catch (e) {} };
+  let isAdmin = new URLSearchParams(location.search).has('admin');
+  try { isAdmin = isAdmin || localStorage.getItem('ipet-admin') === '1'; } catch (e) {}
+  admin(isAdmin);
+  $('#adminBtn').addEventListener('click', () => admin(!document.body.classList.contains('admin')));
+  document.querySelectorAll('.ff').forEach(b => b.addEventListener('click', () => {
+    S.locks = { ...S.locks, [b.dataset.ff]: !S.locks?.[b.dataset.ff] };
+    render(); save();
+  }));
   $('#renameBtn').addEventListener('click', () => {
     const n = prompt(t('renamePrompt'), S.name);
     if (n && n.trim()) { S.name = n.trim().slice(0, 10); save(); render(); }

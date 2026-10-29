@@ -59,6 +59,10 @@ html, body {
 .stat .bar { flex: 1; height: 10px; background: #0000000f; border-radius: 99px; overflow: hidden; }
 .stat .bar i { display: block; height: 100%; width: 50%; border-radius: 99px; background: #7cc96b; transition: width .5s, background .5s; }
 .stat .bar i.mid { background: #f5c04e; }
+.ff { display: none; padding: 1px 5px; border: 1.5px solid #c9b8a6; border-radius: 6px; background: #fff; color: #9a8877;
+  font: 700 10px/1.4 ui-monospace, monospace; cursor: pointer; } /* admin: lock the stat full */
+body.admin .ff { display: inline-block; }
+.ff.on { background: #ff8a5b; border-color: #ff8a5b; color: #fff; }
 .stat .bar i.low { background: #f0705a; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: .55; } }
 
