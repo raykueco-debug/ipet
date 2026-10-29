@@ -64,8 +64,8 @@
   // + back_hang_loop + back_hang_to_back_pull + back_pull_to_back_crouch), and tripping (back_crouch_to_back_crouch_trip)
   const mishaps = { fall: [], trip: [] };
   // into a ditch and out, short and snappy (an old console game's pitfall): down in a blink, a beat at the edge, up and
-  // out — its clips at double speed, the music paused meanwhile
-  const FALL_FPS = 30;
+  // out — its clips at three times their speed, the music paused meanwhile
+  const FALL_FPS = 48;
   let FALL_S = 1;
   async function clipFrames(clip) {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
@@ -78,7 +78,7 @@
     mishaps.trip = (await clipFrames('back_crouch_to_back_crouch_trip')) || [];
     const fall = [];
     const sink = await clipFrames('back_crouch_to_back_hang'), out = sink && await clipFrames('back_pull_to_back_crouch');
-    if (sink && out) fall.push(...sink, ...Array(5).fill(sink.at(-1)), ...out); // (down, a beat hanging there, out)
+    if (sink && out) fall.push(...sink, ...Array(4).fill(sink.at(-1)), ...out); // (down, a beat hanging there, out)
     mishaps.fall = fall.length ? fall : (await clipFrames('back_crouch_to_back_crouch_fall')) || [];
     if (mishaps.fall.length) FALL_S = mishaps.fall.length / FALL_FPS;
     const up = await clipFrames('back_crouch_to_back_air'), down = up && await clipFrames('back_air_to_back_crouch');
