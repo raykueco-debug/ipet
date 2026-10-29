@@ -1,9 +1,9 @@
 /* 狐火奔跑 — a run through the forest behind the fox (a prototype).
    Three lanes on a road that runs into the distance, played like the old lane-dodging car games: tap the left /
    right half of the screen (or swipe) to change lane and get out of the way of what blocks it; now and then
-   something lies across the whole road — swipe up to jump it (a log), down to duck under it (a bough). Fox-fire orbs to collect. ⚡ a burst of speed — the
-   fox can use it as many times as it has tails (S.tails of the pet, or ?tails=): it glows, goes through
-   anything and draws the orbs in. No losing: a bump is a stumble and a slower moment; the run ends on the clock.
+   something lies across the whole road — swipe up to jump it (a log), down to duck under it (a bough). Notes to
+   pick up: each sounds the next of a classical tune (music.js). ⚡ a burst of speed — the fox can use it as many
+   times as it has tails (S.tails of the pet, or ?tails=): it glows, goes through anything and draws the notes in. No losing: a bump is a stumble and a slower moment; the run ends on the clock.
    World: x in lanes (-1, 0, 1; the edges ±1.6), z ahead of the fox in metres-ish; seen from just behind it. */
 (function () {
   const RUN_S = 75;                      // a run, seconds
@@ -66,8 +66,25 @@
 
   // game state
   let run = null;
-  const fresh = () => ({ t: 0, z: 0, lane: 0, x: 0, jump: -1, duck: -1, stumble: -1, boost: -1, boostsLeft: tails,
-    orbs: 0, things: [], trees: [], nextRow: 18, frame: 0, flash: [] });
+  // the music: a piece's melody laid on the road note by note, spaced by the notes' lengths at the speed it runs, so
+  // picking them up as it comes plays the tune in time (music.js); higher notes lie to the right, lower to the left
+  const fresh = () => {
+    const piece = pick(Music.PIECES), ps = piece.notes.map(n => n[0]);
+    return { t: 0, z: 0, lane: 0, x: 0, jump: -1, duck: -1, stumble: -1, boost: -1, boostsLeft: tails,
+      orbs: 0, things: [], trees: [], nextRow: 18, frame: 0, flash: [],
+      piece, low: Math.min(...ps), high: Math.max(...ps), next: 0, noteZ: 12, noteLane: 0 };
+  };
+  function spawnNote() {
+    const [midi, len] = run.piece.notes[run.next % run.piece.notes.length];
+    // its lane by its pitch, but never more than one lane from the last when they come close together
+    const want = Math.round(((midi - run.low) / Math.max(1, run.high - run.low)) * 2 - 1), gap = len * run.piece.eighth * speed();
+    run.noteLane += Math.max(gap < 3 ? -1 : -2, Math.min(gap < 3 ? 1 : 2, want - run.noteLane));
+    run.things.push({ type: 'note', midi, lane: run.noteLane, z: run.noteZ, h: 0.4 });
+    run.next++;
+    run.noteZ += gap;
+  }
+  // (no obstacle where a note lies, a few steps either side of it)
+  const noteNear = (l, z, d = 3) => run.things.some(o => o.type === 'note' && o.lane === l && Math.abs(o.z - z) < d);
   function speed() {
     const k = Math.min(1, run.t / RUN_S), base = SPEED[0] + (SPEED[1] - SPEED[0]) * k;
     return base * (run.boost >= 0 ? BOOST.x : 1) * (run.stumble >= 0 ? 0.45 : 1);
@@ -77,17 +94,14 @@
   // a row of things ahead: always a way through (a free lane, or something to jump / duck), orbs on the way
   function spawnRow(z) {
     const r = Math.random(), lanes = [-1, 0, 1];
-    if (r < 0.07) { // now and then across the road: jump it or duck it
+    if (r < 0.07 && !lanes.some(l => noteNear(l, z, 2))) { // now and then across the road: jump it or duck it
       const type = Math.random() < 0.5 ? 'log' : 'branch';
       for (const l of lanes) run.things.push({ type, lane: l, z, across: true });
-      for (let k = 0; k < 3; k++) run.things.push({ type: 'orb', lane: pick(lanes), z: z + 2 + k * 2, h: type === 'log' ? 1.2 : 0.4 });
       return;
     }
-    const n = Math.random() < 0.55 ? 1 : 2, used = shuffle(lanes).slice(0, n);
+    const open = lanes.filter(l => !noteNear(l, z));
+    const used = shuffle(open).slice(0, Math.min(open.length, Math.random() < 0.55 ? 1 : 2));
     for (const l of used) run.things.push({ type: pick(['rock', 'rock', 'log', 'puddle', 'stump']), lane: l, z }); // in its lane: get out of the way
-    const free = lanes.filter(l => !used.includes(l));
-    const ol = pick(free.length ? free : lanes);
-    for (let k = 0; k < 4; k++) run.things.push({ type: 'orb', lane: ol, z: z - 3 + k * 1.8, h: 0.4 });
   }
   const pick = a => a[Math.floor(Math.random() * a.length)];
   const shuffle = a => a.map(v => [Math.random(), v]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
@@ -132,19 +146,20 @@
     // the world comes at it
     for (const o of run.things) o.z -= v * dt;
     for (const tr of run.trees) tr.z -= v * dt;
+    while (run.noteZ < FAR + 10) spawnNote(); // (the notes first: the obstacles keep clear of them)
     while (run.nextRow < FAR) { spawnRow(run.nextRow); run.nextRow += 9 + Math.random() * 5; }
     run.nextRow -= v * dt;
+    run.noteZ -= v * dt;
     while (run.trees.length < 26) run.trees.push({ side: Math.random() < 0.5 ? -1 : 1, off: 1.9 + Math.random() * 1.6, z: (run.trees.at(-1)?.z ?? 0) + 2 + Math.random() * 4, k: 0.8 + Math.random() * 0.6 });
     run.trees = run.trees.filter(tr => tr.z > -CAM * 0.8);
     // meeting things at the fox (z about 0, its lane)
     const air = run.jump >= 0 ? Math.sin(Math.PI * run.jump / 0.62) : 0, low = run.duck >= 0;
     for (const o of run.things) {
       if (o.hit) continue;
-      if (o.type === 'orb' && run.boost >= 0 && o.z < 6 && o.z > -1) { o.lane += (run.x - o.lane) * Math.min(1, dt * 8); } // drawn in
+      if (o.type === 'note' && run.boost >= 0 && o.z < 6 && o.z > -1) { o.lane += (run.x - o.lane) * Math.min(1, dt * 8); } // drawn in
       if (Math.abs(o.z) > 0.7 || Math.abs(o.lane - run.x) > 0.45) continue;
-      if (o.type === 'orb') {
-        if (o.h > 0.8 && air < 0.5) continue; // a high one: jump for it
-        o.hit = true; run.orbs++; run.flash.push({ x: o.lane, t: 0 }); hud();
+      if (o.type === 'note') { // picked up: it sounds
+        o.hit = true; run.orbs++; run.flash.push({ x: o.lane, t: 0, c: hue(o.midi) }); Music.play(o.midi); hud();
         continue;
       }
       // (a log or a puddle can be jumped too; rocks and stumps only got out of the way of)
@@ -154,7 +169,7 @@
       if (run.boost >= 0) { o.smash = 0; continue; } // bursting through it
       if (run.stumble < 0) run.stumble = 0;
     }
-    run.things = run.things.filter(o => o.z > -CAM * 0.8 && !(o.hit && o.type === 'orb'));
+    run.things = run.things.filter(o => o.z > -CAM * 0.8 && !(o.hit && o.type === 'note'));
     for (const f of run.flash) f.t += dt;
     run.flash = run.flash.filter(f => f.t < 0.4);
     if (run.t >= RUN_S) end();
@@ -191,7 +206,7 @@
     for (const it of items) if (it.z > 0.3) it.d();
     fox();
     for (const it of items) if (it.z <= 0.3) it.d();
-    for (const f of run.flash) { const p = project(f.x, 0); g.fillStyle = `rgba(255,200,80,${1 - f.t / 0.4})`; g.beginPath(); g.arc(p.x, p.y - H * 0.2, 30 + f.t * 120, 0, 7); g.fill(); }
+    for (const f of run.flash) { const p = project(f.x, 0); g.globalAlpha = 0.45 * (1 - f.t / 0.4); g.fillStyle = f.c; g.beginPath(); g.arc(p.x, p.y - H * 0.2, 16 + f.t * 90, 0, 7); g.fill(); g.globalAlpha = 1; }
     if (run.boost >= 0) { g.fillStyle = '#fff6'; for (let k = 0; k < 14; k++) { const x = (k * 137 + run.z * 40) % W; g.fillRect(x, H * 0.4 + (k * 61) % (H * 0.5), 3, 40); } }
     document.getElementById('timeBar').style.width = Math.max(0, 100 - run.t / RUN_S * 100) + '%';
   }
@@ -203,11 +218,16 @@
   }
   function thing(o, b) {
     const p = project(o.lane, o.z), u = laneW() * p.s;
-    if (o.type === 'orb') {
-      const y = p.y - u * (0.25 + o.h * 0.5) + Math.sin(run.t * 6 + o.z) * u * 0.04, r = u * 0.13;
-      const gl = g.createRadialGradient(p.x, y, 0, p.x, y, r * 2.4);
-      gl.addColorStop(0, '#fffbe0'); gl.addColorStop(0.35, '#ffc247'); gl.addColorStop(1, 'rgba(255,140,40,0)');
-      g.fillStyle = gl; g.beginPath(); g.arc(p.x, y, r * 2.4, 0, 7); g.fill();
+    if (o.type === 'note') { // a glowing note, its colour by its pitch
+      const y = p.y - u * 0.45 + Math.sin(run.t * 6 + o.z) * u * 0.04, r = u * 0.16, c = hue(o.midi);
+      const gl = g.createRadialGradient(p.x, y, 0, p.x, y, r * 2.2);
+      gl.addColorStop(0, '#ffffffcc'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gl; g.beginPath(); g.arc(p.x, y, r * 2.2, 0, 7); g.fill();
+      g.fillStyle = c; g.strokeStyle = '#4a3a2a'; g.lineWidth = Math.max(1, 2 * p.s);
+      g.beginPath(); g.ellipse(p.x - r * 0.2, y + r * 0.55, r * 0.5, r * 0.36, -0.4, 0, 7); g.fill(); g.stroke(); // its head
+      g.fillRect(p.x + r * 0.22, y - r * 1.1, r * 0.16, r * 1.65);                                             // its stem
+      g.beginPath(); g.moveTo(p.x + r * 0.38, y - r * 1.1); g.quadraticCurveTo(p.x + r * 1.1, y - r * 0.7, p.x + r * 0.8, y - r * 0.15);
+      g.quadraticCurveTo(p.x + r * 0.9, y - r * 0.6, p.x + r * 0.38, y - r * 0.7); g.fill();               // its flag
       return;
     }
     if (o.smash != null) { g.globalAlpha = Math.max(0, 1 - (o.smash += 0.05)); }
@@ -251,6 +271,7 @@
     g.restore();
   }
 
+  const hue = midi => `hsl(${(midi * 47) % 360}, 85%, 62%)`; // a colour for each pitch
   function hud() {
     document.getElementById('orbs').textContent = run.orbs;
     document.getElementById('boostLeft').textContent = `還有 ${run.boostsLeft} 次`;
@@ -264,15 +285,17 @@
     raf = requestAnimationFrame(loop);
   }
   function start() {
+    Music.unlock(); // (on the tap: sound may start now)
     run = fresh();
     document.getElementById('start').hidden = document.getElementById('end').hidden = true;
     hud();
     last = performance.now();
   }
   function end() {
-    const n = run.orbs;
+    const n = run.orbs, played = run.piece.name;
     run = null;
     document.getElementById('final').textContent = n;
+    document.getElementById('piece').textContent = `《${played}》`;
     document.getElementById('endNote').textContent = `${tails} 條尾巴 = ${tails} 次加速。小狐多長一條尾巴，就能多加速一次！`;
     document.getElementById('end').hidden = false;
   }

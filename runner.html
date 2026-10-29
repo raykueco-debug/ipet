@@ -36,20 +36,22 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div class="hud"><span class="orbs">🔥 <span id="orbs">0</span></span><div class="time"><i id="timeBar"></i></div></div>
+<div class="hud"><span class="orbs">🎵 <span id="orbs">0</span></span><div class="time"><i id="timeBar"></i></div></div>
 <button class="boost" id="boost" aria-label="加速">⚡<b id="boostLeft"></b></button>
 <div class="card" id="start"><div>
   <h1>🦊 狐火奔跑</h1>
   <p>點左邊、右邊（或滑）：換路，閃開擋路的東西</p><p>整條路橫擋時：往上滑跳過木頭、往下滑鑽過樹枝</p>
+  <p>🎵 撿音符：一個一個撿，就會彈出一首古典名曲</p>
   <p>⚡ 加速：小狐有幾條尾巴，就能加速幾次</p>
   <button id="go">開始！</button>
 </div></div>
 <div class="card" id="end" hidden><div>
   <h1>跑完了！</h1>
-  <p>小狐收集到</p><div class="big">🔥 <span id="final">0</span></div>
+  <p>小狐彈了 <b id="piece"></b></p><div class="big">🎵 <span id="final">0</span></div>
   <p id="endNote"></p>
   <button id="again">再跑一次</button><button class="ghost" id="home">回到小狐</button>
 </div></div>
+<script src="music.js"></script>
 <script src="runner.js"></script>
 </body>
 </html>
