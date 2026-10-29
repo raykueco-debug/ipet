@@ -54,8 +54,28 @@
     place(ballEl, b.x, b.z, b.h, w);
     ballEl.style.transform = `translateX(-50%) rotate(${b.spin}deg)`;
     place(shadowEl, b.x, b.z, 0, w * Math.max(0.4, 1 - b.h / 30));
-    shadowEl.style.zIndex = layerAt(b.z);
+    shadowEl.style.zIndex = 9; // on the ground: under everything that stands on it
     shadowEl.style.opacity = home ? 0 : 0.25 * Math.max(0.3, 1 - b.h / 40);
+  }
+
+  function fly(p, dt) { // one step of a free ball: in the air under gravity, bouncing; on the ground rolling
+    p.vh -= G * dt;
+    p.x += p.vx * dt; p.z += p.vz * dt; p.h += p.vh * dt;
+    if (p.h <= 0) {
+      p.h = 0;
+      p.vh = Math.abs(p.vh) > 25 ? -p.vh * BOUNCE : 0;
+      const k = Math.exp(-ROLL * dt);
+      if (!p.vh) { p.vx *= k; p.vz *= k; }
+    } else { const k = Math.exp(-AIR * dt); p.vx *= k; p.vz *= k; }
+    if (p.x < 6 || p.x > 94) { p.x = Math.max(6, Math.min(94, p.x)); p.vx *= -0.6; }
+    if (p.z < 0 || p.z > 1) { p.z = Math.max(0, Math.min(1, p.z)); p.vz *= -0.6; }
+    p.spin += (p.vx * 9 - p.vz * 120) * dt;
+  }
+  const still = p => !p.h && !p.vh && Math.hypot(p.vx, p.vz * 30) < 1.5;
+  function restAt() { // where the ball will stop (the same steps, played ahead)
+    const p = { ...b };
+    for (let k = 0; k < 1200 && !still(p); k++) fly(p, 1 / 60);
+    return p;
   }
 
   // physics: in the air under gravity, bouncing; on the ground rolling to a stop, then the same way up
@@ -64,18 +84,8 @@
     const t = performance.now(), dt = Math.min(0.05, (t - last) / 1000);
     last = t;
     if (b.mode === 'free') {
-      b.vh -= G * dt;
-      b.x += b.vx * dt; b.z += b.vz * dt; b.h += b.vh * dt;
-      if (b.h <= 0) {
-        b.h = 0;
-        b.vh = Math.abs(b.vh) > 25 ? -b.vh * BOUNCE : 0;
-        const k = Math.exp(-ROLL * dt);
-        if (!b.vh) { b.vx *= k; b.vz *= k; }
-      } else { const k = Math.exp(-AIR * dt); b.vx *= k; b.vz *= k; }
-      if (b.x < 6 || b.x > 94) { b.x = Math.max(6, Math.min(94, b.x)); b.vx *= -0.6; }
-      if (b.z < 0 || b.z > 1) { b.z = Math.max(0, Math.min(1, b.z)); b.vz *= -0.6; }
-      b.spin += (b.vx * 9 - b.vz * 120) * dt;
-      if (!b.h && !b.vh && Math.hypot(b.vx, b.vz * 30) < 1.5) settle();
+      fly(b, dt);
+      if (still(b)) settle();
     }
     render();
   }
@@ -84,7 +94,6 @@
   function settle() { // rolled to a stop (a football looks the same whichever way up it stops)
     b.mode = 'rest';
     b.vx = b.vz = b.vh = 0;
-    if (b.after) { const f = b.after; b.after = null; f(); }
   }
 
   // grab and throw: the finger's speed when it lets go is the throw; upwards on the screen = deeper
@@ -119,7 +128,7 @@
     b.vx = Math.max(-160, Math.min(160, vx * 0.7));
     b.vz = Math.max(-0.8, Math.min(2.2, vy * 0.012));
     b.vh = Math.max(0, Math.min(160, vy * 0.6));
-    b.after = Math.hypot(vx, vy) > 40 ? fetch : null; // a real throw: the fox goes for it
+    fetch(); // the fox goes for it at once, while it still flies and rolls
   };
   ballEl.addEventListener('pointerup', letGo);
   ballEl.addEventListener('pointercancel', letGo);
@@ -129,7 +138,7 @@
     if (b.mode !== 'home' || !window.Fox2D || !S.hatched || S.sleeping) return;
     e.preventDefault();
     b.mode = 'held';
-    b.z = Math.min(0.3, foxZ + 0.1);
+    b.z = 0; // out of the button: at the very front, nearest the player
     drag = [{ t: performance.now(), x: e.clientX, y: e.clientY }];
     const move = ev => { drag.push({ t: performance.now(), x: ev.clientX, y: ev.clientY }); if (drag.length > 8) drag.shift(); hold(ev); };
     const up = ev => {
@@ -140,7 +149,7 @@
       b.mode = 'free';
       b.x = Math.max(10, Math.min(90, foxX + rand(-12, 12))); b.z = Math.max(0, foxZ - 0.08); b.h = 40;
       b.vx = rand(-10, 10); b.vz = 0; b.vh = 0;
-      b.after = fetch;
+      fetch();
     };
     addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
     hold(e);
@@ -174,15 +183,28 @@
   function callOff() { // the ball was grabbed: whatever the fox was doing with it, stop
     fetchRun++;
     busy = false;
-    if (walkTarget) { walkTarget = null; Fox2D.stop(); }
+    if (walkTarget) { walkTarget = null; Fox2D.stop(); Fox2D.cut(); } // stops there and then
   }
-  const sat = () => Fox2D.state.clip === 'normal_loop';
+  // sat down (at home, or in a mood's loop: a cue still goes by way of home)
+  const sat = () => { const c = Fox2D.state.clip || ''; return !Fox2D.state.go && c.includes('_loop') && !c.startsWith('walk'); };
   async function until(test, run, ms = 6000) {
     for (let k = 0; k < ms / 50 && !test(); k++) { await wait(50); if (run !== fetchRun) return false; }
     return run === fetchRun;
   }
   const walkThere = (x, z, run, keep) => new Promise(ok => { if (!walk2d(x, z, () => ok(run === fetchRun), keep)) ok(false); });
   const rolled = run => until(() => b.mode === 'rest' || b.mode === 'home', run, 5000);
+  async function chase(run) { // up at once, straight for where it will stop, while it still flies and rolls
+    const p0 = restAt(), far = p => Math.abs(p.x - foxX) > 6 * sizeAt(p.z) || Math.abs(p.z - foxZ) > 0.1;
+    // off like a shot (when not up and going already)
+    if (b.mode === 'free' && far(p0) && !Fox2D.state.go) Fox2D.dash(p0.x < foxX ? 'walk' : 'walk_r');
+    for (let k = 0; b.mode === 'free' && k < 40; k++) {
+      const p = restAt();
+      if (far(p) || Fox2D.state.go) walk2d(p.x + (foxX >= p.x ? 1 : -1) * 4 * sizeAt(p.z), Math.min(1, p.z + 0.04));
+      await wait(250);
+      if (run !== fetchRun) return false;
+    }
+    return rolled(run);
+  }
 
   async function fetch() {
     const run = ++fetchRun;
@@ -191,24 +213,22 @@
   }
   async function play(run) {
     if (!S.hatched || S.sleeping || !Fox2D.canWalk) return;
-    if (S.stats.energy < 15) { say(t('tooTired')); return; } // too tired to play: the ball just lies there
+    if (S.stats.energy < 15) { Fox2D.play('yawn'); say(t('tooTired')); return; } // too tired: a yawn, the ball just lies there
     while (eating) { await wait(500); if (run !== fetchRun) return; }
     S.stats.fun = clamp(S.stats.fun + 15);
     S.stats.energy = clamp(S.stats.energy - 8);
     addBond(2);
     save();
     for (let k = 0, n = 3 + Math.floor(Math.random() * 3); k < n; k++) {
-      if (!(await rolled(run))) return;
-      const sitAndBat = k > 0 && Fox2D.canPlay && Math.random() < 0.3;
+      if (!(await chase(run))) return; // after it again at once, each time it goes
+      // right by it already (no walk to make): sit and bat it too — never a ball that goes off on its own
+      const near = Math.abs(b.x - foxX) < 6 * sizeAt(b.z) && Math.abs(b.z - foxZ) < 0.08;
+      const sitAndBat = Fox2D.canPlay && (near || (k > 0 && Math.random() < 0.3));
       // come up to the ball from the side the fox is on; its head (the middle of its picture) over the ball
       const from = foxX >= b.x ? 1 : -1, s = sizeAt(b.z);
       if (!(await walkThere(b.x + from * (sitAndBat ? 2 : 4) * s, Math.min(1, b.z + 0.04), run, !sitAndBat))) return;
-      if (sitAndBat) { // sit, paw up: the ball goes when the paw is at the top
-        if (!(await until(sat, run))) return;
-        Fox2D.play('paw');
-        if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 4000))) return;
-        kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
-      } else if (Fox2D.ballMoves.length && ['walk', 'walk_r'].includes(Fox2D.state.go) && Math.random() < 0.75) {
+      const side = ['walk', 'walk_r'].includes(Fox2D.state.go);
+      if (side && Fox2D.ballMoves.length && !sitAndBat && Math.random() < 0.75) {
         // side-on: one of the ball-play moves; the ball goes when the move lands (the end of its way in)
         const m = pick(Fox2D.ballMoves), r = Fox2D.state.go === 'walk_r' ? '_r' : '';
         Fox2D.ballMove(m);
@@ -216,11 +236,18 @@
         if (!(await until(() => Fox2D.state.clip === into && Fox2D.state.frame >= 14, run, 6000))) return;
         const [speed, up] = { pounce: [30, 25], swipe: [45, 15], bat: [25, 5], header: [30, 70], tail: [55, 10] }[m];
         kick(-from, speed, up);
-      } else if (Fox2D.canPush && ['walk', 'walk_r'].includes(Fox2D.state.go)) { // side-on: dip the head and push it with the nose
+      } else if (side && Fox2D.canPush && !sitAndBat) { // side-on: dip the head and push it with the nose
         Fox2D.nudge_ball();
         if (!(await until(() => Fox2D.state.pushing && Fox2D.state.frame >= 12, run, 5000))) return;
         kick(-from, 40, 10);
-      } else { // (no push clip yet)
+      } else if (Fox2D.canPlay) { // sit, paw up: the ball goes when the paw is at the top (also facing in or out)
+        Fox2D.stop();
+        if (!(await until(sat, run))) return;
+        Fox2D.play('paw');
+        if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 7000))) return;
+        kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
+      } else { // (no clips for any of it)
+        Fox2D.stop();
         setExpr('play', 1200);
         await wait(500);
         kick(-from, 40, 10);

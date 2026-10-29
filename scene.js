@@ -6,7 +6,7 @@
    a simple drawn stand-in until then. Layers are wider than the stage so they can slide. */
 (function () {
   const SCENE = 'forest';
-  const SHIFT = { sky: 0.02, far: 0.04, mid: 0.1, ground: 0, props: 0.02, front: -0.22 }; // × the fox's offset (px per %)
+  const SHIFT = { sky: 0.02, far: 0.04, mid: 0.1, ground: 0, props: 0.02, front: 0 }; // × the fox's offset (px per %)
   const OUT = '#4a3a2a';
   // a tiny seeded random, so the drawn scene is the same every time
   let seed = 7;
@@ -77,10 +77,16 @@
         <path d="M1066 514 q10 -6 20 -4" stroke="#d6d3cb" stroke-width="4" fill="none" stroke-linecap="round"/></g>
       ${[[300, 560, '#ffd84d'], [330, 575, '#ff8fb1'], [356, 560, '#ffffff'], [860, 568, '#ffd84d'], [890, 582, '#b99cff'],
          [915, 562, '#ff8fb1'], [470, 480, '#ffffff', 0.7], [740, 476, '#ffd84d', 0.7], [600, 446, '#ff8fb1', 0.55]].map(([x, y, c, k]) => flower(x, y, c, k)).join('')}`),
-    front: () => svg(`${[[-10, 612, 0.75], [1210, 612, 0.75]].map(([x, y, k]) =>
-        `<g transform="translate(${x} ${y}) scale(${k})"><path d="M-40 0 q20 -70 30 -92 q4 52 12 62 q8 -62 26 -84 q-2 62 8 82 q14 -42 34 -52 q-14 52 -10 84Z" fill="#4f9e42" stroke="${OUT}" stroke-width="3"/>
-         <path d="M-14 -10 q6 -36 14 -50 M18 -12 q4 -30 12 -44" stroke="#7cc463" stroke-width="3" fill="none" stroke-linecap="round"/></g>`).join('')}
-`),
+    // a low fringe of grass along the whole front edge (slice: always the full width), short enough to hide nothing
+    front: () => svg(`<path d="M-60 610 V596 ${Array.from({ length: 30 }, (_, k) => {
+        const x = -60 + k * 46, r = rnd(14, 22);
+        return `Q${x + 23} ${(596 - r * 1.6).toFixed(0)} ${x + 46} 596`;
+      }).join(' ')} V610Z" fill="#78c25a"/>
+      <path d="M-60 610 V602 ${Array.from({ length: 40 }, (_, k) => {
+        const x = -60 + k * 34;
+        return `Q${x + 17} ${(602 - rnd(12, 20)).toFixed(0)} ${x + 34} 602`;
+      }).join(' ')} V610Z" fill="#8fd36e"/>
+      ${blades(36, 584, 604, '#5fae4b')}`).replace('xMidYMax meet', 'xMidYMax slice'),
   };
 
   const stage = document.getElementById('stage');
@@ -124,11 +130,14 @@
       stage.appendChild(d);
       return [d, x, z, w];
     });
-    const place = () => els.forEach(([d, x, z, w]) => {
+    const place = () => els.forEach(([d, x, z, w], k) => {
+      const n = PROPS[k][0];
       d.style.left = x + '%';
       d.style.bottom = groundAt(z) - 1.5 + '%';
       d.style.width = stage.clientWidth * w * sizeAt(z) + 'px';
-      d.style.zIndex = Math.max(1, layerAt(z)); // past the back of the ground still above the drawn layers
+      // past the back of the ground still above the drawn layers; the bed lies flat on the ground: under the fox and
+      // the ball always, they go over it
+      d.style.zIndex = n === 'bed' ? 9 : Math.max(1, layerAt(z));
     });
     place();
     addEventListener('resize', place);

@@ -201,7 +201,7 @@ const $ = s => document.querySelector(s);
 const el = {
   stage: $('#stage'), petWrap: $('#petWrap'), fox: $('#fox'), body: $('#foxBody'), video: $('#foxVideo'), tails: $('#tails'),
   bubble: $('#bubble'), fx: $('#fx'), poops: $('#poops'), name: $('#petName'), tailBadge: $('#tailBadge'),
-  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'), bowl: $('#bowl'), foodPick: $('#foodPick'),
+  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'), bowl: $('#bowl'), foodPick: $('#foodPick'), ver: $('#ver'),
 };
 
 let expr = null, exprUntil = 0, bubbleTimer = 0, lastPet = 0, renderedTails = -1, renderedStage = '';
@@ -599,7 +599,7 @@ function placeFox() {
 /* 2D fox: it stands up, turns and walks in its own clips (fox2d.js), so the room position moves here, step by
    step, and only while a walk loop is playing — not while it gets up, turns round or sits down. It walks
    side-on even when it goes deeper or nearer (it slants across the ground and shrinks / grows). */
-function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing (stepping on the spot), don't sit
+function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing, don't sit (then queues what's next)
   if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
   if (eating) return true; // stays at its bowl
   walkTarget = { x, z: clamp(z * 100) / 100, then, keep };
@@ -608,29 +608,45 @@ function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing (st
   walkStep();
   return true;
 }
+// It never steps on the spot: a walk loop can only be left at its end (the one picture its ways out start on),
+// so the fox stops as its last stride begins — that stride carries it the rest of the way — and a stride under
+// way when it is called off plays out moving on.
+let walkDir = null; // the last step (x %, z) while walking
 function walkStep() {
-  if (walkTarget == null) return;
-  const dx = walkTarget.x - foxX, dz = (walkTarget.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
-  if (dist < 0.4) {
-    const { then, keep } = walkTarget;
-    walkTarget = null;
-    if (!keep) Fox2D.stop();
+  const st = Fox2D.state;
+  const move = (x, z) => { foxX += x; foxZ += z; walkDir = { x, z }; placeFox(); };
+  if (walkTarget == null || walkTarget.last) {
+    if (st.stride && walkDir) {
+      const w = walkTarget; // on its last stride: just onto the spot; called off: on as it was going
+      if (w) { const dx = w.x - foxX, dz = w.z - foxZ, n = Math.max(1, st.strideLeft * 1.25); move(dx / n, dz / n); } else move(walkDir.x, walkDir.z);
+      return;
+    }
+    walkTarget = walkDir = null;
     clearInterval(walkClock);
     walkClock = 0;
-    if (then) then();
     return;
   }
+  const dx = walkTarget.x - foxX, dz = (walkTarget.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
+  const step = Math.min(dist, WALK_SPEED * 0.05 * sizeAt(foxZ)); // farther away it looks slower
+  const arrive = () => {
+    const { then, keep } = walkTarget;
+    walkTarget.last = true;
+    if (!keep) Fox2D.stop();
+    if (then) then();
+    // more stride left than way to go: no stepping on the spot — cut now (after then() has said what's next)
+    if (st.stride && st.strideLeft * 1.25 * WALK_SPEED * 0.05 * sizeAt(foxZ) > dist * 1.5 + 1) setTimeout(() => Fox2D.cut(), 0);
+  };
+  if (dist < 0.4) { arrive(); return walkStep(); }
   // facing: mostly deeper / nearer → its back / its front (when those clips are there), else side-on by the
   // sideways part; a short way straight in or out keeps the way it faces
   const deep = Math.abs(dz) > Math.abs(dx) * 1.5 && Math.abs(dz) > 3 && Fox2D.canWalkDepth;
   const facing = deep ? (dz > 0 ? 'walk_back' : 'walk_front')
-    : Math.abs(dx) > 1 ? (dx < 0 ? 'walk' : 'walk_r') : Fox2D.state.go || (dx < 0 ? 'walk' : 'walk_r');
+    : Math.abs(dx) > 1 ? (dx < 0 ? 'walk' : 'walk_r') : st.go || (dx < 0 ? 'walk' : 'walk_r');
   Fox2D.go(facing);
   if (!Fox2D.state.walking) return;
-  const step = Math.min(dist, WALK_SPEED * 0.05 * sizeAt(foxZ)); // farther away it looks slower
-  foxX += (dx / dist) * step;
-  foxZ += (dz / dist) * step / DEPTH.across;
-  placeFox();
+  // the spot is within this stride (16 frames a second, a step every 50 ms): stop now, the stride ends there
+  if (dist <= step * Fox2D.state.strideLeft * 1.25) { arrive(); return; }
+  move((dx / dist) * step, (dz / dist) * step / DEPTH.across);
 }
 
 function bindWalk() {
@@ -817,7 +833,7 @@ function bind() {
     el.fox.classList.add('anim2d');
     placeFox();
     const js = document.createElement('script');
-    js.src = 'fox2d.js';
+    js.src = 'fox2d.js?v=' + el.ver?.textContent.slice(1); // the version, as on index.html's scripts
     js.onload = () => Fox2D.ready.then(() => { if (S.hatched && !S.sleeping) Fox2D.play('wave'); }); // hello when the app opens
     document.head.appendChild(js);
   }
