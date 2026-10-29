@@ -46,7 +46,7 @@ html, body {
 }
 .lv { background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 .age { color: var(--muted); font-size: 13px; flex: 1; }
-.ver { color: var(--muted); font-size: 10px; opacity: .7; }
+.ver { color: var(--muted); font-size: 13px; font-weight: 600; }
 .icon-btn { border: 0; background: var(--card); width: 36px; height: 36px; border-radius: 12px; font-size: 18px; color: var(--ink); box-shadow: 0 2px 0 #0001; }
 
 .xp { height: 6px; background: #0000000f; border-radius: 99px; margin: 8px 0 10px; overflow: hidden; }
