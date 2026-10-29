@@ -103,9 +103,9 @@ html, body {
 .toy { position: absolute; transform: translateX(-50%); touch-action: none; }
 .toy svg, .toy img { display: block; width: 100%; height: auto; pointer-events: none; }
 .toy-ball { cursor: grab; }
-.toy-basket { pointer-events: none; transform-origin: 50% 100%; }
-.toy-basket.ask { animation: ask 1s ease-in-out infinite; }
-@keyframes ask { 50% { transform: translateX(-50%) scale(1.08); filter: drop-shadow(0 0 8px #fff6a8); } }
+.actions button.ball-out span { opacity: .3; } /* the ball is out in the scene */
+.actions button.ask { animation: ask 1s ease-in-out infinite; } /* put the toy away here */
+@keyframes ask { 50% { transform: scale(1.08); box-shadow: 0 0 0 4px #ffe27a; } }
 .toy-shadow { position: absolute; aspect-ratio: 3 / 1; transform: translate(-50%, 50%); border-radius: 50%; background: #000; pointer-events: none; }
 #petWrap { transform-origin: 50% 100%; }
 

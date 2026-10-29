@@ -2,15 +2,16 @@
    rolls and slows to a stop on its own (a football: it looks the same whichever way up it stops).
    The ball is too big to carry: the fox goes to it and plays — nudges it about with its nose, now and then bats
    it with a paw — then sits by it and asks for the toys to be put away. It never brings it back: only the
-   player dropping it in the basket puts it home.
+   player putting it away puts it home. Home is the 玩耍 (play) button, off the scene: drag from it to take
+   the ball out and throw it (a tap drops it in front of the fox), drag the ball back onto it to put it away.
 
    World: x in % of the stage width, z = depth 0 (front) … 1 (back), h = height above the ground in % of the
-   stage height (app.js: groundAt / sizeAt / layerAt). Art: assets/scene/toys/ball.png and basket.png once
+   stage height (app.js: groundAt / sizeAt / layerAt). Art: assets/scene/toys/ball.png once
    drawn, simple drawn ones until then. Needs the 2D fox (fox2d.js) for the fetching. */
 (function () {
   const G = 300, BOUNCE = 0.5, ROLL = 2.4, AIR = 0.15;   // gravity %/s², energy kept per bounce, friction /s
   const SIZE = 0.14;                                       // ball width as a share of the stage width, at z 0
-  const BASKET = { x: 86, z: 0.04 };                       // where the basket stands
+  const homeBtn = document.querySelector('[data-act=play]'); // the ball lives in the 玩耍 button
   const stage = document.getElementById('stage');
 
   const art = (name, drawn) => {
@@ -32,11 +33,8 @@
   const shadowEl = document.createElement('div');
   shadowEl.className = 'toy-shadow';
   stage.appendChild(shadowEl);
-  const basketEl = art('basket', `<svg viewBox="0 0 120 80"><ellipse cx="60" cy="22" rx="54" ry="13" fill="#7a5233" stroke="${OUT}" stroke-width="4"/>
-    <path d="M6 22 L16 70 Q60 82 104 70 L114 22 Q60 38 6 22Z" fill="#c98d55" stroke="${OUT}" stroke-width="4"/>
-    <path d="M14 44 Q60 58 106 44 M18 60 Q60 72 102 60" fill="none" stroke="#9a6a3c" stroke-width="4"/></svg>`);
 
-  const b = { x: BASKET.x, z: BASKET.z, h: 0, vx: 0, vz: 0, vh: 0, spin: 0, mode: 'home' };
+  const b = { x: 50, z: 0.15, h: 0, vx: 0, vz: 0, vh: 0, spin: 0, mode: 'home' };
   let fetchRun = 0; // bumps when a fetch is called off (the ball was grabbed)
   let busy = false;  // playing with it: the fox doesn't wander off meanwhile
 
@@ -50,15 +48,15 @@
   function render() {
     const w = W() * SIZE * sizeAt(b.z);
     const home = b.mode === 'home';
-    place(ballEl, b.x, b.z, home ? 5 : b.h, w * (home ? 0.75 : 1));
-    if (home) ballEl.style.zIndex = layerAt(BASKET.z) + 2; // sits in the basket's mouth, its top showing
+    ballEl.style.display = home ? 'none' : ''; // put away: in the 玩耍 button, not in the scene
+    homeBtn?.classList.toggle('ball-out', !home);
+    if (home) { shadowEl.style.opacity = 0; return; }
+    place(ballEl, b.x, b.z, b.h, w);
     ballEl.style.transform = `translateX(-50%) rotate(${b.spin}deg)`;
     place(shadowEl, b.x, b.z, 0, w * Math.max(0.4, 1 - b.h / 30));
     shadowEl.style.zIndex = layerAt(b.z);
     shadowEl.style.opacity = home ? 0 : 0.25 * Math.max(0.3, 1 - b.h / 40);
   }
-  place(basketEl, BASKET.x, BASKET.z, -1, W() * 0.2);
-  addEventListener('resize', () => place(basketEl, BASKET.x, BASKET.z, -1, W() * 0.2));
 
   // physics: in the air under gravity, bouncing; on the ground rolling to a stop, then the same way up
   let last = performance.now();
@@ -106,7 +104,7 @@
     if (drag.length > 8) drag.shift();
     hold(e);
   });
-  function hold(e) { // follow the finger, at the depth it was at
+  function hold(e) { // follow the finger, at the depth it was at (below the stage too, on the way to the button)
     const s = stage.getBoundingClientRect();
     b.x = Math.max(4, Math.min(96, ((e.clientX - s.left) / s.width) * 100));
     b.h = Math.max(0, ((s.bottom - e.clientY) / s.height) * 100 - groundAt(b.z) - 4);
@@ -116,7 +114,7 @@
     const s = stage.getBoundingClientRect(), a = drag[0], z = drag[drag.length - 1], dt = Math.max(0.016, (z.t - a.t) / 1000);
     const vx = ((z.x - a.x) / s.width) * 100 / dt, vy = ((a.y - z.y) / s.height) * 100 / dt; // %/s, up = +
     drag = null;
-    if (overBasket(z.x, z.y)) return putAway();
+    if (overHome(z.x, z.y)) return putAway();
     b.mode = 'free';
     b.vx = Math.max(-160, Math.min(160, vx * 0.7));
     b.vz = Math.max(-0.8, Math.min(2.2, vy * 0.012));
@@ -126,15 +124,38 @@
   ballEl.addEventListener('pointerup', letGo);
   ballEl.addEventListener('pointercancel', letGo);
 
-  function overBasket(x, y) { // let go over the basket (on the screen, a little generous) = put away
-    const r = basketEl.getBoundingClientRect(), m = r.width * 0.3;
+  // taking it out of the 玩耍 button: a drag from the button throws it, a tap drops it in front of the fox
+  homeBtn?.addEventListener('pointerdown', e => {
+    if (b.mode !== 'home' || !window.Fox2D || !S.hatched || S.sleeping) return;
+    e.preventDefault();
+    b.mode = 'held';
+    b.z = Math.min(0.3, foxZ + 0.1);
+    drag = [{ t: performance.now(), x: e.clientX, y: e.clientY }];
+    const move = ev => { drag.push({ t: performance.now(), x: ev.clientX, y: ev.clientY }); if (drag.length > 8) drag.shift(); hold(ev); };
+    const up = ev => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      const moved = Math.hypot(ev.clientX - drag[0].x, ev.clientY - drag[0].y) > 20;
+      if (moved) return letGo(ev);
+      drag = null; // a tap: it drops in front of the fox, and the fox goes for it
+      b.mode = 'free';
+      b.x = Math.max(10, Math.min(90, foxX + rand(-12, 12))); b.z = Math.max(0, foxZ - 0.08); b.h = 40;
+      b.vx = rand(-10, 10); b.vz = 0; b.vh = 0;
+      b.after = fetch;
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+    hold(e);
+  });
+
+  function overHome(x, y) { // let go over the 玩耍 button (a little generous) = put away
+    if (!homeBtn) return false;
+    const r = homeBtn.getBoundingClientRect(), m = r.width * 0.3;
     return x > r.left - m && x < r.right + m && y > r.top - m * 2 && y < r.bottom + m;
   }
   function putAway() {
     const wasOut = b.mode !== 'home';
     b.mode = 'home';
-    b.x = BASKET.x; b.z = BASKET.z; b.h = 0;
-    basketEl.classList.remove('ask');
+    b.h = 0;
+    homeBtn?.classList.remove('ask');
     clearInterval(remind);
     if (wasOut && asked) {
       asked = false;
@@ -170,7 +191,12 @@
   }
   async function play(run) {
     if (!S.hatched || S.sleeping || !Fox2D.canWalk) return;
+    if (S.stats.energy < 15) { say(t('tooTired')); return; } // too tired to play: the ball just lies there
     while (eating) { await wait(500); if (run !== fetchRun) return; }
+    S.stats.fun = clamp(S.stats.fun + 15);
+    S.stats.energy = clamp(S.stats.energy - 8);
+    addBond(2);
+    save();
     for (let k = 0, n = 3 + Math.floor(Math.random() * 3); k < n; k++) {
       if (!(await rolled(run))) return;
       const sitAndBat = k > 0 && Fox2D.canPlay && Math.random() < 0.3;
@@ -200,7 +226,7 @@
     if (b.mode === 'home') return;
     asked = true;
     say(t('tidyAsk'), 3200);
-    basketEl.classList.add('ask');
+    homeBtn?.classList.add('ask');
     clearInterval(remind);
     remind = setInterval(() => { if (b.mode !== 'home' && b.mode !== 'held' && !S.sleeping) say(t('tidyAsk'), 3000); }, 45000);
   }

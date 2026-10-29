@@ -438,6 +438,7 @@ const actions = {
     }, 650);
   },
   play() {
+    if (RENDER === 'anim' && window.Ball) return; // 2D: the ball lives in this button (ball.js takes it out / in)
     if (S.stats.energy < 15) { say(t('tooTired')); setExpr('tired', 1800); return; }
     S.stats.fun = clamp(S.stats.fun + 20);
     S.stats.energy = clamp(S.stats.energy - 10);
