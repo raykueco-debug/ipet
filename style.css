@@ -281,3 +281,5 @@ html, body {
 .learn-progress { color: var(--muted); font-size: 13px; margin: 0; }
 .stars-row { font-size: 28px; letter-spacing: 4px; }
 .mic-live { background: #d9443a !important; color: #fff !important; }
+
+.actions [data-act=play] { touch-action: none; } /* dragging the ball out: no scrolling instead */

@@ -11,7 +11,7 @@
   // a tiny seeded random, so the drawn scene is the same every time
   let seed = 7;
   const rnd = (a, b) => { seed = (seed * 16807) % 2147483647; return a + (b - a) * (seed / 2147483647); };
-  const svg = (body, defs = '') => `<svg viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax meet"><defs>${defs}</defs>${body}</svg>`;
+  const svg = (body, defs = '') => `<svg viewBox="0 0 1200 600" preserveAspectRatio="xMidYMax slice"><defs>${defs}</defs>${body}</svg>`;
   const grad = (id, top, bottom) => `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient>`;
 
   const roundTree = (x, y, s, leaf, light, dark) => `<g transform="translate(${x} ${y}) scale(${s})">
@@ -86,7 +86,7 @@
         const x = -60 + k * 34;
         return `Q${x + 17} ${(602 - rnd(12, 20)).toFixed(0)} ${x + 34} 602`;
       }).join(' ')} V610Z" fill="#8fd36e"/>
-      ${blades(36, 584, 604, '#5fae4b')}`).replace('xMidYMax meet', 'xMidYMax slice'),
+      ${blades(36, 584, 604, '#5fae4b')}`),
   };
 
   const stage = document.getElementById('stage');
@@ -142,6 +142,18 @@
     place();
     addEventListener('resize', place);
     layers.mid.style.display = layers.props.style.display = 'none';
+    // the bed is soft: a weight on it (app.js pressed: the fox, the ball) squashes it where it presses, and it
+    // springs back up when the weight goes — a little past, then settles
+    const bedEl = els[PROPS.findIndex(p => p[0] === 'bed')]?.[0], bed = THINGS.find(t => t.name === 'bed');
+    let give = 0, speed = 0;
+    if (bedEl && bed) setInterval(() => {
+      const want = Math.min(1, Math.max(pressed.fox, pressed.ball * 0.6) / 1.6);
+      speed = (speed + (want - give) * 0.3) * 0.72;
+      give += speed;
+      const at = pressed.fox ? foxX : (window.Ball?.state.x ?? bed.x); // where it presses (% of the bed's width)
+      bedEl.style.transformOrigin = `${50 + Math.max(-40, Math.min(40, ((at - bed.x) / bed.rx) * 40))}% 100%`;
+      bedEl.style.transform = `translateX(-50%) scale(${1 + 0.04 * give}, ${1 - 0.12 * give})`;
+    }, 1000 / 30);
   }, () => {});
 
   // slide the layers against each other: with the fox's position, and with the tablet's tilt

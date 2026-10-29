@@ -23,3 +23,4 @@ assets/fox3d/cub_tex.png
 
 # copies the generation queue runs (scripts may be edited while one runs)
 tools/.run_*.sh
+assets/fox/wan_full/

@@ -24,7 +24,7 @@
                     giggle: 1, wink: 1, sing: 1,
                     paw: 0, wave: 0, nod: 0, shake_no: 0, shake_dry: 0, hungry: 0, shiver: 0, proud: 0,
                     present_l: 0, present_r: 0, cheer: 0, cover_ears: 0, sorry: 0, delight: 0 }; // weights (0: only on cue, Fox2D.play)
-  const FACES = ['ahead', 'happy', 'up', 'back']; // walk loop variants; the plain loop plays most
+  const FACES = ['happy', 'up']; // walk loop variants; the plain loop plays most
   const MOVES = ['pounce', 'swipe', 'bat', 'header', 'tail']; // ball play from standing side-on (tools/wan_ballplay.sh)
   const WALK = ['normal_to_walk', 'normal_to_walk_r', 'walk_loop', 'walk_r_loop', 'walk_turn', 'walk_r_turn',
                 'walk_to_normal', 'walk_r_to_normal'];
@@ -58,7 +58,7 @@
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
   let push = false;   // standing at the ball: nudge it with the nose next (walk[_r]_loop_push)
   let move = null;    // standing at the ball: that ball-play move next (walk_to_<move>, walk_r_to_<move>_r)
-  let smear = null;   // dash(): { from: the picture it was on, dir: -1 left / 1 right, n: frames left } — a blur
+  let running = false; // after the ball: the bounding run (walk[_r]_loop_run) instead of walking
 
   async function load(name, wait = false) { // wait: until its first frames are in (the first clip only)
     if (clips[name] !== undefined) return clips[name];
@@ -118,6 +118,7 @@
     if (at === 'sleep' && clips.sleep_to_sleep_belly && clips.sleep_belly_to_sleep && Math.random() < 0.12) return 'sleep_to_sleep_belly';
     if (at === 'sleep_belly') return clips.sleep_belly_loop && Math.random() < 0.75 ? 'sleep_belly_loop' : 'sleep_belly_to_sleep';
     if (at === 'sleep' && clips.sleep_loop_dream && Math.random() < 0.3) return 'sleep_loop_dream';
+    if (isWalk(at) && running && clips[`${at}_loop_run`]) return `${at}_loop_run`;
     if (isWalk(at) && Math.random() < 0.4) {
       const faces = FACES.map(f => `${at}_loop_${f}`).filter(c => clips[c]);
       if (faces.length) return faces[Math.floor(Math.random() * faces.length)];
@@ -129,7 +130,8 @@
   // does the loop that is playing still fit what is wanted? (pure: no side effects)
   function stays(name) {
     const at = endsOn(name);
-    if (go) return at === go && !(push && clips[`${go}_loop_push`]) && !(move && clips[`${go}_to_${move}${go === 'walk_r' ? '_r' : ''}`]);
+    if (go) return at === go && !(push && clips[`${go}_loop_push`]) && !(move && clips[`${go}_to_${move}${go === 'walk_r' ? '_r' : ''}`])
+      && name.endsWith('_loop_run') === (running && !!clips[`${go}_loop_run`]);
     if (isWalk(at)) return false;
     if (at === 'normal') return !poked && mood() === 'normal' && (name === 'normal_loop_talk') === (talking && !!clips.normal_loop_talk);
     if (name === 'love_loop_rub') return rubbing;
@@ -199,8 +201,6 @@
 
   function advance() {
     if (!cur) return;
-    if (smear && --smear.n > 0) return; // the blur holds a few frames, then the walk loop plays from its start
-    smear = null;
     if (i < cur.frames.length - 1) {
       // a loop that no longer fits leaves early at an exit frame (same picture as its start)
       if (isLoop(cur.name) && cur.exits.includes(i) && !stays(cur.name)) return leave(true);
@@ -227,16 +227,6 @@
     const f = cur.frames[i];
     if (!f.complete || !f.naturalWidth) return; // keep the last picture rather than a blank
     g.clearRect(0, 0, 512, 512);
-    if (smear) { // the dash's blur: the pose it was in and the stride it goes into, smeared the way it runs
-      for (let k = 0; k < 8; k++) {
-        g.globalAlpha = 0.22;
-        const d = smear.dir * (k - 4) * 10;
-        if (smear.from?.naturalWidth) g.drawImage(smear.from, d - smear.dir * 20, DROP, 512, 512);
-        g.drawImage(f, d + smear.dir * 20, DROP, 512, 512);
-      }
-      g.globalAlpha = 1;
-      return;
-    }
     g.drawImage(f, 0, DROP, 512, 512);
   }
 
@@ -251,20 +241,21 @@
     setInterval(tick, 1000 / FPS); // a fixed clock (rAF stops while the page is hidden)
     // the rest in the background: their frame lists six at a time (small), then their pictures one clip at a
     // time; a clip needed before its pictures are in fetches them at once, and draw() keeps the last picture
-    const names = [
+    const names = [ // walking and the ball first: a ball thrown right away is chased right away
+      ...WALK, 'walk_loop_run', 'walk_r_loop_run',
+      ...MOVES.flatMap(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r']),
+      'normal_to_paw', 'paw_to_normal',
       ...Object.keys(ACTIONS).flatMap(a => [`normal_to_${a}`, `${a}_to_normal`]),
-      ...WALK,
       ...MOODS.flatMap(m => [`${m}_loop`, `normal_to_${m}`, `${m}_to_normal`, `${m}_loop_2`]),
       'love_loop_rub', 'normal_to_eat', 'eat_loop', 'eat_to_normal', 'eat_loop_drink',
       ...Object.keys(ACTIONS).map(a => `${a}_loop`), // poses with a loop of their own (the rest just 404)
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
       'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen', 'normal_loop_ears', 'normal_loop_tail', 'normal_loop_blink', 'normal_loop_sway',
-      ...[...FACES, 'push'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),
+      ...[...FACES, 'push', 'run'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),
       ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
         `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
       'walk_front_to_walk_back', 'walk_back_to_walk_front',
-      ...MOVES.flatMap(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r']),
-    ];
+    ].filter((n, k, all) => all.indexOf(n) === k);
     let next = 0;
     const worker = async () => { while (next < names.length) await load(names[next++]); };
     await Promise.all(Array.from({ length: 6 }, worker));
@@ -299,26 +290,7 @@
     drink(on) { drinking = !!on; }, // at the water bowl: lap until it's had enough
     go(dir) { go = dir; },          // start walking / turn round ('walk' left, 'walk_r' right)
     stop() { go = null; },
-    // stopped / told what's next mid-loop: now, not at the loop's end — the blur frame into what comes next
-    cut() {
-      if (!cur || !isLoop(cur.name) || stays(cur.name)) return;
-      const name = next(cur.name);
-      if (name === cur.name || !clips[name]) return;
-      const from = cur.frames[i];
-      switchTo(name, false);
-      smear = { from, dir: cur.name.startsWith('walk_r') ? 1 : -1, n: 3 };
-    },
-    // off at once (after the ball): whatever it was doing, a blur frame — the fixed picture any pose may cut to —
-    // and straight into the walk loop that way, no getting up or turning first
-    dash(dir) {
-      const loop = `${dir}_loop`;
-      if (!clips[loop] || !cur) return this.go(dir);
-      const from = cur.frames[i];
-      go = dir;
-      poked = false; cue = null; action = null; holdLoops = 0; hold = 0; cur.held = false; push = false; move = null;
-      switchTo(loop, false);
-      smear = { from, dir: dir === 'walk' ? -1 : 1, n: 3 };
-    },          // stop, turn to us and sit
+    run(on) { running = !!on; },    // chasing the ball: run, not walk
     get canWalk() { return WALK.every(c => clips[c]); },
     // toward / away from the viewer: walk loops, ways in and out, and turns to and from side-on
     get canWalkDepth() {
@@ -327,9 +299,10 @@
     },
     get canEat() { return ['normal_to_eat', 'eat_loop', 'eat_to_normal'].every(c => clips[c]); },
     get state() {
-      return { clip: cur?.name, frame: i, want, action, go, rubbing, eating: cur?.name === 'eat_loop',
+      return { clip: cur?.name, frame: i, frames: cur?.frames.length || 0, want, action, go, rubbing, eating: cur?.name === 'eat_loop',
                walking: !!go && !!cur && cur.name.startsWith(`${go}_loop`) && !cur.name.endsWith('_push'),
                pushing: !!cur && cur.name.endsWith('_loop_push'),
+               running: !!cur && cur.name.endsWith('_loop_run'),
                // a walk loop playing (legs going), and its frames to where it can be left
                stride: !!cur && /^walk(_r|_front|_back)?_loop/.test(cur.name) && !cur.name.endsWith('_push'),
                strideLeft: cur ? (cur.exits.find(k => k >= i) ?? cur.frames.length - 1) - i : 0 };

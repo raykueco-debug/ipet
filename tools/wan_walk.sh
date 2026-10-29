@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Walking, with the local Wan 2.2 tool — see tools/wan_clips.sh. Pictures from tools/wan_prep.py:
 # normal (sitting, facing us), walk (standing side-on, facing left), walk_r (walk flipped: facing right).
-#   normal_to_walk / normal_to_walk_r   sit → stand up → turn side-on      25 frames
+#   normal_to_walk / normal_to_walk_r   sit → stand up → turn side-on      25 frames (shortened after: tools/clip_trim.py)
 #   walk_loop / walk_r_loop             walking in place, facing left / right   25 → 24-frame loop
-#   walk_to_normal / walk_r_to_normal   stop → turn to us → sit down       25 frames
+#   walk_to_normal / walk_r_to_normal   stop → turn to us → sit down       25 frames (shortened after)
 #   walk_turn / walk_r_turn             turn round: left → right / right → left   17 frames
 #   walk[_r]_loop_<face>               walk loops that do something with the face mid-stride (same anchor)
 #   walk[_r]_loop_push                 standing: dip the head and push the ball with the nose (same anchor)
@@ -22,7 +22,7 @@ want() { [ "$ONLY" = "  " ] || [[ "$ONLY" == *" $1 "* ]]; }
 IN="$IPET/assets/fox/wan_in"
 OUT="$IPET/assets/fox/clips"
 FOX='一隻Q版的小狐狸（橘色的毛、米白色的臉頰和胸口、深褐色的耳尖與腳掌、蓬鬆的大尾巴有白色尾尖），在純綠色背景前。'
-KEEP='畫面裡只有這隻狐狸，沒有手、沒有碗、沒有玩具、沒有任何特效符號。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。'
+KEEP='側身的時候，頭和臉始終是正側面、朝著前進的方向，不回頭、不轉頭看鏡頭。畫面裡只有這隻狐狸，沒有手、沒有碗、沒有玩具、沒有任何特效符號。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。'
 run() { # input  suffix  length  prompt  [end-image]
   local end=()
   [ $# -ge 5 ] && end=(--end "$5")
@@ -52,7 +52,7 @@ if want walk_r_to_normal; then
 fi
 if want walk_turn; then
   echo "=== walk_turn $(date +%T)"
-  run "$IN/walk.png" _turn 17 "${FOX}牠原本側身站著朝畫面左邊，原地轉身，變成側身朝畫面右邊站好。動作自然流暢。$KEEP" "$IN/walk_r.png"
+  run "$IN/walk.png" _turn 25 "${FOX}牠原本側身站著朝畫面左邊，原地轉身，變成側身朝畫面右邊站好。動作自然流暢。$KEEP" "$IN/walk_r.png"
 fi
 if want walk_r_loop; then
   echo "=== walk_r_loop $(date +%T)"
@@ -60,15 +60,13 @@ if want walk_r_loop; then
 fi
 if want walk_r_turn; then
   echo "=== walk_r_turn $(date +%T)"
-  run "$IN/walk_r.png" _turn 17 "${FOX}牠原本側身站著朝畫面右邊，原地轉身，變成側身朝畫面左邊站好。動作自然流暢。$KEEP" "$IN/walk.png"
+  run "$IN/walk_r.png" _turn 25 "${FOX}牠原本側身站著朝畫面右邊，原地轉身，變成側身朝畫面左邊站好。動作自然流暢。$KEEP" "$IN/walk.png"
 fi
 declare -A FACE=(
-  [ahead]='走到一半把頭轉成正側面，看著前進的方向，再把臉轉回來'
   [happy]='走到一半開心地瞇起眼睛笑，再恢復原本的表情'
   [up]='走到一半抬頭往上看了一下，再把頭放回來'
-  [back]='走到一半回頭看了一下身後，再把頭轉回來'
 )
-for f in ahead happy up back; do
+for f in happy up; do
   for d in walk walk_r; do
     side=左; [ $d = walk_r ] && side=右
     if want ${d}_loop_$f; then
@@ -108,7 +106,7 @@ for pair in walk:walk_front walk_front:walk walk_r:walk_front walk_front:walk_r 
   f=${pair%%:*}; t=${pair##*:}
   if want ${f}_to_$t; then
     echo "=== ${f}_to_$t $(date +%T)"
-    run "$IN/$f.png" "_to_$t" 17 "${FOX}牠原本${VIEW[$f]}站著，原地轉身，變成${VIEW[$t]}站好。四隻腳留在原地。動作自然流暢。$KEEP" "$IN/$t.png"
+    run "$IN/$f.png" "_to_$t" 25 "${FOX}牠原本${VIEW[$f]}站著，原地轉身，變成${VIEW[$t]}站好。四隻腳留在原地。動作自然流暢。$KEEP" "$IN/$t.png"
   fi
 done
 # nudging the ball: standing, a dip of the head and a push forward with the nose, back to standing

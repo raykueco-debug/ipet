@@ -41,7 +41,7 @@
   const W = () => stage.clientWidth, H = () => stage.clientHeight;
   function place(elm, x, z, h, w) {
     elm.style.left = x + '%';
-    elm.style.bottom = groundAt(z) + h + '%';
+    elm.style.bottom = groundAt(z) + h - (h ? 0 : sinkAt(x, z, 0.5)) + '%'; // sinks into the soft bed a little
     elm.style.width = w + 'px';
     elm.style.zIndex = layerAt(z) + 1;
   }
@@ -50,6 +50,7 @@
     const home = b.mode === 'home';
     ballEl.style.display = home ? 'none' : ''; // put away: in the 玩耍 button, not in the scene
     homeBtn?.classList.toggle('ball-out', !home);
+    pressed.ball = !home && !b.h ? sinkAt(b.x, b.z, 0.5) : 0; // (scene.js: the bed gives under it)
     if (home) { shadowEl.style.opacity = 0; return; }
     place(ballEl, b.x, b.z, b.h, w);
     ballEl.style.transform = `translateX(-50%) rotate(${b.spin}deg)`;
@@ -69,6 +70,15 @@
     } else { const k = Math.exp(-AIR * dt); p.vx *= k; p.vz *= k; }
     if (p.x < 6 || p.x > 94) { p.x = Math.max(6, Math.min(94, p.x)); p.vx *= -0.6; }
     if (p.z < 0 || p.z > 1) { p.z = Math.max(0, Math.min(1, p.z)); p.vz *= -0.6; }
+    for (const t of THINGS) { // app.js: a solid thing low enough to hit bounces it back; a soft one slows it
+      if (!within(t, p.x, p.z)) continue;
+      if (t.soft) { if (!p.h) { const k = Math.exp(-ROLL * 1.5 * dt); p.vx *= k; p.vz *= k; } continue; }
+      if (p.h > t.h) continue;
+      const nx = (p.x - t.x) / t.rx, nz = (p.z - t.z) / t.rz, d = Math.hypot(nx, nz) || 1;
+      p.x = t.x + (nx / d) * t.rx * 1.02; p.z = t.z + (nz / d) * t.rz * 1.02; // out to its edge
+      const ux = nx / d, uz = nz / d, vn = p.vx / t.rx * ux + p.vz / t.rz * uz; // against its edge, in its own units
+      if (vn < 0) { p.vx -= 1.6 * vn * ux * t.rx; p.vz -= 1.6 * vn * uz * t.rz; }
+    }
     p.spin += (p.vx * 9 - p.vz * 120) * dt;
   }
   const still = p => !p.h && !p.vh && Math.hypot(p.vx, p.vz * 30) < 1.5;
@@ -98,15 +108,23 @@
 
   // grab and throw: the finger's speed when it lets go is the throw; upwards on the screen = deeper
   let drag = null;
-  ballEl.addEventListener('pointerdown', e => {
-    if (!window.Fox2D) return;
+  // a finger on the ball takes it, whatever is drawn over it (the fox's picture is a big see-through box: when it
+  // stands by the ball, its box covers it) — caught before anything else gets the touch; a little generous
+  const onBall = e => {
+    if (b.mode === 'home' || b.mode === 'held') return false;
+    const r = ballEl.getBoundingClientRect(), rad = r.width / 2 * 1.3;
+    return Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) < Math.max(rad, 28);
+  };
+  document.addEventListener('pointerdown', e => {
+    if (!window.Fox2D || !onBall(e)) return;
     e.stopPropagation();
+    e.preventDefault();
     try { ballEl.setPointerCapture(e.pointerId); } catch (err) {} // (no capture for a synthetic pointer)
     callOff();
     b.mode = 'held';
     drag = [{ t: performance.now(), x: e.clientX, y: e.clientY }];
     hold(e);
-  });
+  }, true);
   ballEl.addEventListener('pointermove', e => {
     if (!drag) return;
     drag.push({ t: performance.now(), x: e.clientX, y: e.clientY });
@@ -183,7 +201,8 @@
   function callOff() { // the ball was grabbed: whatever the fox was doing with it, stop
     fetchRun++;
     busy = false;
-    if (walkTarget) { walkTarget = null; Fox2D.stop(); Fox2D.cut(); } // stops there and then
+    Fox2D.run(false);
+    if (walkTarget) { walkTarget = null; Fox2D.stop(); }
   }
   // sat down (at home, or in a mood's loop: a cue still goes by way of home)
   const sat = () => { const c = Fox2D.state.clip || ''; return !Fox2D.state.go && c.includes('_loop') && !c.startsWith('walk'); };
@@ -194,9 +213,7 @@
   const walkThere = (x, z, run, keep) => new Promise(ok => { if (!walk2d(x, z, () => ok(run === fetchRun), keep)) ok(false); });
   const rolled = run => until(() => b.mode === 'rest' || b.mode === 'home', run, 5000);
   async function chase(run) { // up at once, straight for where it will stop, while it still flies and rolls
-    const p0 = restAt(), far = p => Math.abs(p.x - foxX) > 6 * sizeAt(p.z) || Math.abs(p.z - foxZ) > 0.1;
-    // off like a shot (when not up and going already)
-    if (b.mode === 'free' && far(p0) && !Fox2D.state.go) Fox2D.dash(p0.x < foxX ? 'walk' : 'walk_r');
+    const far = p => Math.abs(p.x - foxX) > 6 * sizeAt(p.z) || Math.abs(p.z - foxZ) > 0.1;
     for (let k = 0; b.mode === 'free' && k < 40; k++) {
       const p = restAt();
       if (far(p) || Fox2D.state.go) walk2d(p.x + (foxX >= p.x ? 1 : -1) * 4 * sizeAt(p.z), Math.min(1, p.z + 0.04));
@@ -209,9 +226,12 @@
   async function fetch() {
     const run = ++fetchRun;
     busy = true;
-    try { await play(run); } finally { if (run === fetchRun) busy = false; }
+    Fox2D.run(true); // after it at a run
+    try { await play(run); } finally { if (run === fetchRun) { busy = false; Fox2D.run(false); } }
   }
   async function play(run) {
+    // just opened: its walking clips may still be on the way — wait for them, never just ignore the ball
+    for (let k = 0; !Fox2D.canWalk && k < 600; k++) { await wait(100); if (run !== fetchRun) return; }
     if (!S.hatched || S.sleeping || !Fox2D.canWalk) return;
     if (S.stats.energy < 15) { Fox2D.play('yawn'); say(t('tooTired')); return; } // too tired: a yawn, the ball just lies there
     while (eating) { await wait(500); if (run !== fetchRun) return; }
@@ -233,7 +253,8 @@
         const m = pick(Fox2D.ballMoves), r = Fox2D.state.go === 'walk_r' ? '_r' : '';
         Fox2D.ballMove(m);
         const into = `${Fox2D.state.go}_to_${m}${r}`;
-        if (!(await until(() => Fox2D.state.clip === into && Fox2D.state.frame >= 14, run, 6000))) return;
+        // the move lands at the end of its way in (its last frames: transitions are thinned, tools/clip_trim.py)
+        if (!(await until(() => Fox2D.state.clip === into && Fox2D.state.frame >= Fox2D.state.frames - 3, run, 6000))) return;
         const [speed, up] = { pounce: [30, 25], swipe: [45, 15], bat: [25, 5], header: [30, 70], tail: [55, 10] }[m];
         kick(-from, speed, up);
       } else if (side && Fox2D.canPush && !sitAndBat) { // side-on: dip the head and push it with the nose
@@ -244,7 +265,7 @@
         Fox2D.stop();
         if (!(await until(sat, run))) return;
         Fox2D.play('paw');
-        if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 7000))) return;
+        if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= Fox2D.state.frames - 3, run, 7000))) return;
         kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
       } else { // (no clips for any of it)
         Fox2D.stop();

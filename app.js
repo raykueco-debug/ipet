@@ -578,6 +578,7 @@ function walkTo(pct, follow, z) {
 /* 2D fox: it stands up, turns and walks in its own clips (fox2d.js), so the room position moves here, step by
    step, and only while a walk loop is playing — not while it gets up, turns round or sits down */
 const WALK_SPEED = 16; // % of the room per second
+const RUN_FASTER = 2.2;  // running after the ball (walk[_r]_loop_run)
 let walkTarget = null, walkClock = 0;
 /* depth (2.5D, scene.js): the ground runs from the front edge (z 0) back towards the trees (z 1). Farther
    is higher on the stage and smaller; things nearer are drawn over things farther away. */
@@ -588,10 +589,24 @@ const layerAt = z => 10 + Math.round((1 - z) * 80);                // z-index
 const zFromY = y => { const r = el.stage.getBoundingClientRect(); return clamp(((r.bottom - y) / r.height * 100 - DEPTH.near) / (DEPTH.far - DEPTH.near) * 100) / 100; };
 let foxX = 50, foxZ = 0;
 const BED = { x: 20, z: 0.5 }; // its cushion in the scene (scene.js draws it here): it goes there to sleep
+// things on the ground the fox and the ball meet (scene.js draws them; x %, z, and their half size on the ground
+// rx %, rz): a soft one is walked over and gives under a weight (the bed); a solid one, h % high, is walked
+// round and the ball bounces off it (the water bowl)
+const THINGS = [
+  { name: 'bed', x: BED.x, z: BED.z + 0.04, rx: 13, rz: 0.08, soft: true },
+  { name: 'water', x: BED.x + 17, z: BED.z, rx: 5, rz: 0.05, h: 5 },
+];
+const within = (t, x, z, mx = 0, mz = 0) => ((x - t.x) / (t.rx + mx)) ** 2 + ((z - t.z) / (t.rz + mz)) ** 2 < 1;
+const pressed = { fox: 0, ball: 0 }; // how far each sinks into a soft thing now (% of the stage height; scene.js)
+const sinkAt = (x, z, k = 1) => { // standing on a soft thing: sinks in, most in the middle
+  const t = THINGS.find(t => t.soft && within(t, x, z));
+  return t ? 1.6 * k * (1 - Math.hypot((x - t.x) / t.rx, (z - t.z) / t.rz)) : 0;
+};
 function placeFox() {
   el.petWrap.style.left = foxX + '%';
   if (RENDER !== 'anim') return;
-  el.petWrap.style.bottom = groundAt(foxZ) + '%';
+  pressed.fox = sinkAt(foxX, foxZ);
+  el.petWrap.style.bottom = groundAt(foxZ) - pressed.fox + '%';
   el.petWrap.style.transform = `translateX(-50%) scale(${sizeAt(foxZ)})`;
   el.petWrap.style.zIndex = layerAt(foxZ);
 }
@@ -602,15 +617,41 @@ function placeFox() {
 function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing, don't sit (then queues what's next)
   if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
   if (eating) return true; // stays at its bowl
-  walkTarget = { x, z: clamp(z * 100) / 100, then, keep };
+  z = clamp(z * 100) / 100;
+  for (const t of THINGS) if (!t.soft && within(t, x, z, 1, 0.01)) z = t.z + (z < t.z ? -1 : 1) * (t.rz + 0.06); // not on it: by it
+  walkTarget = { x, z, then, keep, via: roundThings(x, z) };
   el.petWrap.style.transition = 'none';
   if (!walkClock) walkClock = setInterval(walkStep, 50);
   walkStep();
   return true;
 }
+// the way there going round the solid things on the ground: for each one in the way, one or two points around it
+// (in front, behind, at its sides or corners) — the shortest way with no leg through it
+function roundThings(x, z, fx = foxX, fz = foxZ) {
+  const clear = (t, a, b) => { // (from close by it, like the drinking spot: only through it counts)
+    const [mx, mz] = within(t, a.x, a.z, 4, 0.05) || within(t, b.x, b.z, 4, 0.05) ? [0.5, 0.01] : [4, 0.05];
+    for (let k = 1; k < 20; k++) if (within(t, a.x + (b.x - a.x) * k / 20, a.z + (b.z - a.z) * k / 20, mx, mz)) return false;
+    return true;
+  };
+  const len = pts => pts.slice(1).reduce((n, p, k) => n + Math.hypot(p.x - pts[k].x, (p.z - pts[k].z) * DEPTH.across), 0);
+  const via = [], to = { x, z };
+  let from = { x: fx, z: fz };
+  for (const t of THINGS) {
+    if (t.soft || clear(t, from, to)) continue;
+    const C = [];
+    for (const i of [-1, 0, 1]) for (const j of [-1, 0, 1]) if (i || j) C.push({ x: t.x + i * (t.rx + 5), z: clamp((t.z + j * (t.rz + 0.09)) * 100) / 100 });
+    const ways = [...C.map(p => [p]), ...C.flatMap(p => C.filter(q => q !== p).map(q => [p, q]))]
+      .filter(w => [from, ...w, to].every((p, k, all) => !k || clear(t, all[k - 1], p)))
+      .sort((a, b) => len([from, ...a, to]) - len([from, ...b, to]));
+    if (!ways.length) continue;
+    via.push(...ways[0]);
+    from = ways[0][ways[0].length - 1];
+  }
+  return via;
+}
 // It never steps on the spot: a walk loop can only be left at its end (the one picture its ways out start on),
-// so the fox stops as its last stride begins — that stride carries it the rest of the way — and a stride under
-// way when it is called off plays out moving on.
+// so the fox stops as its last stride begins — that stride carries it the rest of the way (slower, when the way
+// is short) — and a stride under way when it is called off plays out moving on.
 let walkDir = null; // the last step (x %, z) while walking
 function walkStep() {
   const st = Fox2D.state;
@@ -626,17 +667,19 @@ function walkStep() {
     walkClock = 0;
     return;
   }
-  const dx = walkTarget.x - foxX, dz = (walkTarget.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
-  const step = Math.min(dist, WALK_SPEED * 0.05 * sizeAt(foxZ)); // farther away it looks slower
+  const goal = walkTarget.via?.[0] || walkTarget;
+  let dx = goal.x - foxX, dz = (goal.z - foxZ) * DEPTH.across, dist = Math.hypot(dx, dz);
+  if (goal !== walkTarget && dist < 2) { walkTarget.via.shift(); return walkStep(); } // round it: on to the next
+  const speed = WALK_SPEED * (Fox2D.state.running ? RUN_FASTER : 1);
+  const step = Math.min(dist, speed * 0.05 * sizeAt(foxZ)); // farther away it looks slower
   const arrive = () => {
     const { then, keep } = walkTarget;
     walkTarget.last = true;
     if (!keep) Fox2D.stop();
     if (then) then();
-    // more stride left than way to go: no stepping on the spot — cut now (after then() has said what's next)
-    if (st.stride && st.strideLeft * 1.25 * WALK_SPEED * 0.05 * sizeAt(foxZ) > dist * 1.5 + 1) setTimeout(() => Fox2D.cut(), 0);
   };
-  if (dist < 0.4) { arrive(); return walkStep(); }
+  const final = goal === walkTarget;
+  if (final && dist < 0.4) { arrive(); return walkStep(); }
   // facing: mostly deeper / nearer → its back / its front (when those clips are there), else side-on by the
   // sideways part; a short way straight in or out keeps the way it faces
   const deep = Math.abs(dz) > Math.abs(dx) * 1.5 && Math.abs(dz) > 3 && Fox2D.canWalkDepth;
@@ -645,7 +688,7 @@ function walkStep() {
   Fox2D.go(facing);
   if (!Fox2D.state.walking) return;
   // the spot is within this stride (16 frames a second, a step every 50 ms): stop now, the stride ends there
-  if (dist <= step * Fox2D.state.strideLeft * 1.25) { arrive(); return; }
+  if (final && dist <= step * Fox2D.state.strideLeft * 1.25) { arrive(); return; }
   move((dx / dist) * step, (dz / dist) * step / DEPTH.across);
 }
 

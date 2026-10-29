@@ -3,7 +3,7 @@
 # is ball.js's own layer, kicked by the player when the move lands); the fox moves from its standing side-on
 # picture (walk / walk_r) into a move's picture and back. Pictures: GPT sheet assets/source/gpt/play_01.png
 # (tools/grid_split.py, facing left; the _r ones are those pictures flipped).
-#   walk_to_<move> / <move>_to_walk           facing left     17 frames each
+#   walk_to_<move> / <move>_to_walk           facing left     25 frames each (shortened after: tools/clip_trim.py)
 #   walk_r_to_<move>_r / <move>_r_to_walk_r   facing right
 # moves: pounce (crouch, leap, land pinning the ball), swipe (a paw bats it), bat (lies down, both paws bat it),
 #        header (jumps, bumps it with the head), tail (turns, sweeps it with the tail)
@@ -19,7 +19,7 @@ MOVES="${*:-pounce swipe bat header tail}"
 IN="$IPET/assets/fox/wan_in"
 OUT="$IPET/assets/fox/clips"
 FOX='一隻Q版的小狐狸（橘色的毛、米白色的臉頰和胸口、深褐色的耳尖與腳掌、蓬鬆的大尾巴有白色尾尖），在純綠色背景前的原地。'
-KEEP='畫面裡只有這隻狐狸，沒有球、沒有任何物品、沒有手、沒有任何特效符號。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。'
+KEEP='側身的時候，頭和臉始終是正側面、朝著前進的方向，不回頭、不轉頭看鏡頭。畫面裡只有這隻狐狸，沒有球、沒有任何物品、沒有手、沒有任何特效符號。鏡頭完全固定不動，背景始終是純綠色，主體大小不變、肢體數量不變。動漫風格，賽璐珞上色，可愛。'
 declare -A GO=(
   [pounce]='壓低身體、屁股翹高扭一扭，然後往前一撲，落地時兩隻前腳往前按住地面'
   [swipe]='站著舉起一隻前腳，往前用力一揮，像在拍打前面的東西'
@@ -35,7 +35,7 @@ declare -A BACK=(
   [tail]='轉回來，站好'
 )
 run() { # input  suffix  prompt  end-image
-  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$1" --length 17 --fps 16 \
+  ./../.venv/Scripts/python.exe tivot_wan.py --mode idle --files "$1" --length 25 --fps 16 \
     --seed "$SEED" --out "$OUT" --suffix "$2" --prompt "$3" --end "$4" 2>&1 | tail -3
 }
 cd "$COMFY/tivot_wan" || exit 1
