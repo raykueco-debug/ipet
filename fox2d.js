@@ -251,7 +251,7 @@
       ...Object.keys(ACTIONS).map(a => `${a}_loop`), // poses with a loop of their own (the rest just 404)
       'normal_to_drowsy', 'drowsy_loop', 'drowsy_to_normal', 'drowsy_to_sleep', 'sleep_loop', 'sleep_loop_dream',
       'sleep_to_normal', 'sleep_to_sleep_belly', 'sleep_belly_loop', 'sleep_belly_to_sleep', 'normal_loop_talk', 'normal_loop_listen', 'normal_loop_ears', 'normal_loop_tail', 'normal_loop_blink', 'normal_loop_sway',
-      ...[...FACES, 'push', 'run'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]),
+      ...[...FACES, 'push', 'run'].flatMap(f => [`walk_loop_${f}`, `walk_r_loop_${f}`]), 'walk_front_loop_push',
       ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
         `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
       'walk_front_to_walk_back', 'walk_back_to_walk_front',
@@ -273,6 +273,7 @@
     get canPlay() { return !!(clips.normal_to_paw && clips.paw_to_normal); },
     nudge_ball() { push = true; },  // standing at the ball (walking, not moving): push it with the nose next
     get canPush() { return !!(clips.walk_loop_push && clips.walk_r_loop_push); },
+    get canPushFront() { return !!clips.walk_front_loop_push; },
     ballMove(m) { move = m; },      // standing at the ball: play that move with it next
     get ballMoves() { // the moves there are clips for, both ways
       return MOVES.filter(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r'].every(c => clips[c]));
@@ -306,6 +307,7 @@
                // a walk loop playing (legs going), and its frames to where it can be left
                // the way it faces: -1 side-on left, 1 side-on right, 0 toward / away from us (by the picture it is on
                // its way to: a move's way in counts as the move)
+               view: cur ? endsOn(cur.name) : null, // the picture it is on, or on its way to
                facing: !cur ? 0 : (a => a === 'walk_r' || (a.endsWith('_r') && MOVES.includes(a.slice(0, -2))) ? 1
                  : a === 'walk' || MOVES.includes(a) ? -1 : 0)(endsOn(cur.name)),
                stride: !!cur && /^walk(_r|_front|_back)?_loop/.test(cur.name) && !cur.name.endsWith('_push'),

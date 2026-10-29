@@ -117,4 +117,9 @@ for d in walk walk_r; do
     run "$IN/$d.png" _loop_push 25 "${FOX}牠側身朝畫面${side}邊站著，低下頭，用鼻子和額頭往前輕輕一頂，像在頂地上的大球玩耍，然後抬起頭站好。四隻腳留在原地。最後回到開始的姿勢。$KEEP"
   fi
 done
+# facing us: dip the head and bump the ball toward the viewer (it is in front of the fox, nearer us)
+if want walk_front_loop_push; then
+  echo "=== walk_front_loop_push $(date +%T)"
+  run "$IN/walk_front.png" _loop_push 25 "${FOX}牠面向你站著，低下頭，用鼻子和額頭朝你的方向往前輕輕一頂，像在把地上的大球頂向你，然後抬起頭站好。四隻腳留在原地，身體位置不前進、大小不變。最後回到開始的姿勢。$KEEP"
+fi
 echo "=== all done $(date +%T)"

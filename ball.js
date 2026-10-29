@@ -88,37 +88,49 @@
     return p;
   }
 
-  // hitboxes (x % of the stage, z, at the fox's depth): the fox's body, and — while a move is under way — the
-  // part of it that strikes (head / paws, in front). Sizes come from the fox's picture: side-on it is about 3/4
-  // of its box long, the muzzle at the front end.
+  // hitboxes (x % of the stage, z, at the fox's depth), from the fox's picture: side-on it is about 3/4 of its
+  // box long with the muzzle at the front end; facing us or away it is narrower and deeper
   const foxW = () => el.petWrap.offsetWidth / stage.clientWidth * 100 * sizeAt(foxZ); // its box, % of the stage
+  const boxAt = z => foxW() / sizeAt(foxZ) * sizeAt(z); // the same at another depth
   const ballR = () => SIZE * 50 * sizeAt(b.z);
   function body() {
-    const w = foxW(), f = Fox2D.state.facing;
-    return f ? { x: foxX, z: foxZ, rx: 0.37 * w, rz: 0.06, h: 22 } : { x: foxX, z: foxZ, rx: 0.3 * w, rz: 0.05, h: 30 };
+    const w = foxW(), v = Fox2D.state.view;
+    if (Fox2D.state.facing) return { x: foxX, z: foxZ, rx: 0.37 * w, rz: 0.04, h: 22 };
+    if (v === 'walk_front' || v === 'walk_back') return { x: foxX, z: foxZ, rx: 0.22 * w, rz: 0.09, h: 26 };
+    return { x: foxX, z: foxZ, rx: 0.28 * w, rz: 0.06, h: 30 }; // sitting
   }
-  let strike = null; // { clips: [names it is live in], from: frame share, zone(), speed, up, dir }
+  // a move under way: { clips: [names it is live in], from: frame share, zone() → box + the way it sends the
+  // ball (vx, vz, vh), hit }
+  let strike = null;
   const inBox = (t, r) => ((b.x - t.x) / (t.rx + r)) ** 2 + ((b.z - t.z) / (t.rz + r / 100)) ** 2 < 1 && b.h < t.h;
   function contact() {
     if (b.mode !== 'free' && b.mode !== 'rest') return;
     const st = Fox2D.state, r = ballR();
     const z = strike && strike.clips.includes(st.clip) && st.frame >= st.frames * strike.from && strike.zone();
     if (z && inBox(z, r)) {
-      const k = strike; strike = null;
-      k.hit = true;
-      return kick(z.dir ?? k.dir, k.speed, k.up); // off the way the head / paws send it
+      strike.hit = true;
+      strike = null;
+      return send(z.vx, z.vz, z.vh);
     }
+    // bumped by the body: only walking into it (going, and the ball ahead of it on the way it goes) — pushed
+    // out ahead and carried on that way, faster than the fox; standing by it, the fox leaves it be
+    if (!st.stride || !walkDir) return;
     const t = body();
     if (!inBox(t, r)) return;
-    // bumped by the body — only walking into it (going, and towards it): pushed out sideways, carried on the
-    // way the fox goes; standing by it, the fox leaves it be
-    const side = Math.sign(b.x - t.x) || (st.facing || 1);
-    if (!st.stride || !walkDir || Math.sign(walkDir.x) !== side) return;
-    b.x = t.x + side * (t.rx + r);
-    const vx = walkDir ? walkDir.x * 20 : 0, vz = walkDir ? walkDir.z * 20 : 0;
-    if (b.mode === 'rest') b.mode = 'free';
-    b.vx = side * Math.max(Math.abs(b.vx) * 0.5, 12) + vx * 1.3;
-    b.vz += vz * 1.3;
+    const ux = walkDir.x, uz = walkDir.z * DEPTH.across, n = Math.hypot(ux, uz) || 1; // its way, in % both ways
+    if ((b.x - t.x) * ux + (b.z - t.z) * DEPTH.across * uz <= 0) return; // behind it on its way: not pushed
+    const speed = (n * 20) * 1.4 + 10; // % a second
+    b.x = t.x + (ux / n) * (t.rx + r);
+    b.z = t.z + (uz / n) * (t.rz + 0.02);
+    send((ux / n) * speed, (uz / n) * speed / DEPTH.across, 6);
+  }
+  function send(vx, vz, vh) { // off it goes: a little random, and away from the walls
+    b.mode = 'free';
+    if ((b.x < 12 && vx < 0) || (b.x > 88 && vx > 0)) vx = -vx;
+    if ((b.z < 0.04 && vz < 0) || (b.z > 0.96 && vz > 0)) vz = -vz * 0.5;
+    b.vx = vx * rand(0.8, 1.15);
+    b.vz = vz * rand(0.8, 1.15);
+    b.vh = vh * rand(0.75, 1);
   }
 
   // physics: in the air under gravity, bouncing; on the ground rolling to a stop, then the same way up
@@ -236,6 +248,7 @@
     fetchRun++;
     busy = false;
     strike = null;
+    clearInterval(pace);
     Fox2D.run(false);
     if (walkTarget) { walkTarget = null; Fox2D.stop(); }
   }
@@ -245,16 +258,54 @@
     for (let k = 0; k < ms / 50 && !test(); k++) { await wait(50); if (run !== fetchRun) return false; }
     return run === fetchRun;
   }
-  const walkThere = (x, z, run, keep) => new Promise(ok => { if (!walk2d(x, z, () => ok(run === fetchRun), keep)) ok(false); });
+  // where the fox goes for the ball lying at p: side-on with its muzzle at it (from the side the fox is on, or the
+  // other when that is off the edge); the ball right in front of it (overlapping, nearer us): behind the ball, to
+  // bump it toward us; sitting by it: just behind it, the ball at its front paws
+  function spotFor(p, plan) {
+    const w = boxAt(p.z), r = SIZE * 50 * sizeAt(p.z);
+    if (plan === 'front') return { x: p.x, z: Math.min(1, p.z + 0.15) };
+    if (plan === 'paw') return { x: p.x + (foxX >= p.x ? 1 : -1) * 0.08 * w, z: Math.min(1, p.z + 0.06) };
+    let from = foxX >= p.x ? 1 : -1;
+    const off = 0.37 * w + r + 1;
+    if (p.x + from * off < 4 || p.x + from * off > 96) from = -from;
+    return { x: Math.max(4, Math.min(96, p.x + from * off)), z: Math.min(1, p.z + 0.02) };
+  }
+  const planFor = p => { // the ball overlapping it, nearer us: bump it toward us
+    const w = boxAt(p.z);
+    return Math.abs(p.x - foxX) < 0.3 * w && p.z < foxZ - 0.02 && p.z > 0.06 && Fox2D.canWalkDepth ? 'front' : 'side';
+  };
+  // walk / run there, never through the ball on the way (round behind it)
+  function goTo(spot, keep, then) {
+    if (!walk2d(spot.x, spot.z, then, keep)) return false;
+    const w = boxAt(b.z), r = ballR(), via = walkTarget?.via;
+    const hits = (ax, az, bx, bz) => {
+      for (let k = 1; k < 16; k++) {
+        const x = ax + (bx - ax) * k / 16, z = az + (bz - az) * k / 16;
+        if (Math.abs(x - b.x) < 0.4 * w + r && Math.abs(z - b.z) < 0.08) return true;
+      }
+      return false;
+    };
+    if (via && b.mode === 'rest' && hits(foxX, foxZ, spot.x, spot.z)) {
+      const side = foxX >= b.x ? 1 : -1;
+      via.unshift({ x: Math.max(4, Math.min(96, b.x + side * (0.45 * w + r))), z: Math.min(1, b.z + 0.12) });
+    }
+    return true;
+  }
+  const walkThere = (spot, run, keep) => new Promise(ok => { if (!goTo(spot, keep, () => ok(run === fetchRun))) ok(false); });
+  let pace = 0;
+  function pacing() { // runs while it's far, walks the last body length (slowing down as a real one does)
+    clearInterval(pace);
+    pace = setInterval(() => {
+      const w = walkTarget?.via?.[0] || walkTarget;
+      Fox2D.run(!!w && Math.hypot(w.x - foxX, (w.z - foxZ) * DEPTH.across) > 0.9 * foxW());
+    }, 100);
+  }
   // stopped (or put away): false when it is still going after a while, or the fetch was called off
   const rolled = async run => (await until(() => b.mode === 'rest' || b.mode === 'home', run, 5000)) && b.mode !== 'free';
-  async function chase(run) { // up at once, straight for where it will stop, while it still flies and rolls
-    const W0 = () => foxW() / sizeAt(foxZ); // its box at depth 0
-    const far = p => Math.abs(p.x - foxX) > 0.5 * W0() * sizeAt(p.z) || Math.abs(p.z - foxZ) > 0.1;
+  async function chase(run) { // up at once, for where it will stop, while it still flies and rolls
     for (let k = 0; b.mode === 'free' && k < 40; k++) {
-      const p = restAt();
-      const o = (0.37 * W0() + SIZE * 50) * sizeAt(p.z) + 1, from = (foxX >= p.x ? 1 : -1) * (p.x + (foxX >= p.x ? o : -o) > 96 || p.x + (foxX >= p.x ? o : -o) < 4 ? -1 : 1);
-      if (far(p) || Fox2D.state.go) walk2d(Math.max(4, Math.min(96, p.x + from * o)), Math.min(1, p.z + 0.02)); // muzzle to where it stops
+      const p = restAt(), s = spotFor(p, planFor(p));
+      if (Math.hypot(s.x - foxX, (s.z - foxZ) * DEPTH.across) > 3 || Fox2D.state.go) walk2d(s.x, s.z);
       await wait(250);
       if (run !== fetchRun) return false;
     }
@@ -264,8 +315,65 @@
   async function fetch() {
     const run = ++fetchRun;
     busy = true;
-    Fox2D.run(true); // after it at a run
-    try { await play(run); } finally { if (run === fetchRun) { busy = false; Fox2D.run(false); } }
+    pacing();
+    try { await play(run); } finally { if (run === fetchRun) { busy = false; clearInterval(pace); Fox2D.run(false); } }
+  }
+  // one go at the ball lying still: get to it, face it, and the move that fits where it lies — true if it hit it
+  async function playOnce(run) {
+    const paw = Fox2D.canPlay && Fox2D.state.view === 'normal' && !Fox2D.state.go && Math.abs(b.x - foxX) < 0.3 * foxW()
+      && Math.abs(b.z - foxZ) < 0.1 && b.z < foxZ;
+    const plan = paw ? 'paw' : planFor(b);
+    const moves = Fox2D.ballMoves.filter(m => m !== 'tail'); // (the tail sweep turns its back on the ball: not for this)
+    const kind = plan !== 'side' ? plan : moves.length && Math.random() < 0.75 ? 'move' : Fox2D.canPush ? 'push' : 'move';
+    if (!(await walkThere(spotFor(b, plan), run, plan !== 'paw'))) return false;
+    if (b.mode !== 'rest') return false; // it got away meanwhile: after it again
+    // where it stands for it: it may still be on its last stride there (walk2d says so as that stride begins)
+    const at = walkTarget?.last ? { x: walkTarget.x, z: walkTarget.z } : { x: foxX, z: foxZ };
+    const w = foxW(), r = ballR(), dir = Math.sign(b.x - at.x) || -1, g = dir > 0 ? 'walk_r' : 'walk';
+    let done;
+    if (kind === 'front') { // facing us, a bump with the head: it comes at us (toward the screen), up a little
+      if (Math.abs(b.x - at.x) > 0.3 * w || b.z > at.z) return false;
+      if (!Fox2D.canPushFront) { // (no bump clip yet) walk on into it, toward us: the body pushes it
+        await walkThere({ x: b.x, z: Math.max(0, b.z - 0.12) }, run, false);
+        return true;
+      }
+      strike = { clips: ['walk_front_loop_push'], from: 0.25, zone: () => ({ x: foxX, z: foxZ - 0.07, rx: 0.2 * foxW(), rz: 0.08, h: 30,
+        vx: rand(-12, 12), vz: -rand(0.75, 1.05), vh: rand(40, 60) }) };
+      Fox2D.nudge_ball();
+      Fox2D.go('walk_front');
+      done = () => Fox2D.state.clip === 'walk_front_loop_push' && Fox2D.state.frame >= Fox2D.state.frames - 2;
+    } else if (kind === 'paw') { // sitting with it at its front paws: bat it, out toward us and to the side
+      Fox2D.stop();
+      if (!(await until(sat, run))) return false;
+      strike = { clips: ['normal_to_paw', 'paw_loop'], from: 0.5, zone: () => ({ x: foxX, z: foxZ - 0.05, rx: 0.22 * foxW(), rz: 0.08, h: 40,
+        vx: (b.x >= foxX ? 1 : -1) * rand(20, 35), vz: -rand(0.3, 0.6), vh: rand(25, 40) }) };
+      Fox2D.play('paw');
+      done = () => Fox2D.state.clip === 'paw_to_normal';
+    } else { // side-on: it faces the ball first (gets up / turns round that way; the move is queued first, so
+      // that goes straight into it), then hits it with what is on its head's side
+      const muzzle = at.x + dir * 0.37 * w;
+      if (Math.abs(b.x - muzzle) > r + 0.12 * w || Math.abs(b.z - at.z) > 0.1) return false;
+      const head = (reach, speed, up) => () => { // the way the frame playing faces: never a hit on the tail's side
+        const f = Fox2D.state.facing;
+        return f ? { x: foxX + f * 0.37 * foxW(), z: foxZ, rx: reach * foxW(), rz: 0.08, h: 40, vx: f * speed, vz: rand(-0.25, 0.25), vh: up } : null;
+      };
+      if (kind === 'move') {
+        const m = pick(moves), rr = dir > 0 ? '_r' : '';
+        const [speed, up, reach] = { pounce: [55, 85, 0.2], swipe: [50, 18, 0.16], bat: [30, 8, 0.16], header: [35, 75, 0.15] }[m];
+        strike = { clips: [`${g}_to_${m}${rr}`, `${m}${rr}_to_${g}`], from: 0.35, zone: head(reach, speed, up) };
+        Fox2D.ballMove(m);
+        done = () => Fox2D.state.clip === `${m}${rr}_to_${g}` && Fox2D.state.frame >= 4;
+      } else {
+        strike = { clips: [`${g}_loop_push`], from: 0.3, zone: head(0.12, 38, 8) };
+        Fox2D.nudge_ball();
+        done = () => Fox2D.state.pushing && Fox2D.state.frame >= Fox2D.state.frames - 2;
+      }
+      Fox2D.go(g);
+    }
+    const k = strike;
+    await until(() => k.hit || done(), run, 7000);
+    if (strike === k) strike = null;
+    return !!k.hit;
   }
   async function play(run) {
     // just opened: its walking clips may still be on the way — wait for them, never just ignore the ball
@@ -277,73 +385,17 @@
     S.stats.energy = clamp(S.stats.energy - 8);
     addBond(2);
     save();
-    let misses = 0, sitNext = false; // (couldn't line up side-on with it: sit by it and bat it instead)
-    for (let k = 0, n = 3 + Math.floor(Math.random() * 3); k < n; k++) {
+    // a few hits, after it each time it goes; tries that didn't reach it don't count (a few, then it stops)
+    for (let hits = 0, tries = 0, n = 3 + Math.floor(Math.random() * 3); hits < n && tries < n + 8; tries++) {
       if (b.mode === 'home') return; // put away meanwhile
-      if (!(await chase(run))) { if (run !== fetchRun || ++misses > 12) return; k--; continue; } // after it again, each time it goes
-      // right by it already (no walk to make): sit and bat it too — never a ball that goes off on its own
-      const w = foxW() / sizeAt(foxZ) * sizeAt(b.z), r = ballR(); // the fox's box at the ball's depth (% of the stage)
-      const near = Math.abs(b.x - foxX) < 0.45 * w && Math.abs(b.z - foxZ) < 0.1;
-      const sitAndBat = Fox2D.canPlay && (near || sitNext || (k > 0 && Math.random() < 0.3));
-      sitNext = false;
-      // side-on: stand with its muzzle at the ball, from the side it is on (the other, if that is off the edge);
-      // sitting: just behind it, the ball at its front paws
-      let from = foxX >= b.x ? 1 : -1;
-      const off = sitAndBat ? 0.08 * w : 0.37 * w + r + 1;
-      if (b.x + from * off < 4 || b.x + from * off > 96) from = -from;
-      if (!(await walkThere(Math.max(4, Math.min(96, b.x + from * off)), Math.min(1, b.z + (sitAndBat ? 0.06 : 0.02)), run, !sitAndBat))) return;
-      // it faces the ball for a move: standing already, or getting up / turning round that way (the move is queued
-      // first, so the way up or round goes straight into it — fox2d.js next())
-      const dir = Math.sign(b.x - foxX) || -1, g = dir > 0 ? 'walk_r' : 'walk', side = Fox2D.canWalk;
-      // a move only at a ball lying still right at its muzzle / paws; else after it again (no strikes at nothing)
-      const muzzle = foxX + dir * 0.37 * foxW();
-      const reach = sitAndBat ? Math.abs(b.x - foxX) < 0.3 * foxW() : Math.abs(b.x - muzzle) < r + 0.12 * foxW();
-      if (b.mode !== 'rest' || !reach || Math.abs(b.z - foxZ) > 0.1) {
-        if (++misses > 12) break;
-        sitNext = b.mode === 'rest';
-        k--;
-        await wait(200);
-        continue;
-      }
-      // the strike zone is on its head's side — the way it faces in the frame playing (not just where the ball is)
-      const front = (reach, rz = 0.08) => () => { const f = Fox2D.state.facing; return f ? { x: foxX + f * 0.37 * foxW(), z: foxZ, rx: reach * foxW(), rz, h: 40, dir: f } : null; };
-      let done;
-      if (side && Fox2D.ballMoves.length && !sitAndBat && Math.random() < 0.75) {
-        // side-on: one of the ball-play moves; it hits the ball when the head / paws get to it
-        const m = pick(Fox2D.ballMoves), rr = dir > 0 ? '_r' : '';
-        const [speed, up, reach] = { pounce: [55, 85, 0.2], swipe: [50, 18, 0.16], bat: [30, 8, 0.16], header: [35, 75, 0.14], tail: [60, 12, 0.24] }[m];
-        strike = { clips: [`${g}_to_${m}${rr}`, `${m}${rr}_to_${g}`], from: 0.35, zone: front(reach), speed, up, dir };
-        Fox2D.ballMove(m);
-        Fox2D.go(g);
-        done = () => Fox2D.state.clip === `${m}${rr}_to_${g}` && Fox2D.state.frame >= 4;
-      } else if (side && Fox2D.canPush && !sitAndBat) { // side-on: dip the head and push it with the nose
-        strike = { clips: [`${g}_loop_push`], from: 0.3, zone: front(0.12), speed: 35, up: 8, dir };
-        Fox2D.nudge_ball();
-        Fox2D.go(g);
-        done = () => Fox2D.state.pushing && Fox2D.state.frame >= Fox2D.state.frames - 2;
-      } else if (Fox2D.canPlay) { // sit, paw out: the paws in front of it
-        Fox2D.stop();
-        if (!(await until(sat, run))) return;
-        strike = { clips: ['normal_to_paw', 'paw_loop'], from: 0.5, speed: 35, up: 30, dir: b.x >= foxX ? 1 : -1,
-                   zone: () => ({ x: foxX, z: foxZ - 0.05, rx: 0.22 * foxW(), rz: 0.08, h: 40 }) };
-        Fox2D.play('paw');
-        done = () => Fox2D.state.clip === 'paw_to_normal';
-      } else { // (no clips for any of it)
-        Fox2D.stop();
-        setExpr('play', 1200);
-        await wait(500);
-        kick(-from, 40, 10);
-      }
-      if (done) { // the move plays out; a ball it didn't reach stays where it is (after it again next round)
-        const k = strike;
-        await until(() => k.hit || done(), run, 7000);
-        if (strike === k) strike = null;
-        if (run !== fetchRun) return;
-      }
-      await wait(600);
+      if (!(await chase(run))) { if (run !== fetchRun) return; continue; }
+      if (await playOnce(run)) { hits++; await wait(rand(250, 600)); } // watches it go a moment
+      if (run !== fetchRun) return;
     }
     if (!(await rolled(run))) return;
     // had enough: sit down by it and ask for the toys to be put away
+    clearInterval(pace);
+    Fox2D.run(false);
     Fox2D.stop();
     if (!(await until(sat, run))) return;
     if (b.mode === 'home') return;
@@ -353,13 +405,8 @@
     clearInterval(remind);
     remind = setInterval(() => { if (b.mode !== 'home' && b.mode !== 'held' && !S.sleeping) say(t('tidyAsk'), 3000); }, 45000);
   }
-  function kick(dir, speed, up) { // a nudge: this way, a bit random, away from the walls
-    b.mode = 'free';
-    if ((b.x < 15 && dir < 0) || (b.x > 85 && dir > 0)) dir = -dir;
-    b.vx = dir * speed * rand(0.7, 1.2);
-    b.vz = rand(-0.2, 0.2);
-    b.vh = up * rand(0.5, 1);
-  }
 
-  window.Ball = { get state() { return { ...b }; }, get busy() { return busy; }, putAway };
+  // drop(x, z): the ball lands there (for trying the play out: the fox goes for it as if thrown)
+  const drop = (x, z) => { callOff(); Object.assign(b, { x, z, h: 20, vx: 0, vz: 0, vh: 0, mode: 'free' }); fetch(); };
+  window.Ball = { get state() { return { ...b }; }, get busy() { return busy; }, putAway, drop };
 })();
