@@ -25,6 +25,7 @@
                     paw: 0, wave: 0, nod: 0, shake_no: 0, shake_dry: 0, hungry: 0, shiver: 0, proud: 0,
                     present_l: 0, present_r: 0, cheer: 0, cover_ears: 0, sorry: 0, delight: 0 }; // weights (0: only on cue, Fox2D.play)
   const FACES = ['ahead', 'happy', 'up', 'back']; // walk loop variants; the plain loop plays most
+  const MOVES = ['pounce', 'swipe', 'bat', 'header', 'tail']; // ball play from standing side-on (tools/wan_ballplay.sh)
   const WALK = ['normal_to_walk', 'normal_to_walk_r', 'walk_loop', 'walk_r_loop', 'walk_turn', 'walk_r_turn',
                 'walk_to_normal', 'walk_r_to_normal'];
   // app.js expressions → the clip moods we have
@@ -53,6 +54,7 @@
   let holdLoops = 0;   // an action's own loop (<action>_loop): rounds left before it goes home
   let go = null;      // 'walk' (to the left) / 'walk_r' (to the right) while app.js wants the fox walking
   let push = false;   // standing at the ball: nudge it with the nose next (walk[_r]_loop_push)
+  let move = null;    // standing at the ball: that ball-play move next (walk_to_<move>, walk_r_to_<move>_r)
 
   async function load(name, wait = false) { // wait: until its first frames are in (the first clip only)
     if (clips[name] !== undefined) return clips[name];
@@ -123,7 +125,7 @@
   // does the loop that is playing still fit what is wanted? (pure: no side effects)
   function stays(name) {
     const at = endsOn(name);
-    if (go) return at === go && !(push && clips[`${go}_loop_push`]);
+    if (go) return at === go && !(push && clips[`${go}_loop_push`]) && !(move && clips[`${go}_to_${move}${go === 'walk_r' ? '_r' : ''}`]);
     if (isWalk(at)) return false;
     if (at === 'normal') return !poked && mood() === 'normal' && (name === 'normal_loop_talk') === (talking && !!clips.normal_loop_talk);
     if (name === 'love_loop_rub') return rubbing;
@@ -135,8 +137,11 @@
   // the clip that follows the one that just ended, on the way to what we want
   function next(name) {
     const at = endsOn(name);
+    if (MOVES.includes(at.replace(/_r$/, ''))) return `${at}_to_${at.endsWith('_r') ? 'walk_r' : 'walk'}`; // a move: stand again
     if (go) { // walking: home first, stand up facing the way to go, turn round when it changes
       if (isWalk(at) && at === go && push && clips[`${go}_loop_push`]) { push = false; return `${go}_loop_push`; }
+      const mv = move && `${go}_to_${move}${go === 'walk_r' ? '_r' : ''}`;
+      if (isWalk(at) && at === go && mv && clips[mv]) { move = null; return mv; }
       if (isWalk(at)) { // facing the wrong way: turn round (a clip from this view to that one, or by sitting down)
         if (at === go) return loopFor(go);
         if (clips[`${at}_to_${go}`]) return `${at}_to_${go}`;
@@ -242,6 +247,7 @@
       ...['walk_front', 'walk_back'].flatMap(v => [`${v}_loop`, `normal_to_${v}`, `${v}_to_normal`,
         `walk_to_${v}`, `${v}_to_walk`, `walk_r_to_${v}`, `${v}_to_walk_r`]),
       'walk_front_to_walk_back', 'walk_back_to_walk_front',
+      ...MOVES.flatMap(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r']),
     ];
     let next = 0;
     const worker = async () => { while (next < names.length) await load(names[next++]); };
@@ -260,6 +266,10 @@
     get canPlay() { return !!(clips.normal_to_paw && clips.paw_to_normal); },
     nudge_ball() { push = true; },  // standing at the ball (walking, not moving): push it with the nose next
     get canPush() { return !!(clips.walk_loop_push && clips.walk_r_loop_push); },
+    ballMove(m) { move = m; },      // standing at the ball: play that move with it next
+    get ballMoves() { // the moves there are clips for, both ways
+      return MOVES.filter(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r'].every(c => clips[c]));
+    },
     rub(on) { rubbing = !!on; },    // finger rubbing the head: the petted loop until it stops
     talk(on) { talking = !!on; },   // speech bubble up / down
     // the head follows the rubbing finger a little (x, y: finger offset from the head, about -1…1);

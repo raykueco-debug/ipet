@@ -208,6 +208,14 @@
         Fox2D.play('paw');
         if (!(await until(() => Fox2D.state.clip === 'normal_to_paw' && Fox2D.state.frame >= 14, run, 4000))) return;
         kick(rand(-1, 1) < 0 ? -1 : 1, 35, 30);
+      } else if (Fox2D.ballMoves.length && ['walk', 'walk_r'].includes(Fox2D.state.go) && Math.random() < 0.75) {
+        // side-on: one of the ball-play moves; the ball goes when the move lands (the end of its way in)
+        const m = pick(Fox2D.ballMoves), r = Fox2D.state.go === 'walk_r' ? '_r' : '';
+        Fox2D.ballMove(m);
+        const into = `${Fox2D.state.go}_to_${m}${r}`;
+        if (!(await until(() => Fox2D.state.clip === into && Fox2D.state.frame >= 14, run, 6000))) return;
+        const [speed, up] = { pounce: [30, 25], swipe: [45, 15], bat: [25, 5], header: [30, 70], tail: [55, 10] }[m];
+        kick(-from, speed, up);
       } else if (Fox2D.canPush && ['walk', 'walk_r'].includes(Fox2D.state.go)) { // side-on: dip the head and push it with the nose
         Fox2D.nudge_ball();
         if (!(await until(() => Fox2D.state.pushing && Fox2D.state.frame >= 12, run, 5000))) return;

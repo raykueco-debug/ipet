@@ -55,11 +55,14 @@ POSES = {
     'present_l': 'assets/fox/t1/g05/present_l.png', 'present_r': 'assets/fox/t1/g05/present_r.png', 'cheer': 'assets/fox/t1/g05/cheer.png',
     'giggle': 'assets/fox/t1/g05/giggle.png', 'wink': 'assets/fox/t1/g05/wink.png', 'cover_ears': 'assets/fox/t1/g05/cover_ears.png',
     'sing': 'assets/fox/t1/g05/sing.png', 'sorry': 'assets/fox/t1/g05/sorry.png', 'delight': 'assets/fox/t1/g05/delight.png',
+    # GPT sheet assets/source/gpt/play_01.png: playing with the ball, side-on facing left (the _r pictures: flipped)
+    'pounce': 'assets/fox/t1/p01/pounce.png', 'swipe': 'assets/fox/t1/p01/swipe.png', 'bat': 'assets/fox/t1/p01/bat.png',
+    'header': 'assets/fox/t1/p01/header.png', 'tail': 'assets/fox/t1/p01/tail.png',
 }
 # facing right = the left picture flipped on the canvas, so the player can flip left-facing frames exactly
-FLIPPED = {'walk_r': 'walk'}
+FLIPPED = {'walk_r': 'walk', 'pounce_r': 'pounce', 'swipe_r': 'swipe', 'bat_r': 'bat', 'header_r': 'header', 'tail_r': 'tail'}
 MIRROR = {'yawn'}  # drawn with the tail on the left; the home pose has it on the right
-ZOOM = {'walk': 0.85}  # get_up is drawn closer than the other sprites: match the head size
+ZOOM = {'walk': 0.85, 'pounce': 0.85, 'swipe': 0.85, 'bat': 0.85, 'header': 0.85, 'tail': 0.85}  # drawn closer than the sitting sprites: match the head size
 
 
 def solid(im):
