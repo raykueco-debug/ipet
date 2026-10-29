@@ -77,10 +77,10 @@
         <path d="M1066 514 q10 -6 20 -4" stroke="#d6d3cb" stroke-width="4" fill="none" stroke-linecap="round"/></g>
       ${[[300, 560, '#ffd84d'], [330, 575, '#ff8fb1'], [356, 560, '#ffffff'], [860, 568, '#ffd84d'], [890, 582, '#b99cff'],
          [915, 562, '#ff8fb1'], [470, 480, '#ffffff', 0.7], [740, 476, '#ffd84d', 0.7], [600, 446, '#ff8fb1', 0.55]].map(([x, y, c, k]) => flower(x, y, c, k)).join('')}`),
-    front: () => svg(`${[[10, 604, 1.2], [80, 612, 1], [1120, 604, 1.15], [1190, 612, 1]].map(([x, y, k]) =>
+    front: () => svg(`${[[-10, 612, 0.75], [1210, 612, 0.75]].map(([x, y, k]) =>
         `<g transform="translate(${x} ${y}) scale(${k})"><path d="M-40 0 q20 -70 30 -92 q4 52 12 62 q8 -62 26 -84 q-2 62 8 82 q14 -42 34 -52 q-14 52 -10 84Z" fill="#4f9e42" stroke="${OUT}" stroke-width="3"/>
          <path d="M-14 -10 q6 -36 14 -50 M18 -12 q4 -30 12 -44" stroke="#7cc463" stroke-width="3" fill="none" stroke-linecap="round"/></g>`).join('')}
-      ${flower(150, 600, '#ff8fb1', 1.3)}${flower(1060, 600, '#ffd84d', 1.3)}`),
+`),
   };
 
   const stage = document.getElementById('stage');
@@ -108,8 +108,9 @@
   // mid and props layers.
   const PROPS = [ // picture, x %, depth, width as a share of the stage width (at depth 0)
     ['pine', 20, 1.25, 0.26], ['pine', 80, 1.3, 0.24], ['tree', 6, 1.12, 0.46], ['tree', 95, 1.08, 0.5],
-    ['bush', 32, 1.05, 0.22], ['bush', 68, 1.06, 0.2], ['flowers', 58, 0.75, 0.13],
-    ['stump', 8, 0.18, 0.18], ['rock', 93, 0.45, 0.16], ['mushrooms', 70, 0.12, 0.12], ['flowers', 40, 0.02, 0.15],
+    ['bush', 32, 1.05, 0.22], ['bush', 68, 1.06, 0.2],
+    // decoration stays at the back and the far sides: the ground in front, where the fox and the ball go, is clear
+    ['mushrooms', 58, 1.02, 0.1], ['flowers', 44, 1.0, 0.11], ['stump', 90, 0.95, 0.15], ['rock', 76, 1.0, 0.12],
     ['bed', BED.x, BED.z + 0.04, 0.34], ['water', BED.x + 17, BED.z, 0.11],
   ];
   Promise.all([...new Set(PROPS.map(p => p[0]))].map(n => new Promise((ok, no) => {
