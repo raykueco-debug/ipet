@@ -63,10 +63,10 @@
   // mishaps: into a ditch and out (down into it, hanging struggling, pulling up, climbing out: back_crouch_to_back_hang
   // + back_hang_loop + back_hang_to_back_pull + back_pull_to_back_crouch), and tripping (back_crouch_to_back_crouch_trip)
   const mishaps = { fall: [], trip: [] };
-  // into a ditch and out, short and snappy (an old console game's pitfall): down in a blink, a beat at the edge, up and
-  // out — its clips at three times their speed, the music paused meanwhile
-  const FALL_FPS = 48;
-  let FALL_S = 1;
+  // into a ditch and out, like an old console game's pitfall: down in a blink (a few of its frames) with a puff of dust
+  // and stars spinning, a beat at the edge, then climbing out at its own pace — the music paused meanwhile
+  const FALL = { down: 0.1, held: 0.35 }; // seconds
+  let FALL_S = 1, FALL_PARTS = null;      // (FALL_PARTS: the frames going down, coming out)
   async function clipFrames(clip) {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return null;
@@ -78,9 +78,13 @@
     mishaps.trip = (await clipFrames('back_crouch_to_back_crouch_trip')) || [];
     const fall = [];
     const sink = await clipFrames('back_crouch_to_back_hang'), out = sink && await clipFrames('back_pull_to_back_crouch');
-    if (sink && out) fall.push(...sink, ...Array(4).fill(sink.at(-1)), ...out); // (down, a beat hanging there, out)
+    if (sink && out) { // (down: three of its frames)
+      const d = [sink[Math.floor(sink.length / 3)], sink[Math.floor(sink.length * 2 / 3)], sink.at(-1)];
+      fall.push(...d, ...out);
+      FALL_PARTS = [d.length, out.length];
+    }
     mishaps.fall = fall.length ? fall : (await clipFrames('back_crouch_to_back_crouch_fall')) || [];
-    if (mishaps.fall.length) FALL_S = mishaps.fall.length / FALL_FPS;
+    if (FALL_PARTS) FALL_S = FALL.down + FALL.held + FALL_PARTS[1] / 16; else if (mishaps.fall.length) FALL_S = mishaps.fall.length / 16;
     const up = await clipFrames('back_crouch_to_back_air'), down = up && await clipFrames('back_air_to_back_crouch');
     if (up && down) { frames = [...up, ...down.slice(1, -1)]; pouncing = true; return; }
     for (const clip of ['walk_back_loop_run', 'walk_back_loop']) { const f = await clipFrames(clip); if (f) { frames = f; return; } }
@@ -193,6 +197,8 @@
         Music.hush();
         const now = songT();
         run.frozen = now; // (exactly still: no drifting road while it's down there)
+        for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2; // a puff of dust out of the ditch
+          run.dust.push({ x: run.x + Math.cos(a) * 0.15, h: 0.1, z: 0, vx: Math.cos(a) * 1.6, vh: 0.8 + Math.random() * 0.8, vz: Math.sin(a) * 0.8, r: 0.07 + Math.random() * 0.05, t: 0 }); }
         run.sched = run.backs.findIndex(b => b.t > now); if (run.sched < 0) run.sched = run.backs.length;
         run.says.push({ text: '加油！爬上來！', t: -0.6 });
       }
@@ -400,6 +406,14 @@
       g.strokeText('一直點！滑過去！', W / 2, H * 0.38); g.fillStyle = '#ff7a3d'; g.fillText('一直點！滑過去！', W / 2, H * 0.38);
     }
   }
+  function frameOfMishap() { // the frame of the mishap playing: a ditch's are timed in parts (down / held / out)
+    const t = run.mishap.t;
+    if (run.mishap.kind !== 'fall' || !FALL_PARTS) return Math.floor(t * 16);
+    const [d] = FALL_PARTS;
+    if (t < FALL.down) return Math.floor(t / FALL.down * d);
+    if (t < FALL.down + FALL.held) return d - 1;
+    return d + Math.floor((t - FALL.down - FALL.held) * 16);
+  }
   function fox() {
     const p = project(run.x, 0), size = Math.min(W * 0.46, H * 0.3);
     const air = run.jump >= 0 ? Math.sin(Math.PI * run.jump / JUMP_S) : 0;
@@ -407,19 +421,37 @@
     // gliding: low on the ground, held in its crouch (the first frame); else pouncing on — up through the first half
     // of the loop, down through the second
     const mis = run.mishap && mishaps[run.mishap.kind];
-    const f = mis ? mis[Math.min(mis.length - 1, Math.floor(run.mishap.t * (run.mishap.kind === 'fall' ? mis.length / FALL_S : 16)))]
+    const f = mis ? mis[Math.min(mis.length - 1, frameOfMishap())]
       : run.glide ? (slide.length ? slide[Math.floor(songT() * 16) % slide.length] : frames[0]) : frames[Math.floor(run.frame) % (frames.length || 1)];
     if (!f || !f.complete || !f.naturalWidth) return;
     const u = (run.frame % (frames.length || 24)) / (frames.length || 24);
     const hop = run.jump >= 0 || run.glide || mis ? 0 : pouncing ? Math.sin(Math.PI * u) : Math.abs(Math.sin(u * Math.PI * 4));
     g.save();
-    // in the ditch (its clips: down, hanging at its edge, out): what has gone down into it is hidden by the ground
-    if (run.mishap?.kind === 'fall') { g.beginPath(); g.rect(0, 0, W, p.y - 2); g.clip(); }
-    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07));
+    // in the ditch (its clips: down, at its edge, out): it sinks down into the ditch's dark, the ditch's near edge
+    // hiding what is below it (the clips' own picture ends there: the fox went out of it at the bottom)
+    let down = 0;
+    if (run.mishap?.kind === 'fall') {
+      const near = project(run.x, -0.7).y, bottom = p.y + size * 31 / 480; // (the clip's picture ends 31/480 below its feet)
+      const t = run.mishap.t, outS = FALL_S - FALL.down - FALL.held;
+      const k = t < FALL.down ? t / FALL.down : t < FALL.down + FALL.held ? 1 : Math.max(0, 1 - (t - FALL.down - FALL.held) / outS);
+      down = Math.max(0, near - bottom) * k;
+      g.beginPath(); g.rect(0, 0, W, near); g.clip();
+    }
+    g.translate(p.x, p.y - air * size * 0.5 - hop * size * (pouncing ? 0.14 : 0.07) + down);
     if (run.glide) { g.rotate(Math.sin(songT() * 10) * 0.04); if (!slide.length) g.scale(1.1, 0.7); } // (low, a little sway as it glides under)
     if (run.stumble >= 0) g.rotate(Math.sin(run.stumble * 20) * 0.15);
     g.drawImage(f, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in the clip's frames)
     g.restore();
+    // down in a ditch: stars spinning round its head
+    const t = run.mishap?.kind === 'fall' ? run.mishap.t : -1;
+    if (t > FALL.down * 0.5 && t < FALL.down + FALL.held + 0.25) {
+      const cy = p.y + down - size * 0.4;
+      g.font = `900 ${Math.round(size * 0.1)}px sans-serif`; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = '#7a5a00';
+      for (let k = 0; k < 3; k++) {
+        const a = t * 9 + k * Math.PI * 2 / 3, x = p.x + Math.cos(a) * size * 0.2, y = cy + Math.sin(a) * size * 0.05;
+        g.fillStyle = '#ffe14d'; g.strokeText('★', x, y); g.fillText('★', x, y);
+      }
+    }
   }
 
   const hue = midi => `hsl(${(midi * 47) % 360}, 85%, 62%)`; // a colour for each pitch
