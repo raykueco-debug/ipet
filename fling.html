@@ -33,6 +33,7 @@
   .card { position: fixed; inset: 0; display: grid; place-items: center; background: #0003; }
   .card[hidden] { display: none; }
   .card > div { background: var(--card); border-radius: 24px; padding: 26px 24px; width: min(88vw, 360px); text-align: center;
+    max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; /* (short screens: it scrolls, the button stays reachable) */
     box-shadow: 0 12px 40px #0003; }
   .card h1 { margin: 0 0 8px; font-size: 28px; }
   .card p { margin: 6px 0; color: #7a6a5e; line-height: 1.5; }
