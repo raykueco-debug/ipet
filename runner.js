@@ -484,7 +484,7 @@
   }
   document.getElementById('go').addEventListener('click', start);
   document.getElementById('again').addEventListener('click', start);
-  document.getElementById('home').addEventListener('click', () => { location.href = 'index.html'; });
+  document.getElementById('home').addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = 'index.html'; }); // (back where it came from)
   // the first frame behind the start card
   run = fresh(); draw(); run = null;
   raf = requestAnimationFrame(loop);

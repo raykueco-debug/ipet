@@ -39,7 +39,7 @@
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
     boar:     { e: '🐗', h: 1.0, w: 10, say: '背著往前衝', hit: f => { f.vy = 0; f.vx = Math.max(f.vx, 16) + 3; f.ride = 1; return 'whoosh'; } },
-    hedgehog: { e: '🦔', h: 0.7, w: 14, say: '哎唷！變慢', hit: f => { f.vx *= 0.55; f.vy = 5; return 'ouch'; } },
+    hedgehog: { e: '🦔', h: 0.7, w: 14, say: '踩到被絆倒、變慢（俯衝撲到才會彈高）', hit: f => { f.vx *= 0.55; f.vy = 4; return 'ouch'; } },
     squirrel: { e: '🐿️', h: 0.8, w: 9,  say: '彈一下＋補 1 次衝刺', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'refill'; } },
   };
   const KINDS = Object.keys(FRIENDS), WSUM = KINDS.reduce((a, k) => a + FRIENDS[k].w, 0);
@@ -49,7 +49,7 @@
   // the pet's save (the same one the home screen keeps): its tails, its farthest
   const pet = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
   const TAILS = Math.max(1, Math.min(9, +params.get('tails') || pet.tailsOverride || pet.tails || 1));
-  let best = pet.fling?.best || 0;
+  let best = pet.fling?.best || (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })(); // (no pet here: its own)
 
   const cv = document.getElementById('game'), g = cv.getContext('2d');
   let W = 0, H = 0, DPR = 1;
@@ -174,8 +174,9 @@
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0;
     dust(a.x, 0.2, 5);
     if (dived && a.kind === 'hedgehog') {
-      a.kick = true; a.vy = 9; f.vy = 9; f.vx = Math.max(f.vx, 8);
-      SFX.boing(); f.spin = 1; act('roll', 0.5); S.shake = 0.2;
+      a.kick = true; a.vy = 9;
+      FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; // (off it as off a mushroom dived onto)
+      SFX.big(); act('joy', 0.8); S.shake = 0.2;
       pop('撲飛！', a.x, fr.h + 1.5, '#ffe14d');
       return;
     }
@@ -195,11 +196,11 @@
     }
     a.carry = a.kind === 'owl' || a.kind === 'boar';
     if (f.hold > 0) S.holder = a; // (the giraffe's: held in its mouth through the swing)
-    if (s === 'ouch') act('ouch', 0.7);
+    if (s === 'ouch') { f.spin = 1; act('roll', 0.6); } // (tripped: tumbling over it)
     else if (s === 'big') act('joy', 0.8);
     else if (s === 'fling') { f.spin = 1.5; act('roll', 0.75); }
     else if (!a.carry) { f.spin = 1; act('roll', 0.5); }
-    pop({ boing: '彈！', hop: '呱呱！', big: '飛高高！', whoosh: '咻～', fling: '甩～！', ouch: '哎唷！' }[s], a.x, fr.h + 1.5, s === 'ouch' ? '#ff8a8a' : '#fff');
+    pop({ boing: '彈！', hop: '呱呱！', big: '飛高高！', whoosh: '咻～', fling: '甩～！', ouch: '絆倒！' }[s], a.x, fr.h + 1.5, s === 'ouch' ? '#ff8a8a' : '#fff');
   }
 
   function step(dt) {
@@ -567,6 +568,7 @@
         if (s.stats) s.stats.fun = Math.min(100, (s.stats.fun || 0) + 8);
         localStorage.setItem(KEY, JSON.stringify(s));
       }
+      localStorage.setItem('ipet-fling-best', Math.max(best, d));
     } catch (e) {}
     $('final').textContent = d;
     $('endTitle').textContent = isBest ? '🎉 新紀錄！' : '飛好遠！';
@@ -599,7 +601,7 @@
   });
   $('go').addEventListener('click', start);
   $('again').addEventListener('click', start);
-  $('home').addEventListener('click', () => { location.href = 'index.html'; });
+  $('home').addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = 'index.html'; }); // (back where it came from: the pet, or a launcher)
 
   S = fresh(); spawn(); hud(); S.phase = 'idle';
   let last = 0;
