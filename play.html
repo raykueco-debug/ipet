@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#bfe6ff">
+<!-- the two mini games, for playing on their own (GitHub Pages: /play.html) -->
+<title>小狐遊樂場</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chiron+GoRound+TC:wght@500;800&display=swap">
+<style>
+  /* a morning meadow: sky on top, the fox standing on the grass, two big doors into the games below */
+  :root {
+    --sky: #bfe6ff; --sky-low: #e9f7ff; --grass: #8fd17a; --ink: #4a3b33; --card: #fffdf8;
+    --fox: #ff8a3d; --sun: #ffd34d; --muted: #7a6a5e;
+    --round: "Chiron GoRound TC", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --sky: #1d2a4a; --sky-low: #33406a; --grass: #3f6b3a; --ink: #f4ead8; --card: #2a2f45;
+    --fox: #ff9a52; --sun: #ffe08a; --muted: #c4b8a8; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --sky: #1d2a4a; --sky-low: #33406a; --grass: #3f6b3a; --ink: #f4ead8; --card: #2a2f45;
+    --fox: #ff9a52; --sun: #ffe08a; --muted: #c4b8a8; color-scheme: dark }
+  html, body { min-height: 100%; margin: 0; }
+  body { background: linear-gradient(var(--sky), var(--sky-low) 55%, var(--grass) 55%); color: var(--ink);
+    font-family: var(--round); padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px; box-sizing: border-box;
+    display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  h1 { margin: 6px 0 0; font-size: clamp(30px, 8vw, 44px); font-weight: 800; letter-spacing: .04em; text-wrap: balance; }
+  .fox { width: min(46vw, 220px); max-width: 100%; filter: drop-shadow(0 8px 0 #0000001f); animation: bob 2.4s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-8px); } }
+  .doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; width: min(100%, 560px); }
+  a.door { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 26px; background: var(--card);
+    color: var(--ink); text-decoration: none; box-shadow: 0 6px 0 #0000002a; transition: transform .1s, box-shadow .1s; }
+  a.door:active { transform: translateY(4px); box-shadow: 0 2px 0 #0000002a; }
+  a.door:focus-visible { outline: 4px solid var(--sun); outline-offset: 3px; }
+  a.door b { display: block; font-size: 24px; font-weight: 800; }
+  a.door small { display: block; color: var(--muted); font-size: 15px; margin-top: 2px; }
+  .badge { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; }
+  .fling .badge { background: var(--fox); }
+  .run .badge { background: var(--sun); }
+  .best { color: var(--fox); font-weight: 800; }
+  @media (prefers-reduced-motion: reduce) { .fox { animation: none; } }
+</style>
+</head>
+<body>
+
+<h1>小狐遊樂場</h1>
+<img class="fox" src="assets/fox/normal.png" alt="小狐">
+<nav class="doors">
+  <a class="door fling" href="fling.html"><span class="badge">🌳</span>
+    <span><b>小狐飛多遠</b><small>往後拉、放開，彈到森林朋友身上飛更遠 <span class="best" id="best"></span></small></span></a>
+  <a class="door run" href="runner.html"><span class="badge">🎵</span>
+    <span><b>狐火奔跑</b><small>跟著音樂跑，收集音符</small></span></a>
+</nav>
+
+<script>
+  try { const b = +localStorage.getItem('ipet-fling-best'); if (b) document.getElementById('best').textContent = `最遠 ${b} m`; } catch (e) {}
+</script>
+</body>
+</html>
