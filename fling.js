@@ -19,7 +19,7 @@
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
   const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
   const SUPER = { stars: 15, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy
-  const STARS = { step: 2.5, band: 2, top: 50 };   // stars: a column every step m, a chance in each band m up to top — more the higher
+  const STARS = { step: 2.5, band: 2, top: 50, dash: 10 }; // stars: a column every step m, a chance in each band m up to top — more the higher; every dash of them a tail's dash back
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -246,6 +246,7 @@
     // stars (and the super bounce they fill)
     for (const a of S.stars) if (!a.got && Math.hypot(a.x - f.x, a.y - (f.y + 0.7)) < 1.1) {
       a.got = true; S.got++; SFX.star(); pop('+1', a.x, a.y + 0.6, '#ffe14d', 0.5);
+      if (S.got % STARS.dash === 0 && S.tails < TAILS) { S.tails++; SFX.refill(); pop('+1 🔥', f.x + 1, f.y + 2.2, '#ffb347', 0.7); }
       if (!S.ready && ++S.meter >= SUPER.stars) {
         S.ready = true; SFX.ready();
         pop('SUPER BOUNCE 準備好！', f.x + 2, f.y + 3, '#ffe14d', 0.9);
