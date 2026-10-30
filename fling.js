@@ -98,7 +98,7 @@
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
     tails: TAILS, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
-    fx: [], cam: { x: 0, s: 1 }, shake: 0, passedBest: !best, hint: '往後拉小狐，放開就彈出去！',
+    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, passedBest: !best, hint: '往後拉小狐，放開就彈出去！',
   });
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
@@ -284,7 +284,9 @@
     // the camera: the fox a third along, drawn smaller as it goes higher (so it stays in sight)
     const base = H / 13, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
     S.cam.s += (want - S.cam.s) * Math.min(1, dt * 4);
-    S.cam.x = Math.max(0, f.x); // (still while it's pulled back)
+    const cx = Math.max(0, f.x); // (still while it's pulled back)
+    S.cam.scroll += (cx - S.cam.x) * S.cam.s; // how far the ground has gone by on screen, px — the hills go by a share of it (not cam.x × scale: that jumps as the camera zooms)
+    S.cam.x = cx;
     const s = S.cam.s;
     g.save();
     if (S.shake > 0) g.translate((Math.random() - 0.5) * S.shake * 24, (Math.random() - 0.5) * S.shake * 24);
@@ -535,7 +537,7 @@
   }
   function hills(par, col, amp, freq) {
     g.fillStyle = col; g.beginPath(); g.moveTo(-20, ground());
-    for (let x = -20; x <= W + 20; x += 8) { const wx = x + S.cam.x * S.cam.s * par; g.lineTo(x, ground() - amp * (0.6 + 0.4 * Math.sin(wx * freq) * Math.cos(wx * freq * 0.37))); }
+    for (let x = -20; x <= W + 20; x += 8) { const wx = x + S.cam.scroll * par; g.lineTo(x, ground() - amp * (0.6 + 0.4 * Math.sin(wx * freq) * Math.cos(wx * freq * 0.37))); }
     g.lineTo(W + 20, ground()); g.fill();
   }
   function roundRect(x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, Math.max(0, w), h, r) : g.rect(x, y, w, h); }
