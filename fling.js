@@ -19,7 +19,8 @@
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
   const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
   const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy
-  const STARS = { step: 2.5, band: 2, top: 50 };   // stars: a column every step m, a chance in each band m up to top — more the higher
+  const STARS = { step: 4, band: 2, top: 40 };     // stars: a column every step m, a chance in each band m up to top — more the higher
+  const CAM = { least: 0.6 };                      // the camera draws smaller as the fox climbs, down to this of its size; above, an arrow
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -108,7 +109,7 @@
     }
     while (S.nextStar < ahead) { // few down low, thick up high
       for (let y = 2; y < STARS.top; y += STARS.band) {
-        if (Math.random() < 0.02 + 0.4 * (y / STARS.top) ** 1.5)
+        if (Math.random() < 0.015 + 0.12 * (y / STARS.top) ** 1.2)
           S.stars.push({ x: S.nextStar + Math.random() * STARS.step, y: y + Math.random() * STARS.band, got: false });
       }
       S.nextStar += STARS.step;
@@ -281,7 +282,7 @@
   function draw(dt) {
     const f = S.fox;
     // the camera: the fox a third along, drawn smaller as it goes higher (so it stays in sight)
-    const base = H / 13, want = Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1));
+    const base = H / 13, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
     S.cam.s += (want - S.cam.s) * Math.min(1, dt * 4);
     S.cam.x = Math.max(0, f.x); // (still while it's pulled back)
     const s = S.cam.s;
@@ -372,6 +373,19 @@
       g.globalAlpha = 1;
     }
     g.restore();
+    offscreen(f, s);
+  }
+  function offscreen(f, s) { // up out of sight: an arrow along the top where it is, and how high
+    const top = toScreen(f.x, f.y + FOX_H * 0.8);
+    if (S.phase !== 'fly' || top.y > H * 0.13) return;
+    const x = Math.max(34, Math.min(W - 34, top.x)), y = 116, r = 24; // (below the counters)
+    g.fillStyle = '#ff8a3d'; g.beginPath(); g.moveTo(x, y - r - 14); g.lineTo(x - 10, y - r - 2); g.lineTo(x + 10, y - r - 2); g.fill(); // the arrow
+    g.fillStyle = '#fffdf8'; g.strokeStyle = '#ff8a3d'; g.lineWidth = 3;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.stroke();
+    const im = A.run?.[AIR];
+    if (im?.complete && im.naturalWidth) g.drawImage(im, x - r * 1.1, y - r * 1.25, r * 2.2, r * 2.2);
+    g.font = '900 15px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top'; g.lineWidth = 4; g.strokeStyle = '#0006';
+    const t = `${Math.round(f.y)} m`; g.strokeText(t, x, y + r + 4); g.fillStyle = '#fff'; g.fillText(t, x, y + r + 4);
   }
   function drawFriend(a, s) {
     const fr = FRIENDS[a.kind], p = toScreen(a.x, a.y), sz = s * fr.h * 1.15, t = a.t;
