@@ -292,6 +292,9 @@ function fanAngles(n) {
 function holdLocks() { for (const k in S.locks || {}) if (S.locks[k]) S.stats[k] = 100; }
 function render() {
   holdLocks();
+  const best = S.fling?.best; // the mini game's farthest (fling.js keeps it in this save), on its button
+  $('#gameBest').hidden = !best;
+  if (best) $('#gameBest').textContent = `${best}m`;
   for (const k in S.stats) {
     const v = S.stats[k];
     const bar = document.querySelector(`.stat[data-k="${k}"] .bar i`);
@@ -454,7 +457,7 @@ async function eat(kind) {
 }
 
 const actions = {
-  game() { save(); location.href = 'runner.html'; }, // the mini game (runner.js)
+  game() { save(); location.href = 'fling.html'; }, // the mini game (fling.js; the rhythm run, runner.html, from the menu)
   feed() {
     if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat, veggies or water? (eat: too full)
     if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }

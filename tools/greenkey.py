@@ -11,10 +11,28 @@ import numpy as np
 from PIL import Image
 
 
+def any_colour(r, g, b):
+    """For art that has its own greens and yellows (the game's forest friends: a frog, a giraffe, cream
+    bellies): alpha from how far a pixel is from pure #00FF00, and despill only where it's see-through."""
+    dist = np.sqrt(r ** 2 + (255 - g) ** 2 + b ** 2)
+    lo, hi = 70.0, 150.0            # nearer than lo: background; farther than hi: fully opaque
+    alpha = np.clip((dist - lo) / (hi - lo), 0, 1)
+    a = np.maximum(alpha, 1e-3)
+    fr, fg, fb = r / a, (g - (1 - alpha) * 255) / a, b / a
+    fg = np.where(alpha < 0.95, np.minimum(fg, np.maximum(fr, fb)), fg)
+    return fr, fg, fb, alpha
+
+
 def main():
     src, dst = sys.argv[1], sys.argv[2]
     rgb = np.asarray(Image.open(src).convert("RGB")).astype(np.float32)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    if "--any-colour" in sys.argv:
+        fr, fg, fb, alpha = any_colour(r, g, b)
+        out = np.dstack([fr, fg, fb, alpha * 255]).clip(0, 255).astype(np.uint8)
+        Image.fromarray(out, "RGBA").save(dst)
+        print(f"keyed (any colour): {(alpha < 0.05).mean():.0%} transparent")
+        return
     # the fox palette never has green above red (orange, cream, brown, pink), so green over red
     # is background showing through fur edges
     excess = g - r

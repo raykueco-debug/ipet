@@ -105,6 +105,9 @@ def main():
 
     crops = []
     for r in range(3):
+        # the column cuts for this row only (a giraffe's head may reach into a gap another row doesn't have)
+        y0, y1 = ys[r], ys[r + 1]
+        xs = splits([sum(1 for y in range(y0, y1, 2) if px[x, y]) for x in range(w)])
         for c in range(3):
             cell = drop_specks(im.crop((xs[c], ys[r], xs[c + 1], ys[r + 1])))
             bbox = cell.getchannel("A").getbbox()
