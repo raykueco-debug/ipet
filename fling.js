@@ -2,7 +2,7 @@
    The fox is flung off a bent branch (tap when the swing is high: the harder, the farther) and flies to the right.
    On the ground lie forest friends, and landing on one throws it on its own way: a rabbit bounces it (and runs ahead past two
    friends, knocking the first away, stopping by the second: off that one, a bunny bounce), a bear sends it high, a frog hops it along (and its next dive bounces
-   high off the ground), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
+   high off the ground), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel sets it gliding (till it dives or lands) —
    a hedgehog only slows it (dived onto, it springs it up as a mushroom does and rolls off along the ground, knocking
    flying whoever it meets). Knocked flying, a friend goes off up and back, out of sight for good; a boar that's run
    on, or a hedgehog, once out of sight, are gone too. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
@@ -60,6 +60,7 @@
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
   const SKY = { height: 25, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
+  const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -79,7 +80,7 @@
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
     boar:     { e: '🐗', h: 1.0, w: 10, say: '背著往前衝', hit: f => { f.vy = 0; f.vx = Math.max(f.vx, 16) + 3; f.ride = 1; return 'whoosh'; } },
     hedgehog: { e: '🦔', h: 0.7, w: 14, say: '踩到被絆倒、變慢（俯衝撲到才會彈高）', hit: f => { f.vx *= 0.55; f.vy = 4; return 'ouch'; } },
-    squirrel: { e: '🐿️', h: 0.8, w: 9,  say: '彈一下＋補 1 次衝刺', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'refill'; } },
+    squirrel: { e: '🐿️', h: 0.8, w: 9,  say: '彈一下，然後滑翔（俯衝或落地才停）', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; f.soar = true; return 'soar'; } },
   };
   const KINDS = Object.keys(FRIENDS), WSUM = KINDS.reduce((a, k) => a + FRIENDS[k].w, 0);
   const ONLY = FRIENDS[params.get('friend')] && params.get('friend'); // (?friend=squirrel: all of one kind, to try it)
@@ -159,14 +160,14 @@
     boing: () => blip(220, 660, 0.25), hop: () => blip(400, 800, 0.12), big: () => blip(120, 520, 0.45, 'triangle', 0.25),
     whoosh: () => blip(900, 300, 0.4, 'triangle'), fling: () => { blip(150, 700, 0.35, 'triangle', 0.22); blip(1200, 400, 0.4, 'triangle', 0.08); }, ouch: () => blip(500, 150, 0.3, 'square', 0.08),
     star: () => blip(1200 + Math.random() * 600, 2400, 0.08, 'sine', 0.08), dash: () => blip(300, 1200, 0.3, 'sawtooth', 0.08), dive: () => blip(1000, 250, 0.2, 'triangle', 0.1),
-    thud: () => blip(160, 60, 0.15, 'sine', 0.2), refill: () => { blip(220, 660, 0.25); chime(990, 2, 90); }, best: () => chime(660, 3, 120), ready: () => chime(880, 4, 80),
+    thud: () => blip(160, 60, 0.15, 'sine', 0.2), soar: () => { blip(500, 900, 0.5, 'triangle', 0.12); chime(990, 2, 90); }, best: () => chime(660, 3, 120), ready: () => chime(880, 4, 80),
     super: () => { blip(100, 900, 0.7, 'sawtooth', 0.12); chime(660, 5, 90); },
   };
 
   let S = null; // the run
   const fresh = () => ({
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
-    fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
+    fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0, soar: false },
     tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
     fx: [], glints: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
   });
@@ -227,7 +228,7 @@
     if (f.hold > 0) return; // (in the giraffe's mouth)
     if (f.vy < 0 && f.y > 0.01) { // falling: a dive down at a slant — free, as often as it likes
       if (!f.dive) f.vx += DASH.down[0];
-      f.vy = Math.min(f.vy, DASH.down[1]); f.dive = true;
+      f.vy = Math.min(f.vy, DASH.down[1]); f.dive = true; f.soar = false; // (a dive ends a glide)
       f.glide = f.ride = 0; f.hops = 0; f.act = null; f.spin = 0;
       SFX.dive(); return;
     }
@@ -247,7 +248,7 @@
     const f = S.fox, fr = FRIENDS[a.kind];
     const dived = f.dive; // (diving onto it: a hedgehog knocked away, any other friend's throw the stronger)
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
-    a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0;
+    a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0; f.soar = false;
     dust(a.x, 0.2, 5);
     if (dived && a.kind === 'hedgehog') { // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
@@ -274,11 +275,7 @@
       if (b) { b.bunny = true; a.runTo = b; a.knock = k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
     }
     if (a.kind === 'frog') { S.frog = true; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
-    if (s === 'refill') { // a tail's dash back (no more than it has tails)
-      const back = S.tails < TAILS; if (back) S.tails++;
-      pop(back ? '+1 🔥' : '彈！', a.x, fr.h + 1.5, '#ffb347'); f.spin = 1; act('roll', 0.5); hud();
-      return;
-    }
+    if (s === 'soar') { pop('滑翔～', a.x, fr.h + 1.5, '#ffd27a'); return; } // (the squirrel's: off gliding)
     a.carry = a.kind === 'owl' || a.kind === 'boar';
     if (f.hold > 0) S.holder = a; // (the giraffe's: held in its mouth through the swing)
     if (s === 'ouch') { f.spin = 1; act('roll', 0.6); } // (tripped: tumbling over it)
@@ -314,10 +311,12 @@
       const grav = f.glide > 0 ? 0 : G; // (in the owl's claws: on at its angle)
       if (f.glide > 0) f.glide -= dt;
       f.vy -= grav * dt;
+      if (f.soar && f.vy < 0) f.vy = Math.max(f.vy, -SOAR.fall); // (gliding, off a squirrel: drifting down slowly, on at its speed)
     }
     if (!(f.hold > 0)) { f.x += f.vx * dt; f.y += f.vy * dt; }
     f.spin = Math.max(0, f.spin - dt * 2);
     if (f.dash > 0) S.fx.push({ kind: 'fire', x: f.x - 0.3, y: f.y + 0.8, vx: -f.vx * 0.2, vy: 0.5, t: 0 });
+    if (f.soar && f.vy < 0 && Math.random() < 0.5) S.fx.push({ kind: 'rain', x: f.x - 0.4, y: f.y + 0.9, t: 0, c: '#ffffffaa' }); // (a wisp of air behind it, gliding)
     if (f.rainbow > 0) S.fx.push({ kind: 'rain', x: f.x - 0.2, y: f.y + 0.8, t: 0, c: `hsl(${(S.t * 600) % 360}, 90%, 65%)` });
     // onto a friend (coming down)
     if (f.vy < 0) for (const a of S.friends) {
@@ -326,7 +325,7 @@
     // the plain ground
     if (f.y <= 0) {
       const dived = f.dive;
-      f.y = 0; f.dive = false; S.combo = 0;
+      f.y = 0; f.dive = false; S.combo = 0; f.soar = false; // (down: the glide over)
       if (f.vy < 0) {
         if (dived && S.frog && -f.vy > 3) { // a dive onto the ground after a frog: sprung back up high (the frog's spring used)
           f.vy = Math.max(-f.vy * FROG.keep, FROG.up); f.vx *= 0.95; S.frog = false;
@@ -368,7 +367,7 @@
       const lane = Math.floor(Math.random() * 3) - 1;
       for (let k = 0; k < 4; k++) sky.stars.push({ lane, z: z + k * 3, got: false });
     }
-    Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0 });
+    Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0, soar: false });
     S.sky = sky; S.phase = 'sky'; S.combo = 0;
     SFX.super(); hud();
   }
