@@ -626,6 +626,7 @@
       g.fillStyle = rg; g.beginPath(); g.arc(0, -size * 0.4, size * 0.6, 0, 7); g.fill();
     }
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
+    if (LOOK.night) cape('back', FOX_NECK.back, size, -size * 449 / 480, sky.t * 14); // (seen from behind: over its back)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
     g.restore(); g.restore();
   }
@@ -669,7 +670,7 @@
   // where it's landed on, when its picture differs from the stand-in: x from its feet, height (the giraffe's head is out front)
   const ART_HIT = { giraffe: { cx: -1.2, h: 2.4 } };
   // where its feet are across the 512px square, when not in the middle (the giraffe's head swings the picture's centre about)
-  const ART_FEET = { giraffe_idle: 330, giraffe_hit: 168 };
+  const ART_FEET = { giraffe_idle: 330, giraffe_hit: LOOK.friends ? 211 : 168 }; // (H02's giraffe stands a little further right)
   const ART = {};
   (async () => { // (assets/friends/index.json: the names sliced so far, e.g. ["rabbit_idle", "rabbit_hit"])
     // (on Halloween, their costumes from <LOOK.friends>/ where there, over the everyday ones: the mushroom a pumpkin)
@@ -767,18 +768,29 @@
     g.beginPath(); g.arc(-0.37 * s, 0.03 * s, 0.025 * s, 0, Math.PI * 2); g.fill(); // nostril
     g.restore();
   }
+  // on Halloween night the fox wears a vampire cape (GPT's C01: three frames of it streaming in the wind, side on,
+  // and three from behind), its collar at the fox's neck — where that is in each of the fox's frames (px of 480)
+  const CAPE = { side: [], back: [] };
+  const CAPE_AT = { side: [0.87, 0.24, 0.72], back: [0.52, 0.2, 0.5] }; // (its collar's clasp across and down its picture; its width, of the fox's)
+  const FOX_NECK = { crouch: [292, 250], run: [288, 232], air: [268, 192], dive: [286, 262], back: [240, 238] };
+  if (LOOK.night) for (const k of ['side', 'back']) for (let i = 0; i < 3; i++) { const im = new Image(); im.onload = () => { CAPE[k][i] = im; }; im.src = `assets/fox/cape/${k}_${i}.png`; }
+  function cape(kind, neck, sz, top, t) { // (drawn in the fox's own frame: sz its picture's side, top its picture's top)
+    const im = CAPE[kind][Math.floor(t) % 3]; if (!im?.complete || !im.naturalWidth) return;
+    const [ax, ay, w] = CAPE_AT[kind], cw = sz * w, ch = cw * im.naturalHeight / im.naturalWidth;
+    g.drawImage(im, -sz / 2 + neck[0] / 480 * sz - ax * cw, top + neck[1] / 480 * sz - ay * ch, cw, ch);
+  }
   function drawFox(f, s) {
     const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25;
     const inAir = S.phase === 'fly' && f.y > 0.05;
-    let img = null, rot = 0, front = false; // (front: a clip facing us — drawn upright, a little smaller)
-    if (S.phase === 'aim' || S.phase === 'idle') img = A.pounce?.[Math.round(CROUCH[0] + (CROUCH[1] - CROUCH[0]) * S.power)] || A.run?.[0];
+    let img = null, rot = 0, front = false, neck = null; // (front: a clip facing us — drawn upright, a little smaller)
+    if (S.phase === 'aim' || S.phase === 'idle') { img = A.pounce?.[Math.round(CROUCH[0] + (CROUCH[1] - CROUCH[0]) * S.power)] || A.run?.[0]; neck = FOX_NECK.crouch; }
     else if (S.phase === 'done') { img = frameOf(S.newBest ? 'cheer' : 'happy', S.t); front = true; }
     else if (f.act && A[f.act.name]) {
       img = frameOf(f.act.name, f.act.t); front = f.act.name !== 'roll';
       if (f.act.name === 'roll') rot = f.spin * Math.PI * 2;
-    } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; }
-    else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
-    else img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null;
+    } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; neck = FOX_NECK.dive; }
+    else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; neck = FOX_NECK.air; }
+    else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; neck = FOX_NECK.run; }
     g.save(); g.translate(p.x, p.y - size * 0.45); g.rotate(rot);
     if (S.ready && S.phase === 'fly') { // a golden glow while a super bounce is waiting
       const k = 0.5 + Math.sin(S.t * 10) * 0.5, rg = g.createRadialGradient(0, 0, size * 0.1, 0, 0, size * 0.7);
@@ -789,6 +801,7 @@
     const sz = front ? size * 0.9 : size;
     if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
+    if (LOOK.night && neck) cape('side', neck, sz, -sz * 449 / 480 + size * 0.45, S.t * (6 + Math.hypot(f.vx, f.vy) * 0.5)); // (over its back, streaming faster the faster it goes)
     g.restore();
   }
   // the background's strips (<dir>/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
