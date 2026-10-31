@@ -1,11 +1,11 @@
-"""Cut a keyed sheet of horizontal strips (GPT's B01: the fling game's background layers) into one PNG each,
+"""Cut a keyed sheet of horizontal strips (GPT's B01: the fling game's background layers) into one WebP each,
 top to bottom, and make each join to itself left-to-right so it can be tiled along the way.
 
 usage: python tools/slice_bands.py <keyed.png> <out dir> <name> [<name> ...]
 
 The strips are the bands of rows that have something in them, split where a run of see-through rows lies between
-(the magenta gaps). Each is cut to its own height, full width, then its ends cross-faded (SEAM of the width taken off
-the right end and blended into the left), since GPT's "seamless" seldom quite is.
+(the magenta gaps). Each is cut to its own height, then followed by its own mirror image (seamless()), since GPT's "seamless" seldom
+quite is.
 """
 import sys
 from pathlib import Path
@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-SEAM = 0.08   # of the strip's width
+EDGE = 3      # columns dropped from each end
 GAP = 6       # see-through rows in a row that part two strips
 
 
@@ -35,14 +35,11 @@ def bands(alpha):
 
 
 def seamless(a):
-    """Blend the right end into the left over SEAM of the width, then drop it: the strip's last column now runs on
-    into its first."""
-    w = a.shape[1]; n = int(w * SEAM)
-    head, tail = a[:, :n].astype(np.float32), a[:, w - n:].astype(np.float32)
-    k = np.linspace(0, 1, n)[None, :, None]               # 0 at the join: all tail; 1 inside: all head
-    a = a[:, :w - n].astype(np.float32)
-    a[:, :n] = tail * (1 - k) + head * k
-    return a.clip(0, 255).astype(np.uint8)
+    """The strip and then itself mirrored: each end meets its own reflection, so the join is exact wherever GPT's
+    ends don't match (a cloud, a tree or a hill cut through at the edge becomes one whole, symmetric, across it).
+    EDGE columns are dropped from each end first (GPT's own outermost pixels are often smeared)."""
+    a = a[:, EDGE:a.shape[1] - EDGE]
+    return np.concatenate([a, a[:, ::-1]], axis=1)
 
 
 def main():
@@ -52,8 +49,9 @@ def main():
     print(f"{len(found)} strips: {found}")
     out.mkdir(parents=True, exist_ok=True)
     for (y0, y1), name in zip(found, names):
-        Image.fromarray(seamless(a[y0:y1])).save(out / f"{name}.png")
-        print(f"  {name}: {a.shape[1] - int(a.shape[1] * SEAM)}x{y1 - y0}")
+        print(f"  {name}:")
+        t = seamless(a[y0:y1]); Image.fromarray(t).save(out / f"{name}.webp", quality=88, method=6)
+        print(f"    {t.shape[1]}x{t.shape[0]}")
 
 
 if __name__ == "__main__":

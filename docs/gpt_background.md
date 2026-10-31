@@ -5,7 +5,7 @@
 1. `python tools/greenkey.py assets/source/B01_background.png assets/source/B01_keyed.png --magenta`
 2. `python tools/slice_bands.py assets/source/B01_keyed.png assets/bg clouds far trees ground`
 
-`fling.js` 看到 `assets/bg/<名字>.png` 就換掉程式畫的那一層（雲、遠山、樹、地面），由遠到近捲得越來越快。
+`fling.js` 看到 `assets/bg/<名字>.webp` 就換掉程式畫的那一層（雲、遠山、樹、地面），由遠到近捲得越來越快。
 
 ## B01
 

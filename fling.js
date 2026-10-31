@@ -360,9 +360,9 @@
     // the layers behind, far to near, each going by faster: GPT's strips (B01, docs/gpt_background.md) once there,
     // else drawn here
     if (BG.clouds) strip(BG.clouds, 0.05, H * 0.03, H * 0.2, S.t * 6);
-    if (BG.far) strip(BG.far, 0.15, ground() - H * 0.3, H * 0.3);
+    if (BG.far) strip(BG.far, 0.15, ground() - H * 0.4, H * 0.36);
     else { hills(0.15, '#bfe3c6', H * 0.18, 0.004); hills(0.35, '#9fd4a5', H * 0.12, 0.009); }
-    if (BG.trees) strip(BG.trees, 0.5, ground() - H * 0.34 + 4, H * 0.34);
+    if (BG.trees) strip(BG.trees, 0.5, ground() - H * 0.24 + 4, H * 0.24);
     else for (let k = Math.floor((S.cam.x * 0.5 - 40) / 7); k < (S.cam.x * 0.5 + 60) / 7; k++) { // trees along the back (at half the ground's pace)
       const tx = (k * 7 - S.cam.x * 0.5) * s + W * 0.3 + ((k * 37) % 11), ty = ground() - 2;
       const th = s * (3 + ((k * 13) % 5) * 0.6);
@@ -604,11 +604,11 @@
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
     g.restore();
   }
-  // the background's strips (assets/bg/index.json: those cut so far — clouds, far, trees, ground), tiled along the way
+  // the background's strips (assets/bg/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
   const BG = {}, BG_LIP = 0.25; // (BG_LIP: the ground strip's grassy top stands this much of its height over the ground line)
   (async () => {
     const r = await fetch('assets/bg/index.json').catch(() => null);
-    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `assets/bg/${name}.png`; }
+    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `assets/bg/${name}.webp`; }
   })();
   function strip(im, par, y, h, drift = 0) { // tiled across, going by at par of the ground's pace (plus drift px)
     const w = im.naturalWidth * h / im.naturalHeight, off = (((S.cam.scroll * par + drift) % w) + w) % w;
