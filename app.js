@@ -457,7 +457,19 @@ async function eat(kind) {
 }
 
 const actions = {
-  game() { save(); location.href = 'fling.html'; }, // the mini game (fling.js; the rhythm run, runner.html, from the menu)
+  game() { // the mini game, in a layer of its own over the pet (fling.js); the rhythm run, runner.html, from the menu
+    save();
+    Fling.open({
+      tails: tailCount(), best: S.fling?.best || 0,
+      onEnd: r => { // home with it: the stars, the farthest, a bit of fun
+        S.stars = (S.stars || 0) + r.stars;
+        S.fling = { best: r.best, plays: (S.fling?.plays || 0) + 1 };
+        S.stats.fun = clamp(S.stats.fun + 8);
+        save(); render();
+      },
+      onClose: () => render(),
+    });
+  },
   feed() {
     if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat, veggies or water? (eat: too full)
     if (S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; }

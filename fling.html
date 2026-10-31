@@ -5,64 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#bfe6ff">
 <title>小狐飛多遠</title>
-<style>
-  :root { --ink: #4a3b33; --card: #fffdf8; --accent: #ff8a65; }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe6ff; color: var(--ink);
-    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
-    -webkit-user-select: none; user-select: none; touch-action: none; overscroll-behavior: none; }
-  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-  .hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: flex-start; gap: 10px;
-    padding: max(12px, env(safe-area-inset-top)) 16px 0; pointer-events: none; font-weight: 800; }
-  .pill { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; white-space: nowrap; }
-  .dist { font-size: 26px; }
-  .stars { display: flex; align-items: center; gap: 6px; }
-  .meter { width: 64px; height: 10px; background: #e9dccb; border-radius: 99px; overflow: hidden; }
-  .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd34d, #ff8a65); border-radius: 99px; transition: width .2s; }
-  .stars.ready { background: #fff3b0; box-shadow: 0 0 0 3px #ffe14d, 0 0 18px #ffd34d; animation: pulse .5s ease-in-out infinite alternate; }
-  .stars.ready .meter i { background: linear-gradient(90deg, #ff6b6b, #ffd34d, #7cc7ff, #9be27a, #e58cff); }
-  @keyframes pulse { to { transform: scale(1.08); } }
-  .friends { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px;
-    text-align: left; color: #7a6a5e; font-size: 15px; }
-  .friends b { font-size: 20px; margin-right: 6px; }
-  .tails { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 50vw; }
-  .tails i { font-style: normal; font-size: 24px; transition: opacity .2s, transform .2s; }
-  .tails i.used { opacity: .25; transform: scale(.8); filter: grayscale(1); }
-  .hint { position: fixed; left: 0; right: 0; bottom: max(18px, env(safe-area-inset-bottom)); text-align: center;
-    font-weight: 800; font-size: 18px; color: #fff; text-shadow: 0 2px 4px #0006; pointer-events: none; }
-  .card { position: fixed; inset: 0; display: grid; place-items: center; background: #0003; }
-  .card[hidden] { display: none; }
-  .card > div { background: var(--card); border-radius: 24px; padding: 26px 24px; width: min(88vw, 360px); text-align: center;
-    max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box; /* (short screens: it scrolls, the button stays reachable) */
-    box-shadow: 0 12px 40px #0003; }
-  .card h1 { margin: 0 0 8px; font-size: 28px; }
-  .card p { margin: 6px 0; color: #7a6a5e; line-height: 1.5; }
-  .card .big { font-size: 40px; font-weight: 900; color: var(--accent); margin: 10px 0; }
-  .card button { margin: 14px 6px 0; padding: 12px 22px; font-size: 18px; font-weight: 800; border: 0; border-radius: 999px;
-    background: var(--accent); color: #fff; }
-  .card button.ghost { background: #f1e7dc; color: var(--ink); }
-</style>
+<link rel="stylesheet" href="fling.css">
+<style> html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe6ff; } </style>
 </head>
 <body>
-<canvas id="game"></canvas>
-<div class="hud"><span class="pill dist"><span id="dist">0</span> m</span><span class="pill stars" id="starPill">⭐ <span id="stars">0</span><span class="meter"><i id="meterBar"></i></span></span>
-  <div class="tails" id="tails"></div></div>
-<div class="hint" id="hint"></div>
-<div class="card" id="start"><div>
-  <h1>🦊 小狐飛多遠</h1>
-  <p>往後拉小狐，放開就彈出去！<br>拉越遠飛越快，往哪拉就往反方向飛</p>
-  <p>落到森林朋友身上：</p>
-  <ul class="friends" id="friends"></ul>
-  <p>⭐ 星星飛越高越多！每撿 <b id="superN">10</b> 顆，下一隻朋友 → <b>SUPER BOUNCE</b> 飛超遠！</p>
-  <p>往上飛時點：用一條尾巴斜斜往上衝 🔥<br>往下掉時點：斜斜往下俯衝（不限次數）<br>俯衝撲到朋友：彈得更遠；撲到 🦔 會把牠撲飛，還像 🍄 一樣彈超高！</p>
-  <button id="go">開始！</button>
-</div></div>
-<div class="card" id="end" hidden><div>
-  <h1 id="endTitle">飛好遠！</h1>
-  <div class="big"><span id="final">0</span> m</div>
-  <p id="endNote"></p>
-  <button id="again">再飛一次</button><button class="ghost" id="home">回到小狐</button>
-</div></div>
+<!-- 小狐飛多遠 on a page of its own (the pet opens the same game in a layer: app.js) -->
 <script src="fling.js"></script>
+<script> Fling.open(); </script>
 </body>
 </html>

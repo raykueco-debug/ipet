@@ -1,0 +1,42 @@
+/* 小狐飛多遠 (fling.js): its own layer over everything, always landscape. .fl-turned: the phone held upright and
+   not locked to landscape — the layer laid on its side (fling.js reads touches on its axes to match). */
+.fl { --fl-ink: #4a3b33; --fl-card: #fffdf8; --fl-accent: #ff8a65;
+  position: fixed; inset: 0; z-index: 1000; overflow: hidden; background: #bfe6ff; color: var(--fl-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
+  -webkit-user-select: none; user-select: none; touch-action: none; overscroll-behavior: none; }
+.fl[hidden] { display: none; }
+.fl * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+.fl.fl-turned { inset: auto; top: 0; left: 0; width: 100vh; height: 100vw; transform-origin: top left;
+  transform: rotate(90deg) translateY(-100%); }
+.fl canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fl-hud { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: flex-start; gap: 10px;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left));
+  pointer-events: none; font-weight: 800; }
+.fl-pill { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; white-space: nowrap; }
+.fl-dist { font-size: 24px; }
+.fl-stars { display: flex; align-items: center; gap: 6px; }
+.fl-meter { width: 64px; height: 10px; background: #e9dccb; border-radius: 99px; overflow: hidden; }
+.fl-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd34d, #ff8a65); border-radius: 99px; transition: width .2s; }
+.fl-stars.ready { background: #fff3b0; box-shadow: 0 0 0 3px #ffe14d, 0 0 18px #ffd34d; animation: fl-pulse .5s ease-in-out infinite alternate; }
+.fl-stars.ready .fl-meter i { background: linear-gradient(90deg, #ff6b6b, #ffd34d, #7cc7ff, #9be27a, #e58cff); }
+@keyframes fl-pulse { to { transform: scale(1.08); } }
+.fl-tails { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 40%; }
+.fl-tails i { font-style: normal; font-size: 22px; transition: opacity .2s, transform .2s; }
+.fl-tails i.used { opacity: .25; transform: scale(.8); filter: grayscale(1); }
+.fl-x { pointer-events: auto; border: 0; width: 38px; height: 38px; border-radius: 50%; background: #ffffffd9;
+  color: var(--fl-ink); font-size: 18px; font-weight: 900; flex: none; }
+.fl-hint { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); text-align: center;
+  font-weight: 800; font-size: 17px; color: #fff; text-shadow: 0 2px 4px #0006; pointer-events: none; }
+.fl-card { position: absolute; inset: 0; display: grid; place-items: center; background: #0003; }
+.fl-card[hidden] { display: none; }
+.fl-card > div { background: var(--fl-card); border-radius: 22px; padding: 18px 22px; width: min(92%, 640px); text-align: center;
+  max-height: calc(100% - 20px); overflow-y: auto; box-shadow: 0 12px 40px #0003; } /* (short screens: it scrolls) */
+.fl-card h1 { margin: 0 0 6px; font-size: 26px; }
+.fl-card p { margin: 5px 0; color: #7a6a5e; line-height: 1.45; font-size: 15px; }
+.fl-big { font-size: 40px; font-weight: 900; color: var(--fl-accent); margin: 8px 0; }
+.fl-card button { margin: 10px 6px 0; padding: 12px 24px; font-size: 18px; font-weight: 800; border: 0; border-radius: 999px;
+  background: var(--fl-accent); color: #fff; }
+.fl-card button.fl-ghost { background: #f1e7dc; color: var(--fl-ink); }
+.fl-friends { list-style: none; padding: 0; margin: 4px 0 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px 10px;
+  text-align: left; color: #7a6a5e; font-size: 14px; }
+.fl-friends b { font-size: 19px; margin-right: 5px; }

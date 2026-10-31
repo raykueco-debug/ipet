@@ -37,9 +37,11 @@
 
   const cv = document.getElementById('game'), g = cv.getContext('2d');
   let W = 0, H = 0, DPR = 1;
-  function resize() {
+  function resize() { // always landscape: held upright, the whole page is laid on its side (runner.html: html.turned)
+    const turned = innerHeight > innerWidth;
+    document.documentElement.classList.toggle('turned', turned);
     DPR = Math.min(2, devicePixelRatio || 1);
-    W = innerWidth; H = innerHeight;
+    W = turned ? innerHeight : innerWidth; H = turned ? innerWidth : innerHeight;
     cv.width = W * DPR; cv.height = H * DPR;
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }

@@ -6,10 +6,12 @@
    dive down at a slant (onto the next friend), free. It bounces on the plain ground less and less, rolls, and stops: that's how far.
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
    SUPER of them caught, the next friend it lands on is a super bounce, off far and high.
-   World: x metres along, y metres up (the ground at 0), seen from the side. */
+   World: x metres along, y metres up (the ground at 0), seen from the side.
+   It plays in a layer of its own, always landscape (fullscreen and turned where the phone lets it; otherwise the
+   layer itself is turned on its side), opened by the pet (app.js: Fling.open with its tails, farthest and what to
+   do with the stars it brings home) or on a page of its own (fling.html). */
 (function () {
   const params = new URLSearchParams(location.search);
-  const KEY = 'ipet-fox-v1';
   const G = 20;                        // gravity, m/s²
   // the fling: the fox pulled back on the little tree's top (dragged from anywhere), let go to fly the other way —
   // how far it's pulled the speed (min..max m/s), the way it's pulled the angle (within deg, up and to the right)
@@ -20,7 +22,7 @@
   const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
   const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy
   const STARS = { step: 4, band: 2, top: 40 };     // stars: a column every step m, a chance in each band m up to top — more the higher
-  const CAM = { least: 0.6 };                      // the camera draws smaller as the fox climbs, down to this of its size; above, an arrow
+  const CAM = { metres: 7, least: 0.7 };           // the screen's height in metres on the ground; drawn smaller as the fox climbs, down to this of it; above, an arrow
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -46,20 +48,45 @@
   const ONLY = FRIENDS[params.get('friend')] && params.get('friend'); // (?friend=squirrel: all of one kind, to try it)
   const pickKind = () => { if (ONLY) return ONLY; let r = Math.random() * WSUM; for (const k of KINDS) if ((r -= FRIENDS[k].w) < 0) return k; return 'rabbit'; };
 
-  // the pet's save (the same one the home screen keeps): its tails, its farthest
-  const pet = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } })();
-  const TAILS = Math.max(1, Math.min(9, +params.get('tails') || pet.tailsOverride || pet.tails || 1));
-  let best = pet.fling?.best || (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })(); // (no pet here: its own)
+  // its tails and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
+  let TAILS = 1, best = 0, opts = {};
 
-  const cv = document.getElementById('game'), g = cv.getContext('2d');
-  let W = 0, H = 0, DPR = 1;
+  // the layer: canvas, counters along the top, a hint at the bottom, the start and end cards
+  const layer = document.createElement('div');
+  layer.className = 'fl'; layer.hidden = true;
+  layer.innerHTML = `<canvas></canvas>
+    <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
+      <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
+      <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
+    <div class="fl-hint" data-k="hint"></div>
+    <div class="fl-card" data-k="start"><div>
+      <h1>🦊 小狐飛多遠</h1>
+      <p>往後拉小狐，放開就彈出去！拉越遠飛越快，往哪拉就往反方向飛</p>
+      <ul class="fl-friends" data-k="friends"></ul>
+      <p>⭐ 星星飛越高越多！每撿 <b data-k="superN">10</b> 顆，下一隻朋友 → <b>SUPER BOUNCE</b> 飛超遠！</p>
+      <p>往上飛時點：用一條尾巴斜斜往上衝 🔥　往下掉時點：斜斜往下俯衝（不限次數）<br>俯衝撲到朋友：彈得更遠；撲到 🦔 會把牠撲飛，還像 🍄 一樣彈超高！</p>
+      <button data-k="go">開始！</button>
+    </div></div>
+    <div class="fl-card" data-k="end" hidden><div>
+      <h1 data-k="endTitle">飛好遠！</h1>
+      <div class="fl-big"><span data-k="final">0</span> m</div>
+      <p data-k="endNote"></p>
+      <button data-k="again">再飛一次</button><button class="fl-ghost" data-k="home">回到小狐</button>
+    </div></div>`;
+  const $ = k => layer.querySelector(`[data-k="${k}"]`);
+  const cv = layer.querySelector('canvas'), g = cv.getContext('2d');
+  let W = 0, H = 0, DPR = 1, turned = false; // (turned: the phone held upright, the layer on its side)
   function resize() {
+    if (layer.hidden) return;
+    turned = innerHeight > innerWidth; // (a lock to landscape, where it held, makes this false)
+    layer.classList.toggle('fl-turned', turned);
     DPR = Math.min(2, window.devicePixelRatio || 1);
-    W = innerWidth; H = innerHeight;
+    W = turned ? innerHeight : innerWidth; H = turned ? innerWidth : innerHeight;
     cv.width = W * DPR; cv.height = H * DPR;
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
-  addEventListener('resize', resize); resize();
+  addEventListener('resize', resize);
+  const at = e => turned ? { x: e.clientY, y: innerWidth - e.clientX } : { x: e.clientX, y: e.clientY }; // (a touch, on the layer's own axes)
 
   // the fox's clips: run (facing right: on the ground, and its most stretched frame in the air), pounce (crouched
   // on the branch; stretched out diving), roll (tumbling off a friend), joy (flung high), ouch, cheer / happy (at the end)
@@ -133,7 +160,7 @@
     return { vx: v * Math.cos(a), vy: v * Math.sin(a), power: len / PULL.max };
   }
   function pullTo(e) { // dragged from anywhere: the pull is how far the finger has gone from where it went down
-    const s = S.cam.s, dx = (e.clientX - S.drag.x) / s, dy = -(e.clientY - S.drag.y) / s, len = Math.hypot(dx, dy);
+    const s = S.cam.s, p = at(e), dx = (p.x - S.drag.x) / s, dy = -(p.y - S.drag.y) / s, len = Math.hypot(dx, dy);
     const k = len > PULL.max ? PULL.max / len : 1;
     S.pull = { x: dx * k, y: Math.max(-PULL.rest[1] + 0.2, dy * k) };
   }
@@ -283,7 +310,7 @@
   function draw(dt) {
     const f = S.fox;
     // the camera: the fox a third along, drawn smaller as it goes higher (so it stays in sight)
-    const base = H / 13, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
+    const base = H / CAM.metres, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
     S.cam.s += (want - S.cam.s) * Math.min(1, dt * 4);
     const cx = Math.max(0, f.x); // (still while it's pulled back)
     S.cam.scroll += (cx - S.cam.x) * S.cam.s; // how far the ground has gone by on screen, px — the hills go by a share of it (not cam.x × scale: that jumps as the camera zooms)
@@ -543,7 +570,6 @@
   }
   function roundRect(x, y, w, h, r) { g.beginPath(); g.roundRect ? g.roundRect(x, y, Math.max(0, w), h, r) : g.rect(x, y, w, h); }
 
-  const $ = id => document.getElementById(id);
   function hud() {
     $('dist').textContent = Math.max(0, Math.floor(S.fox.x));
     $('stars').textContent = S.got;
@@ -559,17 +585,9 @@
     S.phase = 'done'; S.t = 0;
     const d = Math.floor(S.fox.x), isBest = d > best;
     S.newBest = isBest; S.hint = '';
-    // home with it: its stars, its farthest, a bit of fun
-    try {
-      const s = JSON.parse(localStorage.getItem(KEY));
-      if (s) {
-        s.stars = (s.stars || 0) + S.got;
-        s.fling = { best: Math.max(best, d), plays: (s.fling?.plays || 0) + 1 };
-        if (s.stats) s.stats.fun = Math.min(100, (s.stats.fun || 0) + 8);
-        localStorage.setItem(KEY, JSON.stringify(s));
-      }
-      localStorage.setItem('ipet-fling-best', Math.max(best, d));
-    } catch (e) {}
+    // home with it: its stars and its farthest — to the pet that opened it, else kept here
+    if (opts.onEnd) opts.onEnd({ dist: d, stars: S.got, best: Math.max(best, d) });
+    else try { localStorage.setItem('ipet-fling-best', Math.max(best, d)); } catch (e) {}
     $('final').textContent = d;
     $('endTitle').textContent = isBest ? '🎉 新紀錄！' : '飛好遠！';
     $('endNote').textContent = `撿到 ⭐ ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
@@ -585,29 +603,54 @@
   $('friends').innerHTML = KINDS.map(k => `<li><b>${FRIENDS[k].e}</b>${FRIENDS[k].say}</li>`).join('');
   $('superN').textContent = SUPER.stars;
   // before the fling: drag anywhere to pull the fox back, let go to fling it; after: a tap anywhere (but on the
-  // cards) is the one control. Space too (on the tree: a fling pulled 3/4 back at 45°)
-  addEventListener('pointerdown', e => {
-    if (e.target.closest?.('.card') || !S) return;
-    if (S.phase === 'aim') { S.drag = { x: e.clientX, y: e.clientY }; S.spring = null; }
+  // cards and buttons) is the one control. Space too (on the tree: a fling pulled 3/4 back at 45°)
+  layer.addEventListener('pointerdown', e => {
+    if (e.target.closest?.('.fl-card, button') || !S) return;
+    if (S.phase === 'aim') { S.drag = at(e); S.spring = null; }
     else tap();
   });
-  addEventListener('pointermove', e => { if (S?.drag && S.phase === 'aim') pullTo(e); });
+  layer.addEventListener('pointermove', e => { if (S?.drag && S.phase === 'aim') pullTo(e); });
   const up = () => { if (S?.drag) { S.drag = null; if (S.phase === 'aim') letGo(); } };
-  addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  layer.addEventListener('pointerup', up); layer.addEventListener('pointercancel', up);
   addEventListener('keydown', e => {
-    if (e.code !== 'Space' && e.key !== 'ArrowUp') return;
+    if (layer.hidden || (e.code !== 'Space' && e.key !== 'ArrowUp')) return;
     e.preventDefault();
     if (S?.phase === 'aim') { const r = PULL.max * 0.75 / Math.SQRT2; S.pull = { x: -r, y: -r }; letGo(); } else tap();
   });
   $('go').addEventListener('click', start);
   $('again').addEventListener('click', start);
-  $('home').addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = 'index.html'; }); // (back where it came from: the pet, or a launcher)
+  $('home').addEventListener('click', close);
+  $('close').addEventListener('click', close);
 
-  S = fresh(); spawn(); hud(); S.phase = 'idle';
-  let last = 0;
-  (function loop(now) {
+  let raf = 0, last = 0;
+  function loop(now) {
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0)); last = now;
     if (S) { step(dt); draw(dt); }
-    requestAnimationFrame(loop);
-  })(0);
+    raf = requestAnimationFrame(loop);
+  }
+  // open: the layer over everything, landscape, a fresh run waiting on the start card.
+  // o: { tails, best, onEnd({ dist, stars, best }), onClose() } — none of it when on its own page
+  function open(o = {}) {
+    opts = o;
+    TAILS = Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1));
+    best = o.best ?? (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })();
+    if (!layer.isConnected) document.body.appendChild(layer);
+    layer.hidden = false;
+    // fullscreen and locked to landscape where the phone allows it (from the tap that opened it); else turned by CSS
+    const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
+    resize();
+    S = fresh(); spawn(); hud(); S.phase = 'idle';
+    $('start').hidden = false; $('end').hidden = true;
+    cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop);
+  }
+  function close() {
+    cancelAnimationFrame(raf); raf = 0;
+    layer.hidden = true; S = null;
+    try { screen.orientation?.unlock?.(); } catch (e) {}
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    if (opts.onClose) opts.onClose();
+    else if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
+  }
+  window.Fling = { open, close };
 })();

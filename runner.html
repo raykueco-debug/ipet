@@ -12,6 +12,8 @@
     font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
     -webkit-user-select: none; user-select: none; touch-action: none; overscroll-behavior: none; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  /* held upright: the page on its side, so it plays landscape (the body becomes what fixed things sit in) */
+  html.turned body { width: 100vh; height: 100vw; transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
   .hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 12px;
     padding: max(12px, env(safe-area-inset-top)) 16px 0; pointer-events: none; font-weight: 800; }
   .orbs { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; }
