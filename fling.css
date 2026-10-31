@@ -49,3 +49,6 @@
 .fl-night .fl-meter i { background: linear-gradient(90deg, #ff8a2a, #b46cff); }
 .fl-night .fl-stars.ready { background: #4a2a70; box-shadow: 0 0 0 3px #ff8a2a, 0 0 18px #ff8a2a; }
 .fl-look { font-size: 20px; padding: 0; }
+.fl-card p.fl-energy { font-weight: 800; color: #3f8f5a; }
+.fl-card p.fl-energy.tired { color: #c0563a; }
+.fl-card button[hidden] { display: none; }

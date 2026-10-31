@@ -101,6 +101,7 @@
       <h1 data-k="endTitle">飛好遠！</h1>
       <div class="fl-big"><span data-k="final">0</span> m</div>
       <p data-k="endNote"></p>
+      <p class="fl-energy" data-k="energyNote" hidden></p>
       <button data-k="again">再飛一次</button><button class="fl-ghost" data-k="home">回到小狐</button>
     </div></div></div>
     <div class="fl-upright"><span>📱</span>把手機轉成橫的來玩！<button data-k="close2">回到小狐</button></div>`;
@@ -850,7 +851,8 @@
       img = frameOf(f.act.name, f.act.t); front = f.act.name !== 'roll';
       if (f.act.name === 'roll') rot = f.spin * Math.PI * 2;
     } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; }
-    else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
+    else if (inAir && f.ride <= 0 && Math.hypot(f.vx, f.vy) > 8) { img = A.run?.[AIR]; // (slowing, hopping along low: its run, all the way — not a frame each hop)
+      rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
     else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
     if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: diving, or leaping while well up; else crouched, its feet on the ground)
       const v = Math.hypot(f.vx, f.vy), flap = S.t * (8 + v * 0.4), up = S.phase === 'fly' && f.y > 0.05 && v > 8; // (slowing down, hopping along: crouched, all the way — not a frame each hop)
@@ -1005,13 +1007,42 @@
     $('final').textContent = d;
     $('endTitle').textContent = isBest ? '🎉 新紀錄！' : '飛好遠！';
     $('endNote').textContent = `撿到 ${star()} ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
+    if (energy) energyCard(energy.spend()); // (a fling's worth of energy spent: what's left, and whether there's enough for another)
     best = Math.max(best, d);
     hud();
     setTimeout(() => { $('end').hidden = false; }, 1200); // (a moment to see it cheer first)
   }
   function start() {
     S = fresh(); spawn(); hud();
-    $('end').hidden = true;
+    $('end').hidden = true; $('energyNote').hidden = true; $('again').hidden = false; $('home').textContent = '回到小狐';
+    $('final').parentElement.hidden = false;
+  }
+  // the fox's energy (the pet's): each fling costs some, and under energy.least it'd rather go home and rest or eat —
+  // from the pet that opened it ({ get, spend, least }), or on its own page from the pet's own save, if there is one
+  let energy = null;
+  function petEnergy() {
+    const KEY = 'ipet-fox-v1', read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } };
+    if (!read()?.stats) return null;
+    return {
+      least: 20, get: () => Math.round(read()?.stats?.energy ?? 100),
+      spend: () => {
+        const p = read(); if (!p?.stats) return 100;
+        p.stats.energy = Math.max(0, p.stats.energy - 10);
+        try { localStorage.setItem(KEY, JSON.stringify(p)); } catch (e) {}
+        return Math.round(p.stats.energy);
+      },
+    };
+  }
+  function energyCard(left) {
+    const tired = left < energy.least;
+    $('energyNote').hidden = false;
+    $('energyNote').textContent = `⚡ 剩下的精力：${left}` + (tired ? '　小狐累了，回家睡一下或吃點東西吧～' : '');
+    $('energyNote').classList.toggle('tired', tired);
+    $('again').hidden = tired; $('home').textContent = tired ? '回家休息' : '回到小狐';
+  }
+  function tooTired() { // opened too tired to fly: only the card, saying so
+    $('endTitle').textContent = '小狐好累…'; $('final').parentElement.hidden = true; $('endNote').textContent = '今天飛太多次了';
+    energyCard(energy.get()); $('end').hidden = false;
   }
   // before the fling: drag anywhere to pull the fox back, let go to fling it; after: a tap anywhere (but on the
   // cards and buttons) is the one control. Space too (on the tree: a fling pulled 3/4 back at 45°)
@@ -1044,7 +1075,7 @@
     raf = requestAnimationFrame(loop);
   }
   // open: the layer over everything, landscape, a fresh run waiting on the start card.
-  // o: { tails, best, onEnd({ dist, stars, best }), onClose() } — none of it when on its own page
+  // o: { tails, best, energy: { get, spend, least }, onEnd({ dist, stars, best }), onClose() } — none of it when on its own page
   let bgm = null;
   function music() { // the look's music, round and round while it's open (both PeriTune, peritune.com)
     if (!LOOK.music) return;
@@ -1061,7 +1092,9 @@
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
     resize();
+    energy = o.energy || petEnergy();
     start(); // (straight onto the tree, to be pulled back)
+    if (energy && energy.get() < energy.least) tooTired();
     music();
     cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop);
   }

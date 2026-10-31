@@ -21,6 +21,8 @@ const RENDER_3D = RENDER === '3d';
 const RATES_AWAKE = { hunger: -6, fun: -5, energy: -3, clean: -3 };
 const RATES_SLEEP = { hunger: -3, fun: -1, energy: +18, clean: -1 };
 const MAX_CATCHUP_H = 48;
+// energy: a fling costs FLING_ENERGY; under FLING_LEAST the fox would rather rest (sleep) or eat (a meal gives EAT_ENERGY back)
+const FLING_ENERGY = 10, FLING_LEAST = 20, EAT_ENERGY = 10;
 
 // sprite layout (fractions of the square sprite canvas) — tuned to GPT's D01/B01 sprites
 const TAIL_ROOT = { x: 0.54, y: 0.92 };
@@ -429,6 +431,7 @@ async function eat(kind) {
   }
   const m = MEALS[kind];
   S.stats.hunger = clamp(S.stats.hunger + m.hunger);
+  S.stats.energy = clamp(S.stats.energy + EAT_ENERGY); // (a meal: some energy back)
   if (m.fun) S.stats.fun = clamp(S.stats.fun + m.fun);
   S.stats.clean = clamp(S.stats.clean - 2);
   addBond(2);
@@ -458,16 +461,22 @@ async function eat(kind) {
 
 const actions = {
   game() { // the mini game, in a layer of its own over the pet (fling.js); the rhythm run, runner.html, from the menu
+    if (S.stats.energy < FLING_LEAST) { say(t('tooTiredToPlay'), 3000); setExpr('tired', 2200); return; } // (rest or a meal first)
     save();
+    homeMusic.pause();
     Fling.open({
       tails: tailCount(), best: S.fling?.best || 0,
+      energy: { // a fling costs some energy, ended; under FLING_LEAST it'd rather go home and rest or eat
+        get: () => Math.round(S.stats.energy), least: FLING_LEAST,
+        spend: () => { S.stats.energy = clamp(S.stats.energy - FLING_ENERGY); save(); return Math.round(S.stats.energy); },
+      },
       onEnd: r => { // home with it: the stars, the farthest, a bit of fun
         S.stars = (S.stars || 0) + r.stars;
         S.fling = { best: r.best, plays: (S.fling?.plays || 0) + 1 };
         S.stats.fun = clamp(S.stats.fun + 8);
         save(); render();
       },
-      onClose: () => render(),
+      onClose: () => { render(); homeMusic.play().catch(() => {}); },
     });
   },
   feed() {
@@ -478,6 +487,7 @@ const actions = {
     spawnFx(f.e, p.x, p.y + 8, 'drop');
     setTimeout(() => {
       S.stats.hunger = clamp(S.stats.hunger + f.hunger);
+      S.stats.energy = clamp(S.stats.energy + EAT_ENERGY);
       if (f.fun) S.stats.fun = clamp(S.stats.fun + f.fun);
       S.stats.clean = clamp(S.stats.clean - 2);
       addBond(2);
@@ -846,6 +856,7 @@ function receiveGift(ev) {
   spawnFx(f.e, p.x, p.y + 8, 'drop');
   return new Promise(res => setTimeout(() => {
     S.stats.hunger = clamp(S.stats.hunger + f.hunger);
+    S.stats.energy = clamp(S.stats.energy + EAT_ENERGY);
     if (f.fun) S.stats.fun = clamp(S.stats.fun + f.fun);
     addBond(3);
     setExpr('eat', 1800);
@@ -869,7 +880,11 @@ async function speak(ev) {
   addBond(2);
 }
 
+// the pet's own music, round and round on its screen (PeriTune, peritune.com) — from the first touch (browsers want
+// one), paused while the mini game has its own
+const homeMusic = Object.assign(new Audio('assets/music/PerituneMaterial_Laid_Back3_loop.m4a'), { loop: true, volume: 0.35 });
 function unlockAudio() {
+  if (!document.querySelector('.fl:not([hidden])')) homeMusic.play().catch(() => {});
   if (inbox.unlocked) return;
   PetVoice.unlock();
   inbox.unlocked = true;
