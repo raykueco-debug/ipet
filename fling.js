@@ -135,12 +135,18 @@
     ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', up: 'back_crouch_to_back_air', down: 'back_air_to_back_crouch' };
   // (on Halloween, in its cape: the same clips made again with it — tools/wan_cape.py, assets/fox/clips_halloween —
   // frame for frame as the plain ones, where they're there)
-  const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'];
+  const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'], CUT = ['run', 'pounce'];
+  function tailless(src, cutSrc, key, i) { // a frame: its tail-less version where there is one (im.cut), else as it is
+    const im = new Image(); im.root = [key, i]; im.cut = !!cutSrc;
+    if (cutSrc) im.onerror = () => { im.onerror = null; im.cut = false; im.src = src; };
+    im.src = cutSrc || src; return im;
+  }
   for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
     const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return;
     const m = await r.json();
-    into[k] = m.frames.map(f => { const im = new Image(); im.src = `assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`; return im; });
+    const cut = CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
+    into[k] = m.frames.map((f, i) => tailless(`assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`, cut && `assets/fox/notail/${dir}/${clip}/${f}?v=${m.rev || 1}`, `${dir}/${clip}`, i)); // (root: where its tail grows, in tail_roots.json)
   })();
   const A = new Proxy(PLAIN, { get: (o, k) => (LOOK.night && CAPED_CLIPS[k]) || o[k] });
   const AIR = +params.get('air') || 10, DIVE = 7, CROUCH = [0, 4]; // (frames: run's stretched, pounce's dive, pounce's crouch)
@@ -679,6 +685,7 @@
       rg.addColorStop(0, 'rgba(255, 225, 77, 0.6)'); rg.addColorStop(1, 'rgba(255, 225, 77, 0)');
       g.fillStyle = rg; g.beginPath(); g.arc(0, -size * 0.4, size * 0.6, 0, 7); g.fill();
     }
+    tails(im, -size / 2, -size * 449 / 480, size, sky.t, 'fly');
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
     glints(0, -size * 0.45, size, dt);
@@ -832,13 +839,41 @@
   // made again in the cape (A, above); rolling and the rest stay its everyday ones.
   const CAPED = { air: [], dive: [], crouch: [] };
   for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 2]]) for (let i = 0; i < n; i++) { // (crouch_0, _1: V03, only the cape's tail blowing — the fox itself the same picture)
-    const im = new Image(); im.src = `assets/fox/halloween/${k}_${i}.webp`; CAPED[k][i] = im;
+    CAPED[k][i] = tailless(`assets/fox/halloween/${k}_${i}.webp`, `assets/fox/notail/halloween/${k}_${i}.webp`, `halloween/${k}`, 0);
   }
   const caped = () => LOOK.night && CAPED.crouch[0].complete && CAPED.crouch[0].naturalWidth;
   const capedOf = (k, t) => { // (its frames in turn — never still, the cape always streaming; crouched with only the one, leaning forward)
     const fr = CAPED[k].filter(im => im.complete && im.naturalWidth);
     return fr.length > 1 ? fr[Math.floor(t) % fr.length] : k === 'crouch' ? capedOf('dive', t) : fr[0];
   };
+  // its tails: one in every picture of it already; the rest (as many as it has, TAILS) fanned out behind it from where
+  // that one grows (tools/tail_roots.py: found frame by frame in each clip), around the way it points — the pet's own
+  // tail pictures (assets/fox/tail/t1–t9), each swaying a little on its own; more tails, each a bit smaller (as the pet's)
+  let ROOTS = {};
+  fetch('assets/fox/tail_roots.json').then(r => r.json()).then(j => { ROOTS = j; }).catch(() => {});
+  const TAIL_IMG = Array.from({ length: 9 }, (_, i) => { const im = new Image(); im.src = `assets/fox/tail/t${i + 1}.png`; return im; });
+  const TAIL_LEN = 0.42; // (a tail picture's side, of the fox's)
+  // (mode: 'still' — a slow sway; 'fly' — shaking fast in the wind; 'soar' — streaming in long waves. layer: 'behind'
+  // the body, the rest; 'front' — the main one, over the stub left at its root, where the picture's own was taken off)
+  function tails(img, x, y, sz, t, mode, layer = 'behind') {
+    const n = TAILS, r = img?.root && ROOTS[img.root[0]]?.[img.root[1]];
+    if (!r || !r[3] || (n < 2 && !img.cut) || (layer === 'front' && !img.cut)) return;
+    // (from the front or behind, its body in the way: fanned wider, round straight up, from a little higher up)
+    const facing = /cheer|happy|joy|surprised|back_/.test(img.root[0]), mid = facing ? 10 : r[2], lift = facing ? 50 : 0;
+    const spread = Math.min(facing ? 150 : 124, (facing ? 20 : 17) * (n - 1)), L = sz * TAIL_LEN * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, i) => mid - spread / 2 + spread * i / (n - 1));
+    const own = ways.reduce((b, a, i) => Math.abs(a - r[2]) < Math.abs(ways[b] - r[2]) ? i : b, 0); // (the one in the picture)
+    const order = layer === 'front' ? [own] : ways.map((a, i) => i).filter(i => i !== own).sort((i, j) => Math.abs(ways[j] - mid) - Math.abs(ways[i] - mid)); // (outer first)
+    for (const i of order) {
+      const im = TAIL_IMG[i % 9]; if (!im.complete || !im.naturalWidth) continue;
+      const sway = mode === 'soar' ? Math.sin(t * 9 + i * 1.7) * 10
+        : mode === 'fly' ? Math.sin(t * 19 + i * 1.3) * 6 + Math.sin(t * 31 + i * 2.1) * 3
+        : Math.sin(t * 2.2 + i * 1.7) * 5;
+      g.save(); g.translate(x + r[0] / 480 * sz, y + (r[1] - lift) / 480 * sz); g.rotate((ways[i] + sway) * Math.PI / 180);
+      g.drawImage(im, -L / 2, -L, L, L);
+      g.restore();
+    }
+  }
   // gliding: the fox drawn in thin upright strips, those of its back half (its tail, and the cape's tail) each lifted
   // a little on a wave running back along it — the further back, the more — so the tail streams; the front still
   function waving(img, x, y, sz) {
@@ -876,9 +911,12 @@
     }
     if (f.dash > 0 || f.rainbow > 0) { g.shadowColor = f.rainbow > 0 ? '#fff' : '#ffb347'; g.shadowBlur = 24; }
     const sz = front ? size * 0.9 : size;
+    const mode = S.phase !== 'fly' ? 'still' : f.soar && f.vy < 0 ? 'soar' : f.y > 0.05 || Math.abs(f.vx) > 3 ? 'fly' : 'still';
+    tails(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, S.t, mode);
     if (img?.complete && img.naturalWidth && f.soar && S.phase === 'fly' && !front) waving(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz); // (gliding: its tail streaming)
     else if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
+    tails(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, S.t, mode, 'front');
     g.restore();
   }
   // the background's strips (<dir>/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
