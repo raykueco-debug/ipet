@@ -8,7 +8,8 @@
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
    SUPER of them caught, the next friend it lands on is a super bounce, off far and high.
    Flung high enough (SKY.height), it goes up onto the clouds: a run along a cloud road, seen from behind (left /
-   right for a lane, stars on them), SKY.run m of it, then it drops off the end onto a giraffe and flies on.
+   right for a lane, stars on them), bounding along, SKY.run m of it, then a leap off its end and, through black,
+   down onto a giraffe, flying on.
    World: x metres along, y metres up (the ground at 0), seen from the side.
    It plays in a layer of its own, landscape only (fullscreen and locked where the phone lets it; held upright, it
    asks to be turned), on a stage of one fixed size and shape (STAGE, 16:9) scaled to fit the screen, so every
@@ -37,7 +38,8 @@
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
-  const SKY = { height: 25, run: 500, speed: 28, drop: 22 };
+  const SKY = { height: 25, run: 500, speed: 40, drop: 22, hop: 0.7 }; // (hop: s a bound along the clouds)
+  const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -101,7 +103,7 @@
   // the fox's clips: run (facing right: on the ground, and its most stretched frame in the air), pounce (crouched
   // on the branch; stretched out diving), roll (tumbling off a friend), joy (flung high), ouch, cheer / happy (at the end)
   const CLIPS = { run: 'walk_r_loop_run', pounce: 'walk_r_to_pounce_r', roll: 'roll_loop', joy: 'jump_joy_loop',
-    ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', back: 'walk_back_loop_run' };
+    ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', up: 'back_crouch_to_back_air', down: 'back_air_to_back_crouch' };
   const A = {};
   for (const [k, clip] of Object.entries(CLIPS)) (async () => {
     const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
@@ -135,7 +137,7 @@
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
     tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
-    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, flash: 0, sky: null, passedBest: !best,
+    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
   });
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
@@ -256,6 +258,11 @@
   }
 
   function step(dt) {
+    if (S.fade) { // going through black: the change made at its darkest, all going on meanwhile
+      const fd = S.fade; fd.t += dt;
+      if (!fd.done && fd.t >= FADE / 2) { fd.done = true; fd.mid(); }
+      if (fd.t >= FADE) S.fade = null;
+    }
     S.t += dt;
     S.shake = Math.max(0, S.shake - dt);
     const f = S.fox;
@@ -307,7 +314,7 @@
     for (const a of S.stars) if (!a.got && Math.hypot(a.x - f.x, a.y - (f.y + 0.7)) < 1.1) {
       a.got = true; pop('+1', a.x, a.y + 0.6, '#ffe14d', 0.5); starGot();
     }
-    if (f.y > SKY.height && !(f.hold > 0)) return toSky(); // high enough: up onto the clouds
+    if (f.y > SKY.height && !(f.hold > 0) && !S.fade) S.fade = { t: 0, mid: toSky }; // high enough: up onto the clouds
     // past the farthest
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); pop('新紀錄！', f.x, f.y + 3, '#ffe14d'); confetti(f.x, f.y + 2); }
     friends(dt);
@@ -324,30 +331,36 @@
   // up on the clouds: a road of cloud on ahead, the fox running along it away from us, three lanes and stars in
   // rows on them (a tap on the left or the right half: a lane that way); SKY.run m of it, then down off its end
   function toSky() {
-    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0 };
+    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0, leap: -1 };
     for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each
       const lane = Math.floor(Math.random() * 3) - 1;
       for (let k = 0; k < 4; k++) sky.stars.push({ lane, z: z + k * 3, got: false });
     }
     Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0 });
-    S.sky = sky; S.phase = 'sky'; S.flash = 1; S.combo = 0;
+    S.sky = sky; S.phase = 'sky'; S.combo = 0;
     SFX.super(); hud();
   }
   function steer(d) { if (S?.phase === 'sky') S.sky.lane = Math.max(-1, Math.min(1, S.sky.lane + d)); }
   function stepSky(dt) {
     const sky = S.sky, f = S.fox;
-    sky.t += dt; sky.z += SKY.speed * dt;
+    sky.t += dt;
+    if (sky.leap >= 0) { // off the end: a leap out over the sea of cloud, and down through black
+      sky.leap += dt;
+      if (!S.fade && sky.leap > 0.6) S.fade = { t: 0, mid: fromSky };
+      return hud();
+    }
+    sky.z = Math.min(SKY.run, sky.z + SKY.speed * dt);
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; starGot(); }
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
-    if (sky.z >= SKY.run) fromSky();
+    if (sky.z >= SKY.run) { sky.leap = 0; SFX.super(); }
     hud();
   }
   function fromSky() { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
     const f = S.fox;
     f.x = S.sky.x0 + SKY.run; f.y = SKY.drop; f.vx = 0; f.vy = 0;
-    S.sky = null; S.phase = 'fly'; S.flash = 1;
+    S.sky = null; S.phase = 'fly';
     S.friends = []; S.stars = []; S.nextFriend = f.x + 14; S.nextStar = f.x + 4;
     const gi = { x: 0, x0: 0, y: 0, kind: 'giraffe', used: false, t: 0, carry: false, bunny: false };
     gi.x = gi.x0 = f.x - box(gi).cx; S.friends.push(gi); // (its head right under the fox)
@@ -388,8 +401,7 @@
   const ground = () => H * 0.84;
   const toScreen = (x, y) => ({ x: (x - S.cam.x) * S.cam.s + W * 0.3, y: ground() - y * S.cam.s });
   function draw(dt) {
-    S.flash = Math.max(0, S.flash - dt * 1.6);
-    if (S.phase === 'sky') { drawSky(dt); whiteout(); return; }
+    if (S.phase === 'sky') { drawSky(dt); blackout(); return; }
     const f = S.fox;
     // the camera: the fox a third along, drawn smaller as it goes higher (so it stays in sight)
     const base = H / CAM.metres, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
@@ -495,9 +507,12 @@
     }
     g.restore();
     offscreen(f, s);
-    whiteout();
+    blackout();
   }
-  function whiteout() { if (S.flash > 0) { g.fillStyle = `rgba(255, 255, 255, ${Math.min(1, S.flash * 1.4)})`; g.fillRect(0, 0, W, H); } } // (into and out of the clouds)
+  function blackout() { // (into and out of the clouds)
+    if (!S.fade) return;
+    g.fillStyle = `rgba(0, 0, 0, ${Math.min(1, 1 - Math.abs(S.fade.t / (FADE / 2) - 1))})`; g.fillRect(0, 0, W, H);
+  }
 
   // the cloud road, seen from just behind the fox (as the forest run's road): z ahead, in view units of ZV m
   const ZV = 3, FAR = 70, CAMZ = 7, HOR = () => H * 0.36, NEAR = () => H * 0.86, LANE = () => H * 0.2;
@@ -527,6 +542,11 @@
         puff(p.x, p.y, LANE() * p.s * (0.7 + (((k * 13) % 5) + 5) % 5 * 0.12), '#d9dcff');
       }
     }
+    // past the road's end, a lower sea of cloud (where the fox leaps down into it)
+    if (left < FAR) for (let z = FAR; z > left - 1; z -= 1.4) for (let x = -3.2; x <= 3.21; x += 0.8) {
+      const q = project(x + (Math.round(z / 1.4) % 2) * 0.4, z);
+      puff(q.x, q.y + LANE() * q.s * 0.9, LANE() * q.s * 0.55, '#d9dcff');
+    }
     // the road: white cloud, three faint lanes, lumpy along both edges, ending where the run does
     const end = Math.min(FAR, left), zs = [];
     for (let k = 0; k <= 24; k++) zs.push(-CAMZ * 0.6 + (end + CAMZ * 0.6) * (k / 24) ** 1.6);
@@ -549,15 +569,26 @@
       const p = project(a.lane, z), r = LANE() * p.s * 0.5, k = 1 + Math.sin(S.t * 6 + a.z) * 0.12;
       g.font = `${Math.round(r * 1.4 * k)}px sans-serif`; g.fillText('⭐', p.x, p.y - r * 1.2);
     }
-    const p = project(sky.x, 0), size = H * 0.32, im = frameOf('back', sky.t, 18);
-    g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2, size * 0.05, 0, 0, 7); g.fill();
-    g.save(); g.translate(p.x, p.y); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
+    // the fox bounding on, a bound each SKY.hop s (crouched, up, stretched out, down: back_crouch_to_back_air +
+    // back_air_to_back_crouch); at the end one more, a big one out off it, away and down into the cloud below
+    const up = A.up || [], down = A.down || [], hops = [...up, ...down.slice(1, -1)];
+    let z = 0, lift = 0, im;
+    if (sky.leap >= 0) {
+      const L = sky.leap; z = L * SKY.speed / ZV * 0.7; lift = 3.4 * L - 6 * L * L; // (lane widths)
+      im = L < 0.25 ? up[Math.min(up.length - 1, Math.floor(L / 0.25 * up.length))] : up.at(-1);
+    } else {
+      const u = (sky.t / SKY.hop) % 1;
+      lift = Math.sin(Math.PI * u) * 0.45; im = hops[Math.floor(u * hops.length)];
+    }
+    const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
+    if (sky.leap < 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
+    g.save(); g.translate(p.x, p.y - rise); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
     if (S.ready) { // (a super bounce waiting: its glow)
       const rg = g.createRadialGradient(0, -size * 0.4, size * 0.1, 0, -size * 0.4, size * 0.6);
       rg.addColorStop(0, 'rgba(255, 225, 77, 0.6)'); rg.addColorStop(1, 'rgba(255, 225, 77, 0)');
       g.fillStyle = rg; g.beginPath(); g.arc(0, -size * 0.4, size * 0.6, 0, 7); g.fill();
     }
-    if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480)
+    if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
     g.restore();
   }
@@ -731,10 +762,11 @@
     for (let x = -off; x < W; x += w) g.drawImage(im, x, y, w + 1, h);
   }
   // the little tree, GPT's (B02, docs/gpt_background.md): its roots and grass (the stump's top taken off) at the
-  // bottom, its leafy crown at the top where the fox sits, and between them its trunk, drawn here so it can bend —
-  // tapering from the stump's width (TREE_AT.w of the roots' picture) up to the crown, the stump's own browns
-  const TREE = {}, TREE_AT = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.24 }; // (m, and of the pictures)
-  for (const k of ['base', 'crown']) { const im = new Image(); im.onload = () => { TREE[k] = im; }; im.src = `assets/bg/tree_${k}.webp`; }
+  // bottom, its leafy crown at the top where the fox sits, and between them its trunk, bent here — the stump's own
+  // bark (tree_trunk: a band of it straightened out, mirror-tiled up and down) laid along the bend in short slices,
+  // tapering a little from the stump's width (TREE_AT.w of the roots' picture) to the crown, the stump's outline down its sides
+  const TREE = {}, TREE_AT = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.36 }; // (m, and of the pictures)
+  for (const k of ['base', 'crown', 'trunk']) { const im = new Image(); im.onload = () => { TREE[k] = im; }; im.src = `assets/bg/tree_${k}.webp`; }
   function drawTree(tx, ty, s) {
     const A_ = TREE_AT, bw = A_.base, bh = bw * TREE.base.naturalHeight / TREE.base.naturalWidth;
     const b0 = toScreen(A_.x - bw / 2, bh - 0.1); // (its picture's top left; sunk a little into the ground)
@@ -750,11 +782,23 @@
       left.push(toScreen(a.x - dy / n * a.w / 2, a.y + dx / n * a.w / 2)); right.push(toScreen(a.x + dy / n * a.w / 2, a.y - dx / n * a.w / 2));
     }
     g.drawImage(TREE.base, b0.x, b0.y, bw * s, bh * s);
-    g.beginPath(); left.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); [...right].reverse().forEach(p => g.lineTo(p.x, p.y)); g.closePath();
-    g.fillStyle = '#b3623b'; g.fill(); g.strokeStyle = '#5a3320'; g.lineWidth = Math.max(2, s * 0.05); g.lineJoin = 'round'; g.stroke();
-    g.strokeStyle = '#d08a5a'; g.lineWidth = Math.max(2, s * 0.06); g.lineCap = 'round'; g.beginPath(); // (a lighter streak along it)
-    for (let k = 1; k <= 14; k++) { const a = P(k / 16), q = toScreen(a.x - a.w * 0.18, a.y); k > 1 ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }
-    g.stroke();
+    const T = TREE.trunk;
+    if (T) { // the bark, slice by slice up the bend
+      const rep = A_.w * bw * T.naturalHeight / T.naturalWidth; let v = 0; // (m of trunk per run of the bark picture)
+      for (let k = 0; k < 16; k++) {
+        const a = P(k / 16), b = P((k + 1) / 16), m = toScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
+        const len = Math.hypot(b.x - a.x, b.y - a.y), w = (a.w + b.w) / 2;
+        const row = (v / rep % 1) * T.naturalHeight, sh = Math.min(T.naturalHeight - row, len / rep * T.naturalHeight);
+        g.save(); g.translate(m.x, m.y); g.rotate(Math.atan2(b.x - a.x, b.y - a.y));
+        g.drawImage(T, 0, row, T.naturalWidth, Math.max(1, sh), -w * s / 2, -len * s / 2 - 1, w * s, len * s + 2);
+        g.restore(); v += len;
+      }
+    } else {
+      g.beginPath(); left.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); [...right].reverse().forEach(p => g.lineTo(p.x, p.y)); g.closePath();
+      g.fillStyle = '#b3623b'; g.fill();
+    }
+    g.strokeStyle = '#3a291c'; g.lineWidth = Math.max(2, s * 0.045); g.lineJoin = g.lineCap = 'round';
+    for (const side of [left, right]) { g.beginPath(); side.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.stroke(); }
     const cw = A_.crown, ch = cw * TREE.crown.naturalHeight / TREE.crown.naturalWidth, c = toScreen(tx - 0.1, ty - 0.15);
     g.save(); g.translate(c.x, c.y); g.rotate((tx - PULL.rest[0]) * -0.12); // (leaning as it's pulled)
     g.drawImage(TREE.crown, -cw * s / 2, -ch * s * 0.62, cw * s, ch * s);
