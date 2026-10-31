@@ -27,7 +27,9 @@
   const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy (to)
   const COMBO = 13;                                // a combo: this many m/s more, on the way the friend throws it
   const RABBIT = { run: 16, by: 1.4 };             // landed on, a rabbit runs ahead (at least this fast, m/s) to stand by the next friend
-  const FROG = { keep: 0.16, most: 0.9 };          // each frog landed on: a dive onto the plain ground keeps this much more of its fall, up to most
+  // each frog landed on: a dive onto the plain ground keeps this much more of its fall, up to most — and springs back
+  // at least up m/s (6 m high), more each frog after, however low the dive began
+  const FROG = { keep: 0.16, most: 0.9, up: 16, more: 3 };
   const CAM = { metres: 7, least: 0.56 };          // the screen's height in metres on the ground; drawn smaller as the fox climbs, down to this of it; above, an arrow
   // stars: a column every step m, a chance in each band m — more the higher, and none above what the screen shows zoomed out
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
@@ -40,7 +42,7 @@
     f.vx = v * Math.cos(a); f.vy = v * Math.sin(a);
   };
   // the friends — h: how high it stands, m; w: how often; hit: what it does to the fox (and the fox's pose after);
-  // the same words go on the start card
+  // (say: what it does, in words — for whoever reads this)
   const FRIENDS = {
     rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
     frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
@@ -59,7 +61,7 @@
   // its tails and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
   let TAILS = 1, best = 0, opts = {};
 
-  // the layer: canvas, counters along the top, a hint at the bottom, the start and end cards
+  // the layer: canvas, counters along the top, the end card (no instructions: it's found out by playing)
   const layer = document.createElement('div');
   layer.className = 'fl'; layer.hidden = true;
   layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
@@ -67,15 +69,6 @@
       <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸 ×<span data-k="frogs">0</span></span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
-    <div class="fl-hint" data-k="hint"></div>
-    <div class="fl-card" data-k="start"><div>
-      <h1>🦊 小狐飛多遠</h1>
-      <p>往後拉小狐，放開就彈出去！拉越遠飛越快，往哪拉就往反方向飛</p>
-      <ul class="fl-friends" data-k="friends"></ul>
-      <p>⭐ 星星飛越高越多！每撿 <b data-k="superN">10</b> 顆，下一隻朋友 → <b>SUPER BOUNCE</b> 飛超遠！</p>
-      <p>往上飛時點：用一條尾巴斜斜往上衝 🔥　往下掉時點：斜斜往下俯衝（不限次數）<br>俯衝撲到朋友：彈得更遠；撲到 🦔 會把牠撲飛，還像 🍄 一樣彈超高！<br>沒落地又碰到下一隻朋友：<b>COMBO</b> 彈更遠！</p>
-      <button data-k="go">開始！</button>
-    </div></div>
     <div class="fl-card" data-k="end" hidden><div>
       <h1 data-k="endTitle">飛好遠！</h1>
       <div class="fl-big"><span data-k="final">0</span> m</div>
@@ -136,7 +129,7 @@
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
     tails: TAILS, combo: 0, frogs: 0, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
-    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, passedBest: !best, hint: '往後拉小狐，放開就彈出去！',
+    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, passedBest: !best,
   });
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
@@ -182,7 +175,7 @@
     S.pull = { x: 0, y: 0 };
     if (v.power * PULL.max < PULL.least) return; // (hardly pulled: back on the tree)
     Object.assign(S.fox, { vx: v.vx, vy: v.vy });
-    S.phase = 'fly'; S.hint = S.ready ? '✨ 碰到下一隻動物 → SUPER BOUNCE！' : '往上飛時點：尾巴往上衝　往下掉時點：俯衝';
+    S.phase = 'fly';
     SFX.big(); dust(S.fox.x, S.fox.y, 6);
     if (v.power > 0.9) pop('超強！', S.fox.x + 1, S.fox.y + 2, '#ffe14d');
   }
@@ -200,7 +193,7 @@
       SFX.dive(); return;
     }
     if (S.tails <= 0) return; // rising (or rolling): up at a slant, a tail each
-    S.tails--; if (!S.ready) S.hint = '';
+    S.tails--;
     f.vx += DASH.up[0]; f.vy = Math.max(f.vy, 0) + DASH.up[1]; f.dive = false;
     f.glide = f.ride = 0; f.hops = 0; f.still = 0; f.dash = 0.5; f.act = null; f.spin = 0;
     SFX.dash(); hud();
@@ -228,7 +221,7 @@
     if (S.ready || a.bunny) { // a super bounce (the stars full), or a bunny bounce (a rabbit ran here first): as strong
       const bunny = a.bunny; // (the bunny's first: the stars keep for the next)
       f.vy = SUPER.vy; f.vx = Math.max(f.vx, 18) + SUPER.vx; f.rainbow = 2.2; f.spin = 0;
-      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; S.hint = ''; }
+      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
       S.shake = 0.5; act('joy', 1.2); SFX.super();
       pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
       return;
@@ -291,7 +284,7 @@
       f.y = 0; f.dive = false; S.combo = 0;
       if (f.vy < 0) {
         if (dived && S.frogs > 0 && -f.vy > 3) { // a dive onto the ground, after frogs: bounced back up the higher, the more frogs
-          f.vy = -f.vy * Math.min(FROG.most, GROUND.keep + FROG.keep * S.frogs); f.vx *= 0.95;
+          f.vy = Math.max(-f.vy * Math.min(FROG.most, GROUND.keep + FROG.keep * S.frogs), FROG.up + FROG.more * (S.frogs - 1)); f.vx *= 0.95;
           SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
         }
         else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
@@ -309,7 +302,6 @@
       if (!S.ready && ++S.meter >= SUPER.stars) {
         S.ready = true; SFX.ready();
         pop('SUPER BOUNCE 準備好！', f.x + 2, f.y + 3, '#ffe14d', 0.9);
-        S.hint = '✨ 碰到下一隻動物 → SUPER BOUNCE！';
       }
     }
     // past the farthest
@@ -331,9 +323,9 @@
           k.used = k.kick = true; k.t = 0; k.vy = 9; a.knock = null;
           SFX.boing(); dust(k.x, 0.2, 6); pop('撞飛！', k.x, FRIENDS[k.kind].h + 1.2, '#ffb3d9', 0.6);
         }
-        if (a.x >= to) { a.runTo = null; a.t = 0; a.there = true; }
+        if (a.x >= to) { a.there = a.runTo; a.runTo = null; a.t = 0; }
       }
-      else if (a.there) a.y = Math.abs(Math.sin(a.t * 4)) * 0.35 * Math.exp(-a.t * 0.3);
+      else if (a.there) a.y = a.there.bunny ? Math.abs(Math.sin(a.t * 5)) * 0.7 : 0; // (hopping by its friend while the bunny bounce waits there)
       else if (a.kind === 'rabbit' || a.kind === 'squirrel') a.y = a.t < 0.5 ? Math.sin(a.t / 0.5 * Math.PI) * 0.8 : 0;          // a hop of its own
       else if (a.kind === 'frog') { a.x += 4 * dt; a.y = Math.abs(Math.sin(a.t * 5)) * 0.8; }       // off hopping
       else if (a.kind === 'owl') {
@@ -462,11 +454,6 @@
   function drawFriend(a, s) {
     const fr = FRIENDS[a.kind], p = toScreen(a.x, a.y), sz = s * fr.h * 1.15, t = a.t;
     g.save(); g.translate(p.x, p.y);
-    if (a.bunny && !a.used) { // (a rabbit's waiting by it: a bunny bounce — a pink glow round its feet)
-      const k = 0.6 + Math.sin(S.t * 8) * 0.4, rg = g.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.6);
-      rg.addColorStop(0, `rgba(255, 150, 210, ${0.55 * k + 0.2})`); rg.addColorStop(1, 'rgba(255, 150, 210, 0)');
-      g.fillStyle = rg; g.beginPath(); g.ellipse(0, 0, s * 1.6, s * 0.7, 0, 0, Math.PI * 2); g.fill();
-    }
     if (a.kick) { g.translate(0, -sz * 0.4); g.rotate(t * 14); g.translate(0, sz * 0.4); } // (tumbling away)
     if (art(a.kind, 'idle')) { drawArt(a, s, t); g.restore(); return; } // (its own picture, once there)
     if (fr.draw) { fr.draw(a, s, t); g.restore(); return; } // (drawn, not an emoji)
@@ -626,13 +613,12 @@
     const el = $('tails');
     if (el.children.length !== TAILS) el.innerHTML = '<i>🔥</i>'.repeat(TAILS);
     [...el.children].forEach((c, i) => c.classList.toggle('used', i >= S.tails));
-    $('hint').textContent = S.hint;
   }
 
   function end() {
     S.phase = 'done'; S.t = 0;
     const d = Math.floor(S.fox.x), isBest = d > best;
-    S.newBest = isBest; S.hint = '';
+    S.newBest = isBest;
     // home with it: its stars and its farthest — to the pet that opened it, else kept here
     if (opts.onEnd) opts.onEnd({ dist: d, stars: S.got, best: Math.max(best, d) });
     else try { localStorage.setItem('ipet-fling-best', Math.max(best, d)); } catch (e) {}
@@ -645,11 +631,8 @@
   }
   function start() {
     S = fresh(); spawn(); hud();
-    $('start').hidden = $('end').hidden = true;
+    $('end').hidden = true;
   }
-  // the start card's list of friends, from FRIENDS
-  $('friends').innerHTML = KINDS.map(k => `<li><b>${FRIENDS[k].e}</b>${FRIENDS[k].say}</li>`).join('');
-  $('superN').textContent = SUPER.stars;
   // before the fling: drag anywhere to pull the fox back, let go to fling it; after: a tap anywhere (but on the
   // cards and buttons) is the one control. Space too (on the tree: a fling pulled 3/4 back at 45°)
   layer.addEventListener('pointerdown', e => {
@@ -665,7 +648,6 @@
     e.preventDefault();
     if (S?.phase === 'aim') { const r = PULL.max * 0.75 / Math.SQRT2; S.pull = { x: -r, y: -r }; letGo(); } else tap();
   });
-  $('go').addEventListener('click', start);
   $('again').addEventListener('click', start);
   $('home').addEventListener('click', close);
   $('close').addEventListener('click', close);
@@ -689,8 +671,7 @@
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
     resize();
-    S = fresh(); spawn(); hud(); S.phase = 'idle';
-    $('start').hidden = false; $('end').hidden = true;
+    start(); // (straight onto the tree, to be pulled back)
     cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop);
   }
   function close() {

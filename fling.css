@@ -32,8 +32,6 @@
 .fl-tails i.used { opacity: .25; transform: scale(.8); filter: grayscale(1); }
 .fl-x { pointer-events: auto; border: 0; width: 38px; height: 38px; border-radius: 50%; background: #ffffffd9;
   color: var(--fl-ink); font-size: 18px; font-weight: 900; flex: none; }
-.fl-hint { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center;
-  font-weight: 800; font-size: 17px; color: #fff; text-shadow: 0 2px 4px #0006; pointer-events: none; }
 .fl-card { position: absolute; inset: 0; display: grid; place-items: center; background: #0003; }
 .fl-card[hidden] { display: none; }
 .fl-card > div { background: var(--fl-card); border-radius: 22px; padding: 18px 22px; width: min(92%, 640px); text-align: center;
@@ -44,6 +42,3 @@
 .fl-card button { margin: 10px 6px 0; padding: 12px 24px; font-size: 18px; font-weight: 800; border: 0; border-radius: 999px;
   background: var(--fl-accent); color: #fff; }
 .fl-card button.fl-ghost { background: #f1e7dc; color: var(--fl-ink); }
-.fl-friends { list-style: none; padding: 0; margin: 4px 0 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px 10px;
-  text-align: left; color: #7a6a5e; font-size: 15px; }
-.fl-friends b { font-size: 19px; margin-right: 5px; }
