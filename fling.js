@@ -37,6 +37,7 @@
     bgm?.pause(); bgm = null; if (!layer.hidden) music();
   }
   const G = 20;                        // gravity, m/s²
+  const PACE = +params.get('pace') || 0.8; // the whole game played this much slower than real time (easier on young eyes)
   // the fling: the fox pulled back on the little tree's top (dragged from anywhere), let go to fly the other way —
   // how far it's pulled the speed (min..max m/s), the way it's pulled the angle (within deg, up and to the right)
   const PULL = { rest: [0, 2.4], max: 2.6, least: 0.35, deg: [5, 80] };
@@ -455,7 +456,7 @@
     S.cam.x = cx;
     const s = S.cam.s;
     g.save();
-    if (S.shake > 0) g.translate((Math.random() - 0.5) * S.shake * 24, (Math.random() - 0.5) * S.shake * 24);
+    if (S.shake > 0) g.translate((Math.random() - 0.5) * S.shake * 12, (Math.random() - 0.5) * S.shake * 12); // (a gentle shake)
     // sky, hills far and near (moving less than the ground)
     const sky = g.createLinearGradient(0, 0, 0, ground());
     sky.addColorStop(0, LOOK.sky[0]); sky.addColorStop(1, LOOK.sky[1]);
@@ -984,7 +985,7 @@
 
   function hud() {
     $('dist').textContent = Math.max(0, Math.floor(S.fox.x));
-    $('speed').textContent = S.phase === 'sky' ? Math.round(SKY.speed * 3.6) : S.phase === 'fly' ? Math.round(Math.hypot(S.fox.vx, S.fox.vy) * 3.6) : 0; // (how fast it flies, km/h)
+    $('speed').textContent = Math.round((S.phase === 'sky' ? SKY.speed : S.phase === 'fly' ? Math.hypot(S.fox.vx, S.fox.vy) : 0) * 3.6 * PACE); // (how fast it flies, km/h)
     $('stars').textContent = S.got;
     $('meterBar').style.width = `${(S.ready ? 1 : S.meter / SUPER.stars) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
@@ -1039,7 +1040,7 @@
   let raf = 0, last = 0;
   function loop(now) {
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0)); last = now;
-    if (S) { step(dt); draw(dt); }
+    if (S) { step(dt * PACE); draw(dt * PACE); }
     raf = requestAnimationFrame(loop);
   }
   // open: the layer over everything, landscape, a fresh run waiting on the start card.
