@@ -648,6 +648,7 @@
       const u = (sky.t / SKY.hop) % 1;
       lift = Math.sin(Math.PI * u) * 0.45; im = hops[Math.floor(u * hops.length)];
     }
+    if (caped()) im = CAPED.back[Math.floor(sky.t * 12) % 3]; // (Halloween: in its cape, from behind, the cape flapping)
     const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
     if (sky.pop < 1.4) smoke(project(0, -sky.z / ZV), sky.pop); // (a cartoon burst of smoke where it popped out)
     if (sky.leap > SPLASH) { // (and where it dives into the sea of cloud below)
@@ -808,6 +809,16 @@
     g.beginPath(); g.arc(-0.37 * s, 0.03 * s, 0.025 * s, 0, Math.PI * 2); g.fill(); // nostril
     g.restore();
   }
+  // on Halloween night the fox wears its vampire cape — GPT's V01, the fox drawn again with it: leaping (A, three
+  // frames of the cape streaming), diving (B, two), crouched on the tree (C), and from behind, bounding (D, three);
+  // each fitted over the frame it stands for (same size, same place in the 480px square). The rest (rolling,
+  // cheering...) stay its everyday clips.
+  const CAPED = { air: [], dive: [], crouch: [], back: [] };
+  for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 1], ['back', 3]]) for (let i = 0; i < n; i++) {
+    const im = new Image(); im.src = `assets/fox/halloween/${k}_${i}.webp`; CAPED[k][i] = im;
+  }
+  const caped = () => LOOK.night && CAPED.back[2].complete && CAPED.back[2].naturalWidth;
+  const capedOf = (k, t) => CAPED[k][Math.floor(t) % CAPED[k].length];
   function drawFox(f, s) {
     const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25;
     const inAir = S.phase === 'fly' && f.y > 0.05;
@@ -820,6 +831,10 @@
     } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; }
     else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
     else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
+    if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: crouched, diving, or leaping — on the ground too, bounding)
+      const flap = S.t * (8 + Math.hypot(f.vx, f.vy) * 0.4);
+      img = S.phase === 'aim' || S.phase === 'idle' || (S.phase !== 'fly' && f.vx <= 0.5) ? CAPED.crouch[0] : f.dive ? capedOf('dive', flap) : capedOf('air', flap);
+    }
     g.save(); g.translate(p.x, p.y - size * 0.45); g.rotate(rot);
     if (S.ready && S.phase === 'fly') { // a golden glow while a super bounce is waiting
       const k = 0.5 + Math.sin(S.t * 10) * 0.5, rg = g.createRadialGradient(0, 0, size * 0.1, 0, 0, size * 0.7);
