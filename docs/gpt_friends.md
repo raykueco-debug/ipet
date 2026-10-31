@@ -33,4 +33,10 @@ F02 驗收通過。請交 F03，格式相同，給程式交替用的第二格：
 C01 只畫披風本身，疊在小狐身上不自然，所以改請 GPT 連小狐一起重畫：附上 `assets/source/V01_reference.png`（遊戲裡的四個姿勢 A 飛躍、B 下撲、C 蹲著、D 背面跳），
 3×3 綠底：1–3 是 A，披風飄動三幀；4–5 是 B，兩幀；6 是 C；7–9 是 D 背面，三幀。
 去背用 `greenkey.py --any-colour`。每格縮放成跟對應的遊戲幀一樣高，放在 480px 方格裡的同一個位置：A 對齊頭頂和右邊，B、C 對齊腳底和右邊，D 對齊腳底和頭的中心；同一組的幾幀再以頭的位置對齊。
-存成 air_0..2、dive_0..1、crouch_0、back_0..2（.webp）。翻滾、歡呼等其他動作還是用一般的動畫。
+存成 air_0..2、dive_0..1、crouch_0（.webp），用在側面的姿勢。
+
+會動的動畫（雲端蹦跳、結束時歡呼和開心）要跟沒有披風的版本同樣的幀數和動作，所以改成用 WAN 重做：
+- V02：附上 `assets/source/V02_reference.png`（cheer、happy、back_crouch、back_air 這四張 WAN 起始圖，2×2 排好），請 GPT 照同樣的格子、同樣的位置畫上披風。
+- 每格對齊原圖（耳尖和腳底同高、頭在同一個中心）後存到 `assets/fox/wan_in/halloween/`。
+- `python tools/wan_cape.py`：用原本 clip 的提示詞加上披風的描述，同樣的長度、seed 和結尾圖重跑 WAN，輸出到 `assets/fox/clips_halloween/`。原本有抽幀的 clip 會抽同樣的那幾幀。
+- 翻滾、被甩飛等其他動作還是一般的動畫。

@@ -128,13 +128,16 @@
   // on the branch; stretched out diving), roll (tumbling off a friend), joy (flung high), ouch, cheer / happy (at the end)
   const CLIPS = { run: 'walk_r_loop_run', pounce: 'walk_r_to_pounce_r', roll: 'roll_loop', joy: 'jump_joy_loop',
     ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', up: 'back_crouch_to_back_air', down: 'back_air_to_back_crouch' };
-  const A = {};
-  for (const [k, clip] of Object.entries(CLIPS)) (async () => {
-    const r = await fetch(`assets/fox/clips/${clip}/meta.json`).catch(() => null);
+  // (on Halloween, in its cape: the same clips made again with it — tools/wan_cape.py, assets/fox/clips_halloween —
+  // frame for frame as the plain ones, where they're there)
+  const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'];
+  for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
+    const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return;
     const m = await r.json();
-    A[k] = m.frames.map(f => { const im = new Image(); im.src = `assets/fox/clips/${clip}/${f}?v=${m.rev || 1}`; return im; });
+    into[k] = m.frames.map(f => { const im = new Image(); im.src = `assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`; return im; });
   })();
+  const A = new Proxy(PLAIN, { get: (o, k) => (LOOK.night && CAPED_CLIPS[k]) || o[k] });
   const AIR = +params.get('air') || 10, DIVE = 7, CROUCH = [0, 4]; // (frames: run's stretched, pounce's dive, pounce's crouch)
   const frameOf = (k, t, fps = 16) => A[k]?.length ? A[k][Math.floor(t * fps) % A[k].length] : null;
 
@@ -648,7 +651,6 @@
       const u = (sky.t / SKY.hop) % 1;
       lift = Math.sin(Math.PI * u) * 0.45; im = hops[Math.floor(u * hops.length)];
     }
-    if (caped()) im = CAPED.back[Math.floor(sky.t * 12) % 3]; // (Halloween: in its cape, from behind, the cape flapping)
     const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
     if (sky.pop < 1.4) smoke(project(0, -sky.z / ZV), sky.pop); // (a cartoon burst of smoke where it popped out)
     if (sky.leap > SPLASH) { // (and where it dives into the sea of cloud below)
@@ -809,16 +811,19 @@
     g.beginPath(); g.arc(-0.37 * s, 0.03 * s, 0.025 * s, 0, Math.PI * 2); g.fill(); // nostril
     g.restore();
   }
-  // on Halloween night the fox wears its vampire cape — GPT's V01, the fox drawn again with it: leaping (A, three
-  // frames of the cape streaming), diving (B, two), crouched on the tree (C), and from behind, bounding (D, three);
-  // each fitted over the frame it stands for (same size, same place in the 480px square). The rest (rolling,
-  // cheering...) stay its everyday clips.
-  const CAPED = { air: [], dive: [], crouch: [], back: [] };
-  for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 1], ['back', 3]]) for (let i = 0; i < n; i++) {
+  // on Halloween night the fox wears its vampire cape — side on, GPT's V01, the fox drawn again with it: leaping
+  // (A, three frames of the cape streaming), diving (B, two), crouched on the tree (C); each fitted over the frame it
+  // stands for (same size, same place in the 480px square). Bounding on the clouds and cheering at the end, its clips
+  // made again in the cape (A, above); rolling and the rest stay its everyday ones.
+  const CAPED = { air: [], dive: [], crouch: [] };
+  for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 3]]) for (let i = 0; i < n; i++) { // (crouch_1, _2: V03, the cape blowing)
     const im = new Image(); im.src = `assets/fox/halloween/${k}_${i}.webp`; CAPED[k][i] = im;
   }
-  const caped = () => LOOK.night && CAPED.back[2].complete && CAPED.back[2].naturalWidth;
-  const capedOf = (k, t) => CAPED[k][Math.floor(t) % CAPED[k].length];
+  const caped = () => LOOK.night && CAPED.crouch[0].complete && CAPED.crouch[0].naturalWidth;
+  const capedOf = (k, t) => { // (its frames in turn — never still, the cape always streaming; crouched with only the one, leaning forward)
+    const fr = CAPED[k].filter(im => im.complete && im.naturalWidth);
+    return fr.length > 1 ? fr[Math.floor(t) % fr.length] : k === 'crouch' ? capedOf('dive', t) : fr[0];
+  };
   function drawFox(f, s) {
     const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25;
     const inAir = S.phase === 'fly' && f.y > 0.05;
@@ -831,9 +836,11 @@
     } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; }
     else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
     else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
-    if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: crouched, diving, or leaping — on the ground too, bounding)
-      const flap = S.t * (8 + Math.hypot(f.vx, f.vy) * 0.4);
-      img = S.phase === 'aim' || S.phase === 'idle' || (S.phase !== 'fly' && f.vx <= 0.5) ? CAPED.crouch[0] : f.dive ? capedOf('dive', flap) : capedOf('air', flap);
+    if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: diving, or leaping while well up; else crouched, its feet on the ground)
+      const v = Math.hypot(f.vx, f.vy), flap = S.t * (8 + v * 0.4), up = S.phase === 'fly' && f.y > 0.05 && v > 8; // (slowing down, hopping along: crouched, all the way — not a frame each hop)
+      const going = S.phase === 'fly' && v > 0.8; // (sliding or hopping along low: leaning forward, the cape streaming behind)
+      img = f.dive && up ? capedOf('dive', flap) : up && f.ride <= 0 ? capedOf('air', flap) : going ? capedOf('dive', flap) : capedOf('crouch', flap);
+      if (!up) rot = 0;
     }
     g.save(); g.translate(p.x, p.y - size * 0.45); g.rotate(rot);
     if (S.ready && S.phase === 'fly') { // a golden glow while a super bounce is waiting
