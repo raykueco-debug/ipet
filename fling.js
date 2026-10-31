@@ -1,7 +1,8 @@
 /* 小狐飛多遠 — a launch-and-bounce game (a prototype).
    The fox is flung off a bent branch (tap when the swing is high: the harder, the farther) and flies to the right.
-   On the ground lie forest friends, and landing on one throws it on its own way: a rabbit bounces it, a bear sends it
-   high, a frog hops it along, an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
+   On the ground lie forest friends, and landing on one throws it on its own way: a rabbit bounces it (and runs ahead past two
+   friends, knocking the first away, stopping by the second: off that one, a bunny bounce), a bear sends it high, a frog hops it along (and its dives bounce
+   higher off the ground after), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
    a hedgehog only slows it. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
    dive down at a slant (onto the next friend), free. It bounces on the plain ground less and less, rolls, and stops: that's how far.
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
@@ -21,9 +22,15 @@
   const DASH = { up: [6, 8], down: [2, -16] };     // up: a tail's dash [vx +, vy +]; down: a dive, as many as it likes [vx + (once a dive), vy at least]
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
   const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
-  const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy
-  const STARS = { step: 4, band: 2, top: 40 };     // stars: a column every step m, a chance in each band m up to top — more the higher
-  const CAM = { metres: 7, least: 0.7 };           // the screen's height in metres on the ground; drawn smaller as the fox climbs, down to this of it; above, an arrow
+  // how hard each extra throw is, over a tail's dash (DASH.up, ~10 m/s): a super bounce (stars) = a bunny bounce (the
+  // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail
+  const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy (to)
+  const COMBO = 13;                                // a combo: this many m/s more, on the way the friend throws it
+  const RABBIT = { run: 16, by: 1.4 };             // landed on, a rabbit runs ahead (at least this fast, m/s) to stand by the next friend
+  const FROG = { keep: 0.16, most: 0.9 };          // each frog landed on: a dive onto the plain ground keeps this much more of its fall, up to most
+  const CAM = { metres: 7, least: 0.56 };          // the screen's height in metres on the ground; drawn smaller as the fox climbs, down to this of it; above, an arrow
+  // stars: a column every step m, a chance in each band m — more the higher, and none above what the screen shows zoomed out
+  const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
   // the fox's own speed, at least min, and add more
@@ -35,8 +42,8 @@
   // the friends — h: how high it stands, m; w: how often; hit: what it does to the fox (and the fox's pose after);
   // the same words go on the start card
   const FRIENDS = {
-    rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
-    frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
+    rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
+    frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
     mushroom: { e: '🍄', h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
     bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'big'; } },
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
@@ -58,6 +65,7 @@
   layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
     <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
       <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
+      <span class="fl-pill" data-k="frogPill" hidden>🐸 ×<span data-k="frogs">0</span></span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
     <div class="fl-hint" data-k="hint"></div>
     <div class="fl-card" data-k="start"><div>
@@ -65,7 +73,7 @@
       <p>往後拉小狐，放開就彈出去！拉越遠飛越快，往哪拉就往反方向飛</p>
       <ul class="fl-friends" data-k="friends"></ul>
       <p>⭐ 星星飛越高越多！每撿 <b data-k="superN">10</b> 顆，下一隻朋友 → <b>SUPER BOUNCE</b> 飛超遠！</p>
-      <p>往上飛時點：用一條尾巴斜斜往上衝 🔥　往下掉時點：斜斜往下俯衝（不限次數）<br>俯衝撲到朋友：彈得更遠；撲到 🦔 會把牠撲飛，還像 🍄 一樣彈超高！</p>
+      <p>往上飛時點：用一條尾巴斜斜往上衝 🔥　往下掉時點：斜斜往下俯衝（不限次數）<br>俯衝撲到朋友：彈得更遠；撲到 🦔 會把牠撲飛，還像 🍄 一樣彈超高！<br>沒落地又碰到下一隻朋友：<b>COMBO</b> 彈更遠！</p>
       <button data-k="go">開始！</button>
     </div></div>
     <div class="fl-card" data-k="end" hidden><div>
@@ -127,20 +135,20 @@
   const fresh = () => ({
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
-    tails: TAILS, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
+    tails: TAILS, combo: 0, frogs: 0, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
     fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, passedBest: !best, hint: '往後拉小狐，放開就彈出去！',
   });
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
     const ahead = S.fox.x + 60;
     while (S.nextFriend < ahead) {
-      S.friends.push({ x: S.nextFriend, x0: S.nextFriend, y: 0, kind: pickKind(), used: false, t: 0, carry: false });
+      S.friends.push({ x: S.nextFriend, x0: S.nextFriend, y: 0, kind: pickKind(), used: false, t: 0, carry: false, bunny: false });
       S.nextFriend += 6 + Math.random() * 12 + Math.min(10, S.nextFriend / 80); // (thinning out farther on)
     }
     while (S.nextStar < ahead) { // few down low, thick up high
-      for (let y = 2; y < STARS.top; y += STARS.band) {
-        if (Math.random() < 0.015 + 0.12 * (y / STARS.top) ** 1.2)
-          S.stars.push({ x: S.nextStar + Math.random() * STARS.step, y: y + Math.random() * STARS.band, got: false });
+      for (let y = STARS.low; y < STARS.top; y += STARS.band) {
+        if (Math.random() < 0.04 + 0.16 * (y / STARS.top) ** 1.2)
+          S.stars.push({ x: S.nextStar + Math.random() * STARS.step, y: Math.min(STARS.top, y + Math.random() * STARS.band), got: false });
       }
       S.nextStar += STARS.step;
     }
@@ -198,9 +206,15 @@
     SFX.dash(); hud();
   }
 
+  function comboUp(a, fr) { // onto a friend from a friend, the ground not touched between: COMBO m/s more, on the way it's thrown
+    const f = S.fox, v = Math.hypot(f.vx, f.vy) || 1;
+    f.vx += f.vx / v * COMBO; f.vy += f.vy / v * COMBO; S.shake = Math.max(S.shake, 0.2);
+    pop(`COMBO ×${S.combo}!`, a.x - 0.5, fr.h + 3.2, '#7cf0ff', 0.75); chime(780, 2, 70);
+  }
   function landOn(a) { // onto a friend: its own throw, or a super bounce when the stars are full
     const f = S.fox, fr = FRIENDS[a.kind];
     const dived = f.dive; // (diving onto it: a hedgehog knocked away, any other friend's throw the stronger)
+    const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0;
     dust(a.x, 0.2, 5);
     if (dived && a.kind === 'hedgehog') {
@@ -208,17 +222,26 @@
       FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; // (off it as off a mushroom dived onto)
       SFX.big(); act('joy', 0.8); S.shake = 0.2;
       pop('撲飛！', a.x, fr.h + 1.5, '#ffe14d');
+      if (combo) comboUp(a, fr);
       return;
     }
-    if (S.ready) {
+    if (S.ready || a.bunny) { // a super bounce (the stars full), or a bunny bounce (a rabbit ran here first): as strong
+      const bunny = a.bunny; // (the bunny's first: the stars keep for the next)
       f.vy = SUPER.vy; f.vx = Math.max(f.vx, 18) + SUPER.vx; f.rainbow = 2.2; f.spin = 0;
-      S.ready = false; S.meter = 0; S.shake = 0.5; S.hint = '';
-      act('joy', 1.2); SFX.super();
-      pop('SUPER BOUNCE!', a.x, fr.h + 2.5, '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
+      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; S.hint = ''; }
+      S.shake = 0.5; act('joy', 1.2); SFX.super();
+      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
       return;
     }
     const s = fr.hit(f); SFX[s]?.();
     if (dived && s !== 'ouch') { f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; pop('強力！', a.x + 1, fr.h + 2.4, '#ffb347', 0.6); }
+    if (combo && s !== 'ouch') comboUp(a, fr);
+    if (s === 'ouch') S.combo = 0; // (tripped: no combo on from it)
+    if (a.kind === 'rabbit') { // off ahead past two friends: the first knocked flying on the way, by the second it stops — a bunny bounce off that one
+      const [k, b] = S.friends.filter(o => !o.used && !o.bunny && o.x > a.x + 2);
+      if (b) { b.bunny = true; a.runTo = b; a.knock = k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
+    }
+    if (a.kind === 'frog') { S.frogs++; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
     if (s === 'refill') { // a tail's dash back (no more than it has tails)
       const back = S.tails < TAILS; if (back) S.tails++;
       pop(back ? '+1 🔥' : '彈！', a.x, fr.h + 1.5, '#ffb347'); f.spin = 1; act('roll', 0.5); hud();
@@ -264,9 +287,14 @@
     }
     // the plain ground
     if (f.y <= 0) {
-      f.y = 0; f.dive = false;
+      const dived = f.dive;
+      f.y = 0; f.dive = false; S.combo = 0;
       if (f.vy < 0) {
-        if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
+        if (dived && S.frogs > 0 && -f.vy > 3) { // a dive onto the ground, after frogs: bounced back up the higher, the more frogs
+          f.vy = -f.vy * Math.min(FROG.most, GROUND.keep + FROG.keep * S.frogs); f.vx *= 0.95;
+          SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
+        }
+        else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
         else if (-f.vy > 3) { f.vy = -f.vy * GROUND.keep; f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
         else f.vy = 0;
       }
@@ -295,6 +323,17 @@
       if (!a.used) continue;
       a.t += dt;
       if (a.kick) { a.x += 12 * dt; a.vy -= G * dt; a.y = Math.max(0, a.y + a.vy * dt); }           // knocked away, tumbling
+      else if (a.runTo) { // running ahead in hops, to stand by the next friend (then a hop of its own there, waving)
+        const to = a.runTo.x - RABBIT.by;
+        a.x = Math.min(to, a.x + a.speed * dt); a.y = Math.abs(Math.sin(a.t * 9)) * 0.5;
+        const k = a.knock;
+        if (k && !k.used && a.x >= k.x - 0.6) { // bumped into: knocked flying (gone, not to be landed on)
+          k.used = k.kick = true; k.t = 0; k.vy = 9; a.knock = null;
+          SFX.boing(); dust(k.x, 0.2, 6); pop('撞飛！', k.x, FRIENDS[k.kind].h + 1.2, '#ffb3d9', 0.6);
+        }
+        if (a.x >= to) { a.runTo = null; a.t = 0; a.there = true; }
+      }
+      else if (a.there) a.y = Math.abs(Math.sin(a.t * 4)) * 0.35 * Math.exp(-a.t * 0.3);
       else if (a.kind === 'rabbit' || a.kind === 'squirrel') a.y = a.t < 0.5 ? Math.sin(a.t / 0.5 * Math.PI) * 0.8 : 0;          // a hop of its own
       else if (a.kind === 'frog') { a.x += 4 * dt; a.y = Math.abs(Math.sin(a.t * 5)) * 0.8; }       // off hopping
       else if (a.kind === 'owl') {
@@ -423,6 +462,11 @@
   function drawFriend(a, s) {
     const fr = FRIENDS[a.kind], p = toScreen(a.x, a.y), sz = s * fr.h * 1.15, t = a.t;
     g.save(); g.translate(p.x, p.y);
+    if (a.bunny && !a.used) { // (a rabbit's waiting by it: a bunny bounce — a pink glow round its feet)
+      const k = 0.6 + Math.sin(S.t * 8) * 0.4, rg = g.createRadialGradient(0, 0, s * 0.2, 0, 0, s * 1.6);
+      rg.addColorStop(0, `rgba(255, 150, 210, ${0.55 * k + 0.2})`); rg.addColorStop(1, 'rgba(255, 150, 210, 0)');
+      g.fillStyle = rg; g.beginPath(); g.ellipse(0, 0, s * 1.6, s * 0.7, 0, 0, Math.PI * 2); g.fill();
+    }
     if (a.kick) { g.translate(0, -sz * 0.4); g.rotate(t * 14); g.translate(0, sz * 0.4); } // (tumbling away)
     if (art(a.kind, 'idle')) { drawArt(a, s, t); g.restore(); return; } // (its own picture, once there)
     if (fr.draw) { fr.draw(a, s, t); g.restore(); return; } // (drawn, not an emoji)
@@ -434,7 +478,7 @@
     else if (a.kind === 'boar') g.translate(0, -Math.abs(Math.sin(t * 16)) * s * 0.12); // trotting
     g.textAlign = 'center'; g.textBaseline = 'bottom';
     g.font = `${Math.round(sz)}px sans-serif`;
-    if (a.kind === 'frog' || a.kind === 'boar' || a.kind === 'owl') { if (a.used) g.scale(-1, 1); } // (turned to go right, as the fox)
+    if (a.kind === 'frog' || a.kind === 'boar' || a.kind === 'owl' || a.runTo) { if (a.used) g.scale(-1, 1); } // (turned to go right, as the fox)
     g.fillText(fr.e, 0, sz * 0.12);
     g.restore();
   }
@@ -479,7 +523,7 @@
       g.rotate(sw);
     }
     else if (k === 'boar' && moving) g.translate(0, -Math.abs(Math.sin(t * 16)) * s * 0.1);
-    if (a.used && (k === 'frog' || k === 'boar' || k === 'owl')) g.scale(-1, 1);      // (turned to go right, as the fox)
+    if (a.used && (k === 'frog' || k === 'boar' || k === 'owl' || a.runTo)) g.scale(-1, 1); // (turned to go right, as the fox)
     const im = art(k, n), feet = ((ART_FEET[k + '_' + n] ?? 256) - 256) / 512 * side;
     g.drawImage(im, -side / 2 - feet, -side, side, side);
   }
@@ -578,6 +622,7 @@
     $('stars').textContent = S.got;
     $('meterBar').style.width = `${(S.ready ? 1 : S.meter / SUPER.stars) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
+    $('frogPill').hidden = !S.frogs; $('frogs').textContent = S.frogs;
     const el = $('tails');
     if (el.children.length !== TAILS) el.innerHTML = '<i>🔥</i>'.repeat(TAILS);
     [...el.children].forEach((c, i) => c.classList.toggle('used', i >= S.tails));
@@ -657,4 +702,5 @@
     else if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
   }
   window.Fling = { open, close };
+  if (params.has('debug')) Fling.state = () => S; // (?debug: the run, to look at from the console)
 })();

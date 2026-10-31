@@ -19,6 +19,7 @@
   padding: 10px 14px 0;
   pointer-events: none; font-weight: 800; }
 .fl-pill { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; white-space: nowrap; }
+.fl-pill[hidden] { display: none; }
 .fl-dist { font-size: 24px; }
 .fl-stars { display: flex; align-items: center; gap: 6px; }
 .fl-meter { width: 64px; height: 10px; background: #e9dccb; border-radius: 99px; overflow: hidden; }
