@@ -12,6 +12,7 @@ Output: { "<dir>/<clip>": [[x, y, angle, visible], …per frame] } — angle the
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -62,6 +63,14 @@ def main():
     json.dump(out, open(os.path.join(FOX, 'tail_roots.json'), 'w', encoding='utf-8'))
 
 
+SIDE = re.compile(r'^(walk|walk_r|bat|header|leap|pounce|swipe|sniff|rest|sleep|belly|roll|bored|stretch|play_bow|ready|eat)(_r|_far_[lr])?$')
+
+
+def facing(pic):
+    """1 for a picture of it facing us (sitting, standing up), 0 side on or lying down (and from behind: 'over')."""
+    return 0 if SIDE.match(pic) or 'back' in pic else 1
+
+
 def pet(out):
     """The pet's clips made without a tail (assets/fox/clips_notail): each from its start picture's root
     (tools/tail_pics.py: where the tail was on the picture with one), followed through the clip — tracked on the
@@ -78,8 +87,14 @@ def pet(out):
             continue
         x, y, a = pics[start]
         back = 'back' in start
-        out[key] = [[r[0], r[1], round(a + r[2], 1), True] + (['over'] if back else [])
-                    for r in track_slot(load_frames_named(os.path.join(d, clip), meta['frames']), x, y)]
+        rows = track_slot(load_frames_named(os.path.join(d, clip), meta['frames']), x, y)
+        # how much it faces us, frame by frame (from its start picture to its end one): its tails fanned round
+        # behind it then, like the fling's cheer
+        ends = [facing(p) for p in (meta.get('pictures') or [start])]
+        ends = ends if len(ends) == 2 else ends * 2
+        out[key] = [[r[0], r[1], round(a + r[2], 1), True] + (['over'] if back else
+                    [round(ends[0] + (ends[1] - ends[0]) * i / max(1, len(rows) - 1), 2)])
+                    for i, r in enumerate(rows)]
         print(f'{key}: {len(out[key])} frames (from {start})')
 
 

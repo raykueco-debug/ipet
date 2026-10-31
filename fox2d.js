@@ -276,13 +276,17 @@
   function tails(r) {
     const n = tailN, t = performance.now() / 1000, k = 512 / 480;
     const quick = /_loop_run|_loop$|^walk/.test(cur.name) && /walk|run/.test(cur.name);
-    const spread = Math.min(124, 17 * (n - 1)), L = 512 * 0.42 * Math.pow(0.85, Math.floor((n - 1) / 3));
-    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => r[2] - spread / 2 + spread * j / (n - 1));
-    const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - r[2]) - Math.abs(ways[a] - r[2]));
+    // f: how much it faces us (tools/tail_roots.py) — then, the more tails the more so, fanned out wide to both sides
+    // round straight up from behind its hips, bigger, to show past its big head; side on, round the way its own went
+    const f = (typeof r[4] === 'number' ? r[4] : 0) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
+    const mid = mix(r[2], 5), lift = 40 * f;
+    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
+    const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
     for (const j of order) {
       const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
       const sway = quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
-      g.save(); g.translate(r[0] * k, r[1] * k + DROP); g.rotate((ways[j] + sway) * Math.PI / 180);
+      g.save(); g.translate((r[0] - 51 * f) * k, (r[1] + 72 * f - lift) * k + DROP); g.rotate((ways[j] + sway) * Math.PI / 180); // (facing us: from its hips' middle)
       g.drawImage(im, -L / 2, -L, L, L);
       g.restore();
     }

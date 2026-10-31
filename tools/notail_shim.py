@@ -48,6 +48,8 @@ if end:
     setarg('--end', notail(end))
 setarg('--out', nout)
 setarg('--prompt', tailless(arg('--prompt')))
+if os.environ.get('NOTAIL_SEED'):  # (another try at one that grew its tail back: tools/notail_retry.sh)
+    setarg('--seed', os.environ['NOTAIL_SEED'])
 
 sys.argv = [TIVOT] + args
 os.chdir(os.path.dirname(TIVOT))
