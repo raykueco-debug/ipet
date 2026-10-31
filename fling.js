@@ -18,15 +18,22 @@
 (function () {
   const params = new URLSearchParams(location.search);
   // the look: the sunny day (B01), or Halloween night (B03: pumpkins, a dark forest, the moon, now and then bats
-  // flying by far off) — Halloween from mid-October to its day; ?bg=day / ?bg=halloween to pick
+  // flying by far off, its own music) — picked with the 🎃 / ☀️ button by ✕ (kept), else Halloween from mid-October
+  // to its day; ?bg=day / ?bg=halloween to try one
   const LOOKS = {
     day: { dir: 'assets/bg', lip: 0.25, sky: ['#8fd0ff', '#e6f6ff'], soil: '#9b7653', clouds: ['#8fd0ff', '#ffe6f2', '#e9e4ff'] },
-    halloween: { dir: 'assets/bg/halloween', lip: 0.64, tree: { cx: 0.539, cut: 0.326, w: 0.28 }, friends: 'assets/friends/halloween', sky: ['#1b1440', '#4b3a7a'], soil: '#3b2638', clouds: ['#1b1440', '#6a4f96', '#3a2f6e'], night: true },
+    halloween: { music: 'assets/music/Peritune_Magic_Skirmish_loop.m4a', dir: 'assets/bg/halloween', lip: 0.64, tree: { cx: 0.539, cut: 0.326, w: 0.28 }, friends: 'assets/friends/halloween', sky: ['#1b1440', '#4b3a7a'], soil: '#3b2638', clouds: ['#1b1440', '#6a4f96', '#3a2f6e'], night: true },
   };
-  const LOOK = LOOKS[params.get('bg')] || (() => {
+  let LOOK = LOOKS[params.get('bg')] || LOOKS[(() => { try { return localStorage.getItem('ipet-fling-look'); } catch (e) { return null; } })()] || (() => {
     const d = new Date(), m = d.getMonth(), day = d.getDate();
     return m === 9 && day >= 15 ? LOOKS.halloween : LOOKS.day;
   })();
+  function setLook(look) { // (the button: everything the look draws from, loaded afresh)
+    LOOK = look;
+    try { localStorage.setItem('ipet-fling-look', look === LOOKS.halloween ? 'halloween' : 'day'); } catch (e) {}
+    loadBG(); loadTree(); loadFriends(); lookUI(); bats.length = 0;
+    bgm?.pause(); bgm = null; if (!layer.hidden) music();
+  }
   const G = 20;                        // gravity, m/s²
   // the fling: the fox pulled back on the little tree's top (dragged from anywhere), let go to fly the other way —
   // how far it's pulled the speed (min..max m/s), the way it's pulled the angle (within deg, up and to the right)
@@ -63,7 +70,7 @@
   const FRIENDS = {
     rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
     frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
-    mushroom: { e: LOOK.night ? '🎃' : '🍄', h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
+    mushroom: { get e() { return LOOK.night ? '🎃' : '🍄'; }, h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
     bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'big'; } },
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
@@ -86,7 +93,7 @@
       <span class="fl-pill fl-speed">💨 <span data-k="speed">0</span> km/h</span>
       <span class="fl-pill fl-stars" data-k="starPill"><b data-k="starIcon">⭐</b> <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
-      <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
+      <div class="fl-tails" data-k="tails"></div><button class="fl-x fl-look" data-k="look" aria-label="換普通版或萬聖節版">🎃</button><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
     <div class="fl-card" data-k="end" hidden><div>
       <h1 data-k="endTitle">飛好遠！</h1>
       <div class="fl-big"><span data-k="final">0</span> m</div>
@@ -95,8 +102,13 @@
     </div></div></div>
     <div class="fl-upright"><span>📱</span>把手機轉成橫的來玩！<button data-k="close2">回到小狐</button></div>`;
   const $ = k => layer.querySelector(`[data-k="${k}"]`);
-  const STAR = LOOK.night ? '🍬' : '⭐'; // (what's caught along the way: on Halloween night, sweets)
-  if (LOOK.night) { layer.classList.add('fl-night'); $('starIcon').textContent = STAR; }
+  const star = () => LOOK.night ? '🍬' : '⭐'; // (what's caught along the way: on Halloween night, sweets)
+  function lookUI() { // (the counters in the look's colours, and the button showing the other look)
+    layer.classList.toggle('fl-night', !!LOOK.night); $('starIcon').textContent = star();
+    $('look').textContent = LOOK.night ? '☀️' : '🎃';
+  }
+  lookUI();
+  $('look').addEventListener('click', () => setLook(LOOK.night ? LOOKS.day : LOOKS.halloween));
   const STAGE = { w: 800, h: 450 };   // the game's own pixels; the stage is scaled to the screen whole, bars round it where the shape differs
   const stage = layer.querySelector('.fl-stage'), cv = layer.querySelector('canvas'), g = cv.getContext('2d');
   const W = STAGE.w, H = STAGE.h;
@@ -445,7 +457,7 @@
       g.beginPath(); g.ellipse(tx, ty - th * 0.6, th * 0.32, th * 0.42, 0, 0, Math.PI * 2); g.fill();
     }
     // ground
-    if (BG.ground) { g.fillStyle = LOOK.soil; g.fillRect(-20, ground(), W + 40, H); strip(BG.ground, 1, ground() - (H - ground()) * BG_LIP, (H - ground()) * (1 + BG_LIP)); }
+    if (BG.ground) { g.fillStyle = LOOK.soil; g.fillRect(-20, ground(), W + 40, H); strip(BG.ground, 1, ground() - (H - ground()) * LOOK.lip, (H - ground()) * (1 + LOOK.lip)); }
     else {
       g.fillStyle = '#7cc46a'; g.fillRect(-20, ground(), W + 40, H);
       g.fillStyle = '#6ab35a';
@@ -502,6 +514,7 @@
     }
     // the fox
     drawFox(f, s);
+    if (S.fade?.mid === toSky) { const q = toScreen(f.x, f.y + 0.6); smoke({ x: q.x, y: q.y, s: s * 1.6 / LANE() }, S.fade.t * 1.4); } // (up into the clouds: a puff of them)
     for (const a of carriers) drawFriend(a, s);
     // bits: dust, fire, rainbow, confetti, words
     const life = e => e.kind === 'text' ? 1 : e.kind === 'bit' ? 2 : e.kind === 'rain' ? 0.8 : 0.6;
@@ -541,6 +554,7 @@
   }
   // a cartoon puff of smoke: round grey-white clouds with a dark outline, bursting out and up, swelling, then gone
   const SMOKE = Array.from({ length: 9 }, (_, k) => ({ a: k / 9 * Math.PI * 2 + (k % 2) * 0.3, r: 0.8 + (k * 37 % 5) * 0.12, up: 0.5 + (k * 13 % 4) * 0.25 }));
+  const SPLASH = (3.4 + Math.sqrt(3.4 ** 2 + 4 * 6 * 0.9)) / 12; // (s into the leap: down to the sea of cloud, 0.9 lanes below — see the leap's lift)
   function smoke(p, t) {
     const L = LANE() * p.s, k = Math.min(1, t / 0.18), fade = Math.max(0, 1 - Math.max(0, t - 0.35) / 0.9);
     if (fade <= 0) return;
@@ -616,6 +630,9 @@
     }
     const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
     if (sky.pop < 1.4) smoke(project(0, -sky.z / ZV), sky.pop); // (a cartoon burst of smoke where it popped out)
+    if (sky.leap > SPLASH) { // (and where it dives into the sea of cloud below)
+      const q = project(sky.x, SPLASH * SKY.speed / ZV * 0.7); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.9, s: q.s }, sky.leap - SPLASH);
+    }
     g.save(); if (lift < 0) { g.beginPath(); g.rect(0, 0, W, p.y + (sky.leap >= 0 ? LANE() * p.s * 0.9 : 0)); g.clip(); } // (what's inside the cloud, hidden: the road, or the sea below it)
     if (sky.leap < 0 && lift >= 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
     g.save(); g.translate(p.x, p.y - rise); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
@@ -626,7 +643,6 @@
       g.fillStyle = rg; g.beginPath(); g.arc(0, -size * 0.4, size * 0.6, 0, 7); g.fill();
     }
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
-    if (LOOK.night) cape('back', FOX_NECK.back, size, -size * 449 / 480, sky.t * 14); // (seen from behind: over its back)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
     g.restore(); g.restore();
   }
@@ -670,19 +686,22 @@
   // where it's landed on, when its picture differs from the stand-in: x from its feet, height (the giraffe's head is out front)
   const ART_HIT = { giraffe: { cx: -1.2, h: 2.4 } };
   // where its feet are across the 512px square, when not in the middle (the giraffe's head swings the picture's centre about)
-  const ART_FEET = { giraffe_idle: 330, giraffe_hit: LOOK.friends ? 211 : 168 }; // (H02's giraffe stands a little further right)
-  const ART = {};
-  (async () => { // (assets/friends/index.json: the names sliced so far, e.g. ["rabbit_idle", "rabbit_hit"])
+  const ART_FEET = { giraffe_idle: 330, get giraffe_hit() { return LOOK.friends ? 211 : 168; } }; // (H02's giraffe stands a little further right)
+  let ART = {};
+  async function loadFriends() { // (assets/friends/index.json: the names sliced so far, e.g. ["rabbit_idle", "rabbit_hit"])
     // (on Halloween, their costumes from <LOOK.friends>/ where there, over the everyday ones: the mushroom a pumpkin)
-    for (const dir of ['assets/friends', LOOK.friends].filter(Boolean)) {
+    const into = {}, look = LOOK;
+    for (const dir of ['assets/friends', look.friends].filter(Boolean)) {
       const r = await fetch(`${dir}/index.json`).catch(() => null);
       const names = r?.ok ? await r.json() : [];
       await Promise.all(names.map(name => new Promise(done => {
         const [k, n] = name.split('_'), im = new Image();
-        im.onload = () => { (ART[k] ||= {})[n] = im; done(); }; im.onerror = done; im.src = `${dir}/${name}.png`;
+        im.onload = () => { (into[k] ||= {})[n] = im; done(); }; im.onerror = done; im.src = `${dir}/${name}.png`;
       })));
     }
-  })();
+    if (LOOK === look) ART = into; // (all at once, so no friend is half one look and half the other)
+  }
+  loadFriends();
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
   function drawArt(a, s, t) {
@@ -768,29 +787,18 @@
     g.beginPath(); g.arc(-0.37 * s, 0.03 * s, 0.025 * s, 0, Math.PI * 2); g.fill(); // nostril
     g.restore();
   }
-  // on Halloween night the fox wears a vampire cape (GPT's C01: three frames of it streaming in the wind, side on,
-  // and three from behind), its collar at the fox's neck — where that is in each of the fox's frames (px of 480)
-  const CAPE = { side: [], back: [] };
-  const CAPE_AT = { side: [0.87, 0.24, 0.72], back: [0.52, 0.2, 0.5] }; // (its collar's clasp across and down its picture; its width, of the fox's)
-  const FOX_NECK = { crouch: [292, 250], run: [288, 232], air: [268, 192], dive: [286, 262], back: [240, 238] };
-  if (LOOK.night) for (const k of ['side', 'back']) for (let i = 0; i < 3; i++) { const im = new Image(); im.onload = () => { CAPE[k][i] = im; }; im.src = `assets/fox/cape/${k}_${i}.png`; }
-  function cape(kind, neck, sz, top, t) { // (drawn in the fox's own frame: sz its picture's side, top its picture's top)
-    const im = CAPE[kind][Math.floor(t) % 3]; if (!im?.complete || !im.naturalWidth) return;
-    const [ax, ay, w] = CAPE_AT[kind], cw = sz * w, ch = cw * im.naturalHeight / im.naturalWidth;
-    g.drawImage(im, -sz / 2 + neck[0] / 480 * sz - ax * cw, top + neck[1] / 480 * sz - ay * ch, cw, ch);
-  }
   function drawFox(f, s) {
     const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25;
     const inAir = S.phase === 'fly' && f.y > 0.05;
-    let img = null, rot = 0, front = false, neck = null; // (front: a clip facing us — drawn upright, a little smaller)
-    if (S.phase === 'aim' || S.phase === 'idle') { img = A.pounce?.[Math.round(CROUCH[0] + (CROUCH[1] - CROUCH[0]) * S.power)] || A.run?.[0]; neck = FOX_NECK.crouch; }
+    let img = null, rot = 0, front = false; // (front: a clip facing us — drawn upright, a little smaller)
+    if (S.phase === 'aim' || S.phase === 'idle') { img = A.pounce?.[Math.round(CROUCH[0] + (CROUCH[1] - CROUCH[0]) * S.power)] || A.run?.[0]; }
     else if (S.phase === 'done') { img = frameOf(S.newBest ? 'cheer' : 'happy', S.t); front = true; }
     else if (f.act && A[f.act.name]) {
       img = frameOf(f.act.name, f.act.t); front = f.act.name !== 'roll';
       if (f.act.name === 'roll') rot = f.spin * Math.PI * 2;
-    } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; neck = FOX_NECK.dive; }
-    else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; neck = FOX_NECK.air; }
-    else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; neck = FOX_NECK.run; }
+    } else if (f.dive && A.pounce) { img = A.pounce[DIVE]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.7; }
+    else if (inAir && f.ride <= 0) { img = A.run?.[AIR]; rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
+    else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
     g.save(); g.translate(p.x, p.y - size * 0.45); g.rotate(rot);
     if (S.ready && S.phase === 'fly') { // a golden glow while a super bounce is waiting
       const k = 0.5 + Math.sin(S.t * 10) * 0.5, rg = g.createRadialGradient(0, 0, size * 0.1, 0, 0, size * 0.7);
@@ -801,15 +809,17 @@
     const sz = front ? size * 0.9 : size;
     if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
-    if (LOOK.night && neck) cape('side', neck, sz, -sz * 449 / 480 + size * 0.45, S.t * (6 + Math.hypot(f.vx, f.vy) * 0.5)); // (over its back, streaming faster the faster it goes)
     g.restore();
   }
   // the background's strips (<dir>/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
-  const BG = {}, BG_LIP = LOOK.lip; // (BG_LIP: the ground strip's grassy top stands this much of its height over the ground line)
-  (async () => {
-    const r = await fetch(`${LOOK.dir}/index.json`).catch(() => null);
-    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `${LOOK.dir}/${name}.webp`; }
-  })();
+  // (LOOK.lip: the ground strip's grassy top stands this much of its height over the ground line)
+  const BG = {};
+  async function loadBG() {
+    const look = LOOK; for (const k in BG) delete BG[k];
+    const r = await fetch(`${look.dir}/index.json`).catch(() => null);
+    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { if (LOOK === look) BG[name] = im; }; im.src = `${look.dir}/${name}.webp`; }
+  }
+  loadBG();
   // on Halloween night the stars are sweets: a round one in its wrapper, twisted at both ends, in one of three colours
   const CANDY = [['#ff8a2a', '#ffd08a'], ['#9a5cff', '#d9c2ff'], ['#45c46a', '#b8f0c4']];
   function candy(x, y, r, seed) {
@@ -863,8 +873,13 @@
   // bottom, its leafy crown at the top where the fox sits, and between them its trunk, bent here — the stump's own
   // bark (tree_trunk: a band of it straightened out, mirror-tiled up and down) laid along the bend in short slices,
   // tapering a little from the stump's width (TREE_AT.w of the roots' picture) to the crown, the stump's outline down its sides
-  const TREE = {}, TREE_AT = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.36, ...LOOK.tree }; // (m, and of the pictures; B04 for Halloween)
-  for (const k of ['base', 'crown', 'trunk']) { const im = new Image(); im.onload = () => { TREE[k] = im; }; im.src = `${LOOK.dir}/tree_${k}.webp`; }
+  const TREE = {}, TREE_DAY = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.36 }; // (m, and of the pictures)
+  let TREE_AT = TREE_DAY;
+  function loadTree() { // (B04 for Halloween: its own cut)
+    const look = LOOK; TREE_AT = { ...TREE_DAY, ...look.tree };
+    for (const k of ['base', 'crown', 'trunk']) { delete TREE[k]; const im = new Image(); im.onload = () => { if (LOOK === look) TREE[k] = im; }; im.src = `${look.dir}/tree_${k}.webp`; }
+  }
+  loadTree();
   function drawTree(tx, ty, s) {
     const A_ = TREE_AT, bw = A_.base, bh = bw * TREE.base.naturalHeight / TREE.base.naturalWidth;
     const b0 = toScreen(A_.x - bw / 2, bh - 0.1); // (its picture's top left; sunk a little into the ground)
@@ -930,7 +945,7 @@
     else try { localStorage.setItem('ipet-fling-best', Math.max(best, d)); } catch (e) {}
     $('final').textContent = d;
     $('endTitle').textContent = isBest ? '🎉 新紀錄！' : '飛好遠！';
-    $('endNote').textContent = `撿到 ${STAR} ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
+    $('endNote').textContent = `撿到 ${star()} ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
     best = Math.max(best, d);
     hud();
     setTimeout(() => { $('end').hidden = false; }, 1200); // (a moment to see it cheer first)
@@ -943,6 +958,7 @@
   // cards and buttons) is the one control. Space too (on the tree: a fling pulled 3/4 back at 45°)
   layer.addEventListener('pointerdown', e => {
     if (e.target.closest?.('.fl-card, button') || !S) return;
+    if (bgm?.paused) bgm.play().catch(() => {}); // (where it couldn't start by itself: on the first touch)
     if (S.phase === 'aim') { S.drag = at(e); S.spring = null; }
     else if (S.phase === 'sky') steer(at(e).x < W / 2 ? -1 : 1); // (on the clouds: a lane to that side)
     else tap();
@@ -970,6 +986,12 @@
   }
   // open: the layer over everything, landscape, a fresh run waiting on the start card.
   // o: { tails, best, onEnd({ dist, stars, best }), onClose() } — none of it when on its own page
+  let bgm = null;
+  function music() { // the look's music, round and round while it's open (Halloween: PeriTune, peritune.com)
+    if (!LOOK.music) return;
+    bgm ||= Object.assign(new Audio(LOOK.music), { loop: true, volume: 0.45 });
+    bgm.play().catch(() => {});
+  }
   function open(o = {}) {
     opts = o;
     TAILS = Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1));
@@ -981,10 +1003,12 @@
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
     resize();
     start(); // (straight onto the tree, to be pulled back)
+    music();
     cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop);
   }
   function close() {
     cancelAnimationFrame(raf); raf = 0;
+    bgm?.pause();
     layer.hidden = true; S = null;
     try { screen.orientation?.unlock?.(); } catch (e) {}
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
