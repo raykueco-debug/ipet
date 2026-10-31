@@ -142,6 +142,13 @@
     im.src = cutSrc || src; return im;
   }
   for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
+    // from the front or behind: the clip made again without its tail (tools/wan_notail.py), where it's there
+    const own = await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
+    if (own?.ok) {
+      const m = await own.json(), d = `${dir}_notail/${clip}`;
+      into[k] = m.frames.map((f, i) => Object.assign(tailless(`assets/fox/${d}/${f}?v=${m.rev || 1}`, null, d, i), { cut: true }));
+      return;
+    }
     const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return;
     const m = await r.json();
@@ -688,6 +695,7 @@
     tails(im, -size / 2, -size * 449 / 480, size, sky.t, 'fly');
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
+    tails(im, -size / 2, -size * 449 / 480, size, sky.t, 'fly', 'front'); // (seen from behind: its tails over its back)
     glints(0, -size * 0.45, size, dt);
     g.restore(); g.restore();
   }
@@ -857,13 +865,19 @@
   // the body, the rest; 'front' — the main one, over the stub left at its root, where the picture's own was taken off)
   function tails(img, x, y, sz, t, mode, layer = 'behind') {
     const n = TAILS, r = img?.root && ROOTS[img.root[0]]?.[img.root[1]];
-    if (!r || !r[3] || (n < 2 && !img.cut) || (layer === 'front' && !img.cut)) return;
-    // (from the front or behind, its body in the way: fanned wider, round straight up, from a little higher up)
-    const facing = /cheer|happy|joy|surprised|back_/.test(img.root[0]), mid = facing ? 10 : r[2], lift = facing ? 50 : 0;
-    const spread = Math.min(facing ? 150 : 124, (facing ? 20 : 17) * (n - 1)), L = sz * TAIL_LEN * Math.pow(0.85, Math.floor((n - 1) / 3));
+    if (!r || !r[3] || (n < 2 && !img.cut)) return;
+    // (from the front or behind, its body in the way: fanned wider, round straight up, from a little higher up — and
+    // from the front all of them behind the body, from behind all of them over it)
+    const facing = /cheer|happy|joy|surprised|back_/.test(img.root[0]), back = /back_/.test(img.root[0]);
+    const front = facing && !back, mid = facing && n > 1 ? (front ? 5 : 10) : r[2], lift = front ? 40 : facing ? 50 : 0;
+    if (img.cut && facing ? (layer === 'front') !== back : layer === 'front' && !img.cut) return;
+    // (from the front, bigger and spread out flat to both sides, to show past its body)
+    const spread = Math.min(front ? 170 : facing ? 150 : 124, (front ? 22 : facing ? 20 : 17) * (n - 1));
+    const L = sz * (front ? 0.55 : TAIL_LEN) * Math.pow(0.85, Math.floor((n - 1) / 3));
     const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, i) => mid - spread / 2 + spread * i / (n - 1));
     const own = ways.reduce((b, a, i) => Math.abs(a - r[2]) < Math.abs(ways[b] - r[2]) ? i : b, 0); // (the one in the picture)
-    const order = layer === 'front' ? [own] : ways.map((a, i) => i).filter(i => i !== own).sort((i, j) => Math.abs(ways[j] - mid) - Math.abs(ways[i] - mid)); // (outer first)
+    const all = img.cut && facing; // (every one of them drawn here, its own picture's one too — none left in it)
+    const order = layer === 'front' && !all ? [own] : ways.map((a, i) => i).filter(i => all || i !== own).sort((i, j) => Math.abs(ways[j] - mid) - Math.abs(ways[i] - mid)); // (outer first)
     for (const i of order) {
       const im = TAIL_IMG[i % 9]; if (!im.complete || !im.naturalWidth) continue;
       const sway = mode === 'soar' ? Math.sin(t * 9 + i * 1.7) * 10

@@ -33,6 +33,12 @@ ROOTS = {
     ('clips_halloween', 'back_crouch_to_back_air'): (225, 345, 50),
     ('clips_halloween', 'back_air_to_back_crouch'): (210, 285, 30),
 }
+# (the same clips made again without the tail, tools/wan_notail.py: the same motion, from the same place)
+ROOTS.update({(d + '_notail', c): v for (d, c), v in list(ROOTS.items())
+              if c in ('cheer_loop', 'happy_loop', 'jump_joy_loop', 'surprised_loop', 'back_crouch_to_back_air', 'back_air_to_back_crouch')})
+# (and from the front, every tail the game's: fanned from the middle of its back, low down — not its own one's side)
+ROOTS.update({(d, c): (215, 400, 40) for d in ('clips_notail', 'clips_halloween_notail') for c in ('cheer_loop', 'happy_loop')})
+ROOTS[('clips_notail', 'surprised_loop')] = (220, 400, 60)
 MATCH = {('clips', 'walk_r_loop_run')}
 # single pictures (the caped fox side on, assets/fox/halloween): no tracking, just where
 STILLS = {'halloween/air': (184, 224, -108), 'halloween/dive': (225, 255, -80), 'halloween/crouch': (172, 285, -75)}
