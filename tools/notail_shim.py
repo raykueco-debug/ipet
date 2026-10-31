@@ -74,6 +74,7 @@ if os.path.exists(os.path.join(d, 'meta.json')) and os.path.exists(plain_path):
             n = f'frame_{i:02d}.webp'
             shutil.copy(os.path.join(full, f'frame_{k:02d}.webp'), os.path.join(d, n)); meta['frames'].append(n)
         meta['trimmed'] = plain['trimmed']
+    meta['pictures'] = [os.path.splitext(os.path.basename(start))[0]] + ([os.path.splitext(os.path.basename(end))[0]] if end else [])  # (where its tail roots start: tools/tail_roots.py)
     for k in ('exits', 'near', 'speed', 'duration_ms'):
         if k in plain:
             meta[k] = plain[k]

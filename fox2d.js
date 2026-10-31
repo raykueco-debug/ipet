@@ -64,17 +64,26 @@
   let watching = false, gaze = 0;
   let running = false; // after the ball: the bounding run (walk[_r]_loop_run) instead of walking
 
+  // its tails: the clips made again without a tail (assets/fox/clips_notail, docs/tailless.md) where there are, and
+  // all its tails (as many as it has) drawn on them from where the tail grows in each frame (assets/fox/tail_roots.json)
+  const NOTAIL = 'assets/fox/clips_notail/';
+  let ROOTS = {};
+  fetch('assets/fox/tail_roots.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { ROOTS = j; }).catch(() => {});
+  const TAIL_IMG = Array.from({ length: 9 }, (_, k) => { const im = new Image(); im.src = `assets/fox/tail/t${k + 1}.png`; return im; });
+  let tailN = 1;
+
   async function load(name, wait = false) { // wait: until its first frames are in (the first clip only)
     if (clips[name] !== undefined) return clips[name];
     clips[name] = null;
     try {
-      const meta = await fetch(ROOT + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null));
+      let root = NOTAIL, meta = await fetch(NOTAIL + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+      if (!meta) { root = ROOT; meta = await fetch(ROOT + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)); }
       if (!meta) return null;
       const v = meta.rev ? '?v=' + meta.rev : ''; // a new revision (tools/clip_fill.py) skips cached frames
       // pictures are fetched only when the clip is needed (fetch()): ~150 clips × ~20 frames at once jammed the
       // server and would cost a tablet some 60 MB up front
-      const frames = meta.frames.map(f => { const im = new Image(); im.dataset.src = ROOT + name + '/' + f + v; return im; });
-      clips[name] = { name, frames, exits: meta.exits || [], near: meta.near || [], pace: meta.speed || 0 };
+      const frames = meta.frames.map(f => { const im = new Image(); im.dataset.src = root + name + '/' + f + v; return im; });
+      clips[name] = { name, frames, exits: meta.exits || [], near: meta.near || [], pace: meta.speed || 0, notail: root === NOTAIL };
       if (wait) await fetchFrames(clips[name], 2);
     } catch (e) { clips[name] = null; }
     return clips[name];
@@ -257,7 +266,26 @@
     const f = cur.frames[i];
     if (!f.complete || !f.naturalWidth) return; // keep the last picture rather than a blank
     g.clearRect(0, 0, 512, 512);
+    const r = cur.notail && ROOTS['clips_notail/' + cur.name]?.[i];
+    const over = r && r[4] === 'over'; // (seen from behind: its tails over its back)
+    if (r && !over) tails(r);
     g.drawImage(f, 0, DROP, 512, 512);
+    if (r && over) tails(r);
+  }
+  // fanned out from the root around the way it goes; each its own pace of sway — slow sitting, quick on the move
+  function tails(r) {
+    const n = tailN, t = performance.now() / 1000, k = 512 / 480;
+    const quick = /_loop_run|_loop$|^walk/.test(cur.name) && /walk|run/.test(cur.name);
+    const spread = Math.min(124, 17 * (n - 1)), L = 512 * 0.42 * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => r[2] - spread / 2 + spread * j / (n - 1));
+    const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - r[2]) - Math.abs(ways[a] - r[2]));
+    for (const j of order) {
+      const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
+      const sway = quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
+      g.save(); g.translate(r[0] * k, r[1] * k + DROP); g.rotate((ways[j] + sway) * Math.PI / 180);
+      g.drawImage(im, -L / 2, -L, L, L);
+      g.restore();
+    }
   }
 
   function tick() {
@@ -296,6 +324,8 @@
   }
 
   window.Fox2D = {
+    tails(n) { tailN = Math.max(1, Math.min(9, n | 0)); }, // how many tails it has (app.js)
+    get hasTails() { return !!cur?.notail; },              // drawing them itself, on this clip
     set({ mood: m }) {
       want = MAP[m] || 'normal';
       if (want !== 'normal') { load(`normal_to_${want}`); load(`${want}_loop`); load(`${want}_to_normal`); }

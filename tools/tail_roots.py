@@ -58,7 +58,29 @@ def main():
         print(f'{d}/{clip}: {len(out[f"{d}/{clip}"])} frames')
     for k, (x, y, a) in STILLS.items():
         out[k] = [[x, y, a, True]]
+    pet(out)
     json.dump(out, open(os.path.join(FOX, 'tail_roots.json'), 'w', encoding='utf-8'))
+
+
+def pet(out):
+    """The pet's clips made without a tail (assets/fox/clips_notail): each from its start picture's root
+    (tools/tail_pics.py: where the tail was on the picture with one), followed through the clip — tracked on the
+    tail-less frames, the fur round the root. Seen from behind (walk_back…, sit_back, back_…) its tails go over it."""
+    pics = json.load(open(os.path.join(FOX, 'tail_pics.json')))
+    d = os.path.join(FOX, 'clips_notail')
+    for clip in sorted(os.listdir(d)):
+        key = f'clips_notail/{clip}'
+        if key in out or not os.path.exists(os.path.join(d, clip, 'meta.json')):
+            continue
+        meta = json.load(open(os.path.join(d, clip, 'meta.json'), encoding='utf-8'))
+        start = (meta.get('pictures') or [None])[0]
+        if start not in pics:
+            continue
+        x, y, a = pics[start]
+        back = 'back' in start
+        out[key] = [[r[0], r[1], round(a + r[2], 1), True] + (['over'] if back else [])
+                    for r in track_slot(load_frames_named(os.path.join(d, clip), meta['frames']), x, y)]
+        print(f'{key}: {len(out[key])} frames (from {start})')
 
 
 def matched(path, names, x, y, r=34, poor=0.55):

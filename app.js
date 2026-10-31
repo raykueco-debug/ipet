@@ -258,6 +258,7 @@ function petPos() {
 /* tails: fan behind the body; each tail sways around its root */
 function renderTails() {
   const n = tailCount();
+  window.Fox2D?.tails(n); // (the 2D clips: it draws them itself where a clip has none of its own)
   if (n === renderedTails) return;
   if (renderedTails > 0 && n > renderedTails) window.Fox2D?.play('proud'); // a new tail: chest out
   renderedTails = n;

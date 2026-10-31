@@ -7,8 +7,7 @@
 set -u
 IPET="$(cd "$(dirname "$0")/.." && pwd)"
 SHIM="$IPET/tools/notail_shim.py"
-TMP="$(mktemp -d)"
-shimmed() { sed "s#tivot_wan.py#$SHIM#g" "$IPET/tools/$1" > "$TMP/$1"; echo "$TMP/$1"; }
+shimmed() { sed "s#tivot_wan.py#$SHIM#g" "$IPET/tools/$1" > "$IPET/tools/_notail_$1"; echo "$IPET/tools/_notail_$1"; } # (beside the real one: it finds the project from where it is)
 cd "$IPET/assets/fox/clips"
 ACTS="$(ls -d normal_to_* | sed 's/^normal_to_//' | tr '\n' ' ')"
 LOOPS="$(ls -d *_loop | sed 's/_loop$//' | tr '\n' ' ')"
@@ -18,5 +17,5 @@ for s in wan_actions.sh wan_walk.sh wan_look.sh wan_eat.sh wan_sleep.sh wan_read
   echo "##### $s $(date +%T)"
   bash "$(shimmed $s)" 7
 done
-rm -rf "$TMP"
+rm -f "$IPET"/tools/_notail_*.sh
 echo "##### all done $(date +%T)"

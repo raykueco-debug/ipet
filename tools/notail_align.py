@@ -57,6 +57,10 @@ def fit(orig, q, s=4):
     return k, round(x - box[0] * k), round(y - box[1] * k)
 
 
+# pictures that are just another one flipped (wan_prep.py): their tail-less one flipped too
+MIRRORS = {'bat_r': 'bat', 'header_r': 'header', 'pounce_r': 'pounce', 'swipe_r': 'swipe', 'walk_r': 'walk', 'leap_r': 'leap'}
+
+
 def main():
     grids = json.load(open(os.path.join(SRC, 'grids.json')))
     os.makedirs(os.path.join(IN, 'notail'), exist_ok=True)
@@ -70,6 +74,10 @@ def main():
             out = Image.new('RGB', (512, 512), (0, 255, 0)); out.paste(q2, (x, y))
             out.save(os.path.join(IN, 'notail', f'{n}.png'))
             print(g, n, round(k, 3))
+    for r, n in MIRRORS.items():
+        p = os.path.join(IN, 'notail', f'{n}.png')
+        if os.path.exists(p):
+            Image.open(p).transpose(Image.FLIP_LEFT_RIGHT).save(os.path.join(IN, 'notail', f'{r}.png'))
 
 
 if __name__ == '__main__':

@@ -22,4 +22,6 @@
 （每完成一步在這裡記一行）
 - 飛行遊戲一般版：完成（25a6a7e）。
 - 飛行遊戲披風版：完成。
-- 飼養區：GPT N01 完成並對齊（tools/notail_align.py，形狀比對對齊）；N02 起進行中。WAN 用 tools/wan_tailless.sh（經 tools/notail_shim.py）。
+- 飼養區：GPT N01 完成並對齊（tools/notail_align.py，形狀比對對齊）；N02、N03、N04 完成。GPT 偶爾把姿勢畫成不同大小（paw、play_bow、ready），記在 assets/source/notail/redo.json，最後集中一張九宮格重畫。
+- N05、N06 完成；N07 進行中。fox2d.js 已會優先載入 clips_notail 並畫程式尾巴（Fox2D.tails(n)，app.js renderTails 傳入）；tools/tail_pics.py 算每張起始圖的根部，tools/tail_roots.py 追蹤到每一幀。
+- 全部 WAN 跑完後：python tools/tail_pics.py → python tools/tail_roots.py → 抽查 → commit。WAN 用 tools/wan_tailless.sh（經 tools/notail_shim.py）。
