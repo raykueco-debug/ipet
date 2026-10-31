@@ -316,7 +316,6 @@
     if (!(f.hold > 0)) { f.x += f.vx * dt; f.y += f.vy * dt; }
     f.spin = Math.max(0, f.spin - dt * 2);
     if (f.dash > 0) S.fx.push({ kind: 'fire', x: f.x - 0.3, y: f.y + 0.8, vx: -f.vx * 0.2, vy: 0.5, t: 0 });
-    if (f.soar && f.vy < 0 && Math.random() < 0.5) S.fx.push({ kind: 'rain', x: f.x - 0.4, y: f.y + 0.9, t: 0, c: '#ffffffaa' }); // (a wisp of air behind it, gliding)
     if (f.rainbow > 0) S.fx.push({ kind: 'rain', x: f.x - 0.2, y: f.y + 0.8, t: 0, c: `hsl(${(S.t * 600) % 360}, 90%, 65%)` });
     // onto a friend (coming down)
     if (f.vy < 0) for (const a of S.friends) {
@@ -840,6 +839,16 @@
     const fr = CAPED[k].filter(im => im.complete && im.naturalWidth);
     return fr.length > 1 ? fr[Math.floor(t) % fr.length] : k === 'crouch' ? capedOf('dive', t) : fr[0];
   };
+  // gliding: the fox drawn in thin upright strips, those of its back half (its tail, and the cape's tail) each lifted
+  // a little on a wave running back along it — the further back, the more — so the tail streams; the front still
+  function waving(img, x, y, sz) {
+    const n = img.naturalWidth, back = 0.45, step = 4, k = sz / n; // (back: how far along from the left the tail reaches)
+    g.drawImage(img, n * back, 0, n * (1 - back), n, x + sz * back, y, sz * (1 - back), sz);
+    for (let sx = 0; sx < n * back; sx += step) {
+      const u = 1 - sx / (n * back), dy = Math.sin(S.t * 9 + u * 5) * sz * 0.035 * u * u;
+      g.drawImage(img, sx, 0, step + 1, n, x + sx * k, y + dy, (step + 1) * k, sz);
+    }
+  }
   function drawFox(f, s) {
     const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25;
     const inAir = S.phase === 'fly' && f.y > 0.05;
@@ -867,7 +876,8 @@
     }
     if (f.dash > 0 || f.rainbow > 0) { g.shadowColor = f.rainbow > 0 ? '#fff' : '#ffb347'; g.shadowBlur = 24; }
     const sz = front ? size * 0.9 : size;
-    if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
+    if (img?.complete && img.naturalWidth && f.soar && S.phase === 'fly' && !front) waving(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz); // (gliding: its tail streaming)
+    else if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
     g.restore();
   }
