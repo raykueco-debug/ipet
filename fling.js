@@ -3,7 +3,9 @@
    On the ground lie forest friends, and landing on one throws it on its own way: a rabbit bounces it (and runs ahead past two
    friends, knocking the first away, stopping by the second: off that one, a bunny bounce), a bear sends it high, a frog hops it along (and its next dive bounces
    high off the ground), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
-   a hedgehog only slows it. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
+   a hedgehog only slows it (dived onto, it springs it up as a mushroom does and rolls off along the ground, knocking
+   flying whoever it meets). Knocked flying, a friend goes off up and back, out of sight for good; a boar that's run
+   on, or a hedgehog, once out of sight, are gone too. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
    dive down at a slant (onto the next friend), free. It bounces on the plain ground less and less, rolls, and stops: that's how far.
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
    SUPER of them caught, the next friend it lands on is a super bounce, off far and high.
@@ -245,11 +247,11 @@
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0;
     dust(a.x, 0.2, 5);
-    if (dived && a.kind === 'hedgehog') {
-      a.kick = true; a.vy = 9;
+    if (dived && a.kind === 'hedgehog') { // curled up and rolling off along the ground, knocking flying whoever it meets
+      a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
       FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; // (off it as off a mushroom dived onto)
       SFX.big(); act('joy', 0.8); S.shake = 0.2;
-      pop('撲飛！', a.x, fr.h + 1.5, '#ffe14d');
+      pop('滾出去！', a.x, fr.h + 1.5, '#ffe14d');
       if (combo) comboUp(a, fr);
       return;
     }
@@ -398,20 +400,32 @@
     pop('+500 m！', f.x, f.y + 2.5, '#ffe14d', 1.1);
   }
 
+  // knocked flying (by the rabbit running by, or the hedgehog rolling into it): off up and back, tumbling, out of
+  // sight for good — not to be landed on, never back
+  const KICK = [-9, 16], ROLL = { least: 12, slow: 3, r: 0.4 }; // (m/s along, up; the roll: its least speed, slowing m/s², radius m)
+  function knock(b) {
+    b.used = b.kick = true; b.t = 0; b.there = null; b.runTo = null; b.carry = false;
+    SFX.boing(); dust(b.x, 0.2, 6); pop('撞飛！', b.x, FRIENDS[b.kind].h + 1.2, '#ffb3d9', 0.6);
+  }
   function friends(dt) { // the friends after the fox lands on them: each its own way
     const f = S.fox;
+    // (gone for good: the knocked ones, long gone; and once out of sight, a boar that has run on, a hedgehog stepped on or rolled off)
+    const out = a => { const sx = (a.x - S.cam.x) * S.cam.s + W * 0.3; return sx < -W * 0.15 || sx > W * 1.15; };
+    S.friends = S.friends.filter(a => !(a.kick && a.t > 3) && !(a.used && ((a.kind === 'boar' && !a.carry) || a.kind === 'hedgehog') && out(a)));
     for (const a of S.friends) {
       if (!a.used) continue;
       a.t += dt;
-      if (a.kick) { a.x += 12 * dt; a.vy -= G * dt; a.y = Math.max(0, a.y + a.vy * dt); }           // knocked away, tumbling
+      if (a.kick) { a.x += KICK[0] * dt; a.y += KICK[1] * dt; }                                    // knocked flying, off up and back out of sight
+      else if (a.roll) { // the hedgehog rolling along, slowing; whoever's in its way knocked flying
+        a.speed = Math.max(0, a.speed - ROLL.slow * dt); a.x += a.speed * dt; a.spin += a.speed * dt / ROLL.r;
+        for (const b of S.friends) if (!b.used && b !== a && Math.abs(b.x - a.x) < 0.7) knock(b);
+        if (a.speed <= 0) { a.roll = false; a.t = 1; }
+      }
       else if (a.runTo) { // running ahead in hops, to stand by the next friend (then a hop of its own there, waving)
         const to = a.runTo.x - RABBIT.by;
         a.x = Math.min(to, a.x + a.speed * dt); a.y = Math.abs(Math.sin(a.t * 9)) * 0.5;
         const k = a.knock;
-        if (k && !k.used && a.x >= k.x - 0.6) { // bumped into: knocked flying (gone, not to be landed on)
-          k.used = k.kick = true; k.t = 0; k.vy = 9; a.knock = null;
-          SFX.boing(); dust(k.x, 0.2, 6); pop('撞飛！', k.x, FRIENDS[k.kind].h + 1.2, '#ffb3d9', 0.6);
-        }
+        if (k && !k.used && a.x >= k.x - 0.6) { knock(k); a.knock = null; } // bumped into: knocked flying
         if (a.x >= to) { a.there = a.runTo; a.runTo = null; a.t = 0; }
       }
       else if (a.there) a.y = a.there.bunny ? Math.abs(Math.sin(a.t * 5)) * 0.7 : 0; // (hopping by its friend while the bunny bounce waits there)
@@ -686,7 +700,8 @@
   function drawFriend(a, s) {
     const fr = FRIENDS[a.kind], p = toScreen(a.x, a.y), sz = s * fr.h * 1.15, t = a.t;
     g.save(); g.translate(p.x, p.y);
-    if (a.kick) { g.translate(0, -sz * 0.4); g.rotate(t * 14); g.translate(0, sz * 0.4); } // (tumbling away)
+    if (a.kick) { g.translate(0, -sz * 0.4); g.rotate(-t * 14); g.translate(0, sz * 0.4); } // (tumbling away)
+    else if (a.roll || (a.kind === 'hedgehog' && a.spin)) { const r = ROLL.r * s; g.translate(0, -r); g.rotate(a.spin); g.translate(0, r); } // (curled up, rolling)
     if (art(a.kind, 'idle')) { drawArt(a, s, t); g.restore(); return; } // (its own picture, once there)
     if (fr.draw) { fr.draw(a, s, t); g.restore(); return; } // (drawn, not an emoji)
     if (!a.used) g.scale(1, 1 + Math.sin(S.t * 3 + a.x) * 0.04);                   // breathing, waiting
