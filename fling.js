@@ -23,7 +23,7 @@
   // flying by far off, its own music) — picked with the 🎃 / ☀️ button by ✕ (kept), else Halloween from mid-October
   // to its day; ?bg=day / ?bg=halloween to try one
   const LOOKS = {
-    day: { dir: 'assets/bg', lip: 0.25, sky: ['#8fd0ff', '#e6f6ff'], soil: '#9b7653', clouds: ['#8fd0ff', '#ffe6f2', '#e9e4ff'] },
+    day: { music: 'assets/music/PerituneMaterial_Battle_Fun_loop.m4a', dir: 'assets/bg', lip: 0.25, sky: ['#8fd0ff', '#e6f6ff'], soil: '#9b7653', clouds: ['#8fd0ff', '#ffe6f2', '#e9e4ff'] },
     halloween: { music: 'assets/music/Peritune_Magic_Skirmish_loop.m4a', dir: 'assets/bg/halloween', lip: 0.64, tree: { cx: 0.539, cut: 0.326, w: 0.28 }, friends: 'assets/friends/halloween', sky: ['#1b1440', '#4b3a7a'], soil: '#3b2638', clouds: ['#1b1440', '#6a4f96', '#3a2f6e'], night: true },
   };
   let LOOK = LOOKS[params.get('bg')] || LOOKS[(() => { try { return localStorage.getItem('ipet-fling-look'); } catch (e) { return null; } })()] || (() => {
@@ -1046,7 +1046,7 @@
   // open: the layer over everything, landscape, a fresh run waiting on the start card.
   // o: { tails, best, onEnd({ dist, stars, best }), onClose() } — none of it when on its own page
   let bgm = null;
-  function music() { // the look's music, round and round while it's open (Halloween: PeriTune, peritune.com)
+  function music() { // the look's music, round and round while it's open (both PeriTune, peritune.com)
     if (!LOOK.music) return;
     bgm ||= Object.assign(new Audio(LOOK.music), { loop: true, volume: 0.45 });
     bgm.play().catch(() => {});
