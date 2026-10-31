@@ -1,8 +1,8 @@
 /* 小狐飛多遠 — a launch-and-bounce game (a prototype).
    The fox is flung off a bent branch (tap when the swing is high: the harder, the farther) and flies to the right.
    On the ground lie forest friends, and landing on one throws it on its own way: a rabbit bounces it (and runs ahead past two
-   friends, knocking the first away, stopping by the second: off that one, a bunny bounce), a bear sends it high, a frog hops it along (and its dives bounce
-   higher off the ground after), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
+   friends, knocking the first away, stopping by the second: off that one, a bunny bounce), a bear sends it high, a frog hops it along (and its next dive bounces
+   high off the ground), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel gives it a dash back —
    a hedgehog only slows it. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
    dive down at a slant (onto the next friend), free. It bounces on the plain ground less and less, rolls, and stops: that's how far.
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
@@ -27,9 +27,9 @@
   const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy (to)
   const COMBO = 13;                                // a combo: this many m/s more, on the way the friend throws it
   const RABBIT = { run: 16, by: 1.4 };             // landed on, a rabbit runs ahead (at least this fast, m/s) to stand by the next friend
-  // each frog landed on: a dive onto the plain ground keeps this much more of its fall, up to most — and springs back
-  // at least up m/s (6 m high), more each frog after, however low the dive began
-  const FROG = { keep: 0.16, most: 0.9, up: 16, more: 3 };
+  // a frog landed on: the next dive onto the plain ground (only a dive) springs back, keeping this of its fall and at
+  // least up m/s (6 m high) — once, then it takes another frog (two frogs before it are still once)
+  const FROG = { keep: 0.6, up: 16 };
   const CAM = { metres: 7, least: 0.56 };          // the screen's height in metres on the ground; drawn smaller as the fox climbs, down to this of it; above, an arrow
   // stars: a column every step m, a chance in each band m — more the higher, and none above what the screen shows zoomed out
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
@@ -67,7 +67,7 @@
   layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
     <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
       <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
-      <span class="fl-pill" data-k="frogPill" hidden>🐸 ×<span data-k="frogs">0</span></span>
+      <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
     <div class="fl-card" data-k="end" hidden><div>
       <h1 data-k="endTitle">飛好遠！</h1>
@@ -128,7 +128,7 @@
   const fresh = () => ({
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
-    tails: TAILS, combo: 0, frogs: 0, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
+    tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
     fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, passedBest: !best,
   });
 
@@ -234,7 +234,7 @@
       const [k, b] = S.friends.filter(o => !o.used && !o.bunny && o.x > a.x + 2);
       if (b) { b.bunny = true; a.runTo = b; a.knock = k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
     }
-    if (a.kind === 'frog') { S.frogs++; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
+    if (a.kind === 'frog') { S.frog = true; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
     if (s === 'refill') { // a tail's dash back (no more than it has tails)
       const back = S.tails < TAILS; if (back) S.tails++;
       pop(back ? '+1 🔥' : '彈！', a.x, fr.h + 1.5, '#ffb347'); f.spin = 1; act('roll', 0.5); hud();
@@ -283,8 +283,8 @@
       const dived = f.dive;
       f.y = 0; f.dive = false; S.combo = 0;
       if (f.vy < 0) {
-        if (dived && S.frogs > 0 && -f.vy > 3) { // a dive onto the ground, after frogs: bounced back up the higher, the more frogs
-          f.vy = Math.max(-f.vy * Math.min(FROG.most, GROUND.keep + FROG.keep * S.frogs), FROG.up + FROG.more * (S.frogs - 1)); f.vx *= 0.95;
+        if (dived && S.frog && -f.vy > 3) { // a dive onto the ground after a frog: sprung back up high (the frog's spring used)
+          f.vy = Math.max(-f.vy * FROG.keep, FROG.up); f.vx *= 0.95; S.frog = false;
           SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
         }
         else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
@@ -609,7 +609,7 @@
     $('stars').textContent = S.got;
     $('meterBar').style.width = `${(S.ready ? 1 : S.meter / SUPER.stars) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
-    $('frogPill').hidden = !S.frogs; $('frogs').textContent = S.frogs;
+    $('frogPill').hidden = !S.frog;
     const el = $('tails');
     if (el.children.length !== TAILS) el.innerHTML = '<i>🔥</i>'.repeat(TAILS);
     [...el.children].forEach((c, i) => c.classList.toggle('used', i >= S.tails));
