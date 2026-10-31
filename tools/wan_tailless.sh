@@ -7,7 +7,11 @@
 set -u
 IPET="$(cd "$(dirname "$0")/.." && pwd)"
 SHIM="$IPET/tools/notail_shim.py"
-shimmed() { sed "s#tivot_wan.py#$SHIM#g" "$IPET/tools/$1" > "$IPET/tools/_notail_$1"; echo "$IPET/tools/_notail_$1"; } # (beside the real one: it finds the project from where it is)
+# (each script's own actions only: ACTS / LOOPS list them all, and one it doesn't know stops it)
+shimmed() { sed -e "s#tivot_wan.py#$SHIM#g" \
+  -e 's#^for a in ${ACTS-.*; do$#& [[ -v GO[$a] ]] || continue;#' \
+  -e 's#^for a in ${LOOPS:-}; do$#& [[ -v HOLD[$a] ]] || continue;#' \
+  "$IPET/tools/$1" > "$IPET/tools/_notail_$1"; echo "$IPET/tools/_notail_$1"; } # (beside the real one: it finds the project from where it is)
 cd "$IPET/assets/fox/clips"
 ACTS="$(ls -d normal_to_* | sed 's/^normal_to_//' | tr '\n' ' ')"
 LOOPS="$(ls -d *_loop | sed 's/_loop$//' | tr '\n' ' ')"

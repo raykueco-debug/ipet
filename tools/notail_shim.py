@@ -9,7 +9,6 @@ clip's exits / near / speed copied over, and the cheer's third leg mirrored away
 """
 import json
 import os
-import runpy
 import shutil
 import sys
 
@@ -52,8 +51,12 @@ setarg('--prompt', tailless(arg('--prompt')))
 
 sys.argv = [TIVOT] + args
 os.chdir(os.path.dirname(TIVOT))
+# Wan grows the tail back halfway through a turn or a lie-down unless told not to: tails in its negative prompt too
+src = open(TIVOT, encoding='utf-8').read()
+src = src.replace("伸手')", "伸手，尾巴，大尾巴，蓬鬆的尾巴，白色尾尖，狐狸尾巴')", 1)
+sys.path.insert(0, os.path.dirname(TIVOT))
 try:
-    runpy.run_path(TIVOT, run_name='__main__')
+    exec(compile(src, TIVOT, 'exec'), {'__name__': '__main__', '__file__': TIVOT})
 except SystemExit:
     pass
 shutil.rmtree(os.path.join(nout, os.path.splitext(os.path.basename(start))[0]), ignore_errors=True)

@@ -28,3 +28,4 @@
 - WAN：tools/wan_tailless_until_done.sh 會一輪輪重跑到沒有新動畫，最後算根部。
 - 尚未處理：chase_tail、hug_tail、shy、shiver、tail/tail_r（尾巴是動作主角）仍用原動畫，只有 1 條尾巴；接到這些動畫時尾巴數會跳。
 - 全部 WAN 跑完後：python tools/tail_pics.py → python tools/tail_roots.py → 抽查 → commit。WAN 用 tools/wan_tailless.sh（經 tools/notail_shim.py）。
+- 第一輪（11/1 03:00）：114 段；wan_actions 因 ACTS 含它不認得的動作而中斷（已修：wan_tailless.sh 只給每支腳本它自己的動作）。抽查：14 段轉場（躺下、起身、轉身到背面、跑跳）中途被 WAN 長回尾巴 → 移除重做；notail_shim.py 現在把「尾巴」加進 WAN 的反向提示詞。
