@@ -66,6 +66,7 @@
   layer.className = 'fl'; layer.hidden = true;
   layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
     <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
+      <span class="fl-pill fl-speed">💨 <span data-k="speed">0</span> km/h</span>
       <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
@@ -606,6 +607,7 @@
 
   function hud() {
     $('dist').textContent = Math.max(0, Math.floor(S.fox.x));
+    $('speed').textContent = S.phase === 'fly' ? Math.round(Math.hypot(S.fox.vx, S.fox.vy) * 3.6) : 0; // (how fast it flies, km/h)
     $('stars').textContent = S.got;
     $('meterBar').style.width = `${(S.ready ? 1 : S.meter / SUPER.stars) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
