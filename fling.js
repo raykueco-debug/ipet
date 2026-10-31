@@ -70,7 +70,7 @@
   const FRIENDS = {
     rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
     frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
-    mushroom: { get e() { return LOOK.night ? '🎃' : '🍄'; }, h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
+    mushroom: { get e() { return LOOK.night ? '🫕' : '🍄'; }, h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
     bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'big'; } },
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
@@ -816,7 +816,7 @@
   // stands for (same size, same place in the 480px square). Bounding on the clouds and cheering at the end, its clips
   // made again in the cape (A, above); rolling and the rest stay its everyday ones.
   const CAPED = { air: [], dive: [], crouch: [] };
-  for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 3]]) for (let i = 0; i < n; i++) { // (crouch_1, _2: V03, the cape blowing)
+  for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 2]]) for (let i = 0; i < n; i++) { // (crouch_0, _1: V03, only the cape's tail blowing — the fox itself the same picture)
     const im = new Image(); im.src = `assets/fox/halloween/${k}_${i}.webp`; CAPED[k][i] = im;
   }
   const caped = () => LOOK.night && CAPED.crouch[0].complete && CAPED.crouch[0].naturalWidth;
