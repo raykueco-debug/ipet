@@ -37,12 +37,13 @@
 
   const cv = document.getElementById('game'), g = cv.getContext('2d');
   let W = 0, H = 0, DPR = 1;
-  function resize() { // always landscape: held upright, the whole page is laid on its side (runner.html: html.turned)
-    const turned = innerHeight > innerWidth;
-    document.documentElement.classList.toggle('turned', turned);
-    DPR = Math.min(2, devicePixelRatio || 1);
-    W = turned ? innerHeight : innerWidth; H = turned ? innerWidth : innerHeight;
-    cv.width = W * DPR; cv.height = H * DPR;
+  const stage = document.querySelector('.stage');
+  function resize() { // one fixed stage (800×450) scaled whole to the screen, so every phone sees the same road (runner.html)
+    W = 800; H = 450;
+    const zoom = Math.min(innerWidth / W, innerHeight / H);
+    stage.style.transform = `translate(-50%, -50%) scale(${zoom})`;
+    DPR = Math.min(3, (devicePixelRatio || 1) * zoom);
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   addEventListener('resize', resize);

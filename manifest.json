@@ -3,7 +3,7 @@
   "short_name": "小狐",
   "start_url": "./",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#fff3e6",
   "theme_color": "#fff3e6",
   "icons": [

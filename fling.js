@@ -7,8 +7,9 @@
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
    SUPER of them caught, the next friend it lands on is a super bounce, off far and high.
    World: x metres along, y metres up (the ground at 0), seen from the side.
-   It plays in a layer of its own, always landscape (fullscreen and turned where the phone lets it; otherwise the
-   layer itself is turned on its side), opened by the pet (app.js: Fling.open with its tails, farthest and what to
+   It plays in a layer of its own, landscape only (fullscreen and locked where the phone lets it; held upright, it
+   asks to be turned), on a stage of one fixed size and shape (STAGE, 16:9) scaled to fit the screen, so every
+   phone sees the same stretch of the world; opened by the pet (app.js: Fling.open with its tails, farthest and what to
    do with the stars it brings home) or on a page of its own (fling.html). */
 (function () {
   const params = new URLSearchParams(location.search);
@@ -54,7 +55,7 @@
   // the layer: canvas, counters along the top, a hint at the bottom, the start and end cards
   const layer = document.createElement('div');
   layer.className = 'fl'; layer.hidden = true;
-  layer.innerHTML = `<canvas></canvas>
+  layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
     <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
       <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
@@ -72,21 +73,23 @@
       <div class="fl-big"><span data-k="final">0</span> m</div>
       <p data-k="endNote"></p>
       <button data-k="again">再飛一次</button><button class="fl-ghost" data-k="home">回到小狐</button>
-    </div></div>`;
+    </div></div></div>
+    <div class="fl-upright"><span>📱</span>把手機轉成橫的來玩！<button data-k="close2">回到小狐</button></div>`;
   const $ = k => layer.querySelector(`[data-k="${k}"]`);
-  const cv = layer.querySelector('canvas'), g = cv.getContext('2d');
-  let W = 0, H = 0, DPR = 1, turned = false; // (turned: the phone held upright, the layer on its side)
+  const STAGE = { w: 800, h: 450 };   // the game's own pixels; the stage is scaled to the screen whole, bars round it where the shape differs
+  const stage = layer.querySelector('.fl-stage'), cv = layer.querySelector('canvas'), g = cv.getContext('2d');
+  const W = STAGE.w, H = STAGE.h;
+  let DPR = 1, zoom = 1;
   function resize() {
     if (layer.hidden) return;
-    turned = innerHeight > innerWidth; // (a lock to landscape, where it held, makes this false)
-    layer.classList.toggle('fl-turned', turned);
-    DPR = Math.min(2, window.devicePixelRatio || 1);
-    W = turned ? innerHeight : innerWidth; H = turned ? innerWidth : innerHeight;
-    cv.width = W * DPR; cv.height = H * DPR;
+    zoom = Math.min(innerWidth / W, innerHeight / H);
+    stage.style.transform = `translate(-50%, -50%) scale(${zoom})`;
+    DPR = Math.min(3, (window.devicePixelRatio || 1) * zoom); // (drawn at the screen's own sharpness)
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
   addEventListener('resize', resize);
-  const at = e => turned ? { x: e.clientY, y: innerWidth - e.clientX } : { x: e.clientX, y: e.clientY }; // (a touch, on the layer's own axes)
+  const at = e => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }; }; // (a touch, in stage pixels)
 
   // the fox's clips: run (facing right: on the ground, and its most stretched frame in the air), pounce (crouched
   // on the branch; stretched out diving), roll (tumbling off a friend), joy (flung high), ouch, cheer / happy (at the end)
@@ -621,6 +624,7 @@
   $('again').addEventListener('click', start);
   $('home').addEventListener('click', close);
   $('close').addEventListener('click', close);
+  $('close2').addEventListener('click', close);
 
   let raf = 0, last = 0;
   function loop(now) {
@@ -636,7 +640,7 @@
     best = o.best ?? (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })();
     if (!layer.isConnected) document.body.appendChild(layer);
     layer.hidden = false;
-    // fullscreen and locked to landscape where the phone allows it (from the tap that opened it); else turned by CSS
+    // fullscreen and locked to landscape where the phone allows it (from the tap that opened it); else it asks (CSS)
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
     resize();

@@ -8,26 +8,32 @@
 <style>
   :root { --ink: #4a3b33; --card: #fffdf8; --accent: #ff8a65; --glow: #ffb347; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe6ff; color: var(--ink);
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1f2a3a; color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", sans-serif;
     -webkit-user-select: none; user-select: none; touch-action: none; overscroll-behavior: none; }
-  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-  /* held upright: the page on its side, so it plays landscape (the body becomes what fixed things sit in) */
-  html.turned body { width: 100vh; height: 100vw; transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
-  .hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 12px;
-    padding: max(12px, env(safe-area-inset-top)) 16px 0; pointer-events: none; font-weight: 800; }
+  /* landscape only: the game on a stage of one fixed size (800×450) that runner.js scales to fit the screen, bars
+     where its shape differs; held upright, it asks to be turned */
+  .stage { position: absolute; left: 50%; top: 50%; width: 800px; height: 450px; overflow: hidden; background: #bfe6ff; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .upright { display: none; position: fixed; inset: 0; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; background: #bfe6ff; font-size: 22px; font-weight: 800; text-align: center; padding: 24px; }
+  .upright span { font-size: 64px; animation: turn 1.6s ease-in-out infinite; }
+  @keyframes turn { 40%, 60% { transform: rotate(-90deg); } }
+  @media (orientation: portrait) { .upright { display: flex; } .stage { visibility: hidden; } }
+  .hud { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px 0; pointer-events: none; font-weight: 800; }
   .orbs { background: #ffffffd9; border-radius: 999px; padding: 6px 14px; font-size: 20px; }
   .time { flex: 1; height: 12px; background: #ffffff99; border-radius: 99px; overflow: hidden; }
   .time i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ffd56b, #ff8a65); border-radius: 99px; }
-  .keys { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
-    padding: 10px 12px max(14px, env(safe-area-inset-bottom)); }
-  .key { height: min(16vh, 110px); border: 0; border-radius: 22px; box-shadow: 0 6px 0 #0002; touch-action: none; }
+  .keys { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    padding: 10px 12px 12px; }
+  .key { height: 72px; border: 0; border-radius: 22px; box-shadow: 0 6px 0 #0002; touch-action: none; }
   .key:nth-child(1) { background: #ff9f6b; } .key:nth-child(2) { background: #ffd34d; } .key:nth-child(3) { background: #7cc7ff; }
   .key.down { transform: translateY(4px); box-shadow: 0 2px 0 #0002; filter: brightness(1.15); }
-  .card { position: fixed; inset: 0; display: grid; place-items: center; background: #0003; }
+  .card { position: absolute; inset: 0; display: grid; place-items: center; background: #0003; }
   .card[hidden] { display: none; }
-  .card > div { background: var(--card); border-radius: 24px; padding: 26px 24px; width: min(88vw, 360px); text-align: center;
-    box-shadow: 0 12px 40px #0003; }
+  .card > div { background: var(--card); border-radius: 24px; padding: 26px 24px; width: min(88%, 420px); text-align: center;
+    max-height: calc(100% - 20px); overflow-y: auto; box-shadow: 0 12px 40px #0003; }
   .card h1 { margin: 0 0 8px; font-size: 28px; }
   .card p { margin: 6px 0; color: #7a6a5e; line-height: 1.5; }
   .card .big { font-size: 40px; font-weight: 900; color: var(--accent); margin: 10px 0; }
@@ -37,6 +43,8 @@
 </style>
 </head>
 <body>
+<div class="upright"><span>📱</span>把手機轉成橫的來玩！</div>
+<div class="stage">
 <canvas id="game"></canvas>
 <div class="hud"><span class="orbs">🎵 <span id="orbs">0</span></span><div class="time"><i id="timeBar"></i></div></div>
 <div class="keys"><button class="key" aria-label="左"></button><button class="key" aria-label="中"></button><button class="key" aria-label="右"></button></div>
@@ -54,6 +62,7 @@
   <p id="endNote"></p>
   <button id="again">再跑一次</button><button class="ghost" id="home">回到小狐</button>
 </div></div>
+</div>
 <script src="music.js"></script>
 <script src="runner.js"></script>
 </body>
