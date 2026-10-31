@@ -17,6 +17,16 @@
    do with the stars it brings home) or on a page of its own (fling.html). */
 (function () {
   const params = new URLSearchParams(location.search);
+  // the look: the sunny day (B01), or Halloween night (B03: pumpkins, a dark forest, the moon, now and then bats
+  // flying by far off) — Halloween from mid-October to its day; ?bg=day / ?bg=halloween to pick
+  const LOOKS = {
+    day: { dir: 'assets/bg', lip: 0.25, sky: ['#8fd0ff', '#e6f6ff'], soil: '#9b7653', clouds: ['#8fd0ff', '#ffe6f2', '#e9e4ff'] },
+    halloween: { dir: 'assets/bg/halloween', lip: 0.64, tree: { cx: 0.539, cut: 0.326, w: 0.28 }, friends: 'assets/friends/halloween', sky: ['#1b1440', '#4b3a7a'], soil: '#3b2638', clouds: ['#1b1440', '#6a4f96', '#3a2f6e'], night: true },
+  };
+  const LOOK = LOOKS[params.get('bg')] || (() => {
+    const d = new Date(), m = d.getMonth(), day = d.getDate();
+    return m === 9 && day >= 15 ? LOOKS.halloween : LOOKS.day;
+  })();
   const G = 20;                        // gravity, m/s²
   // the fling: the fox pulled back on the little tree's top (dragged from anywhere), let go to fly the other way —
   // how far it's pulled the speed (min..max m/s), the way it's pulled the angle (within deg, up and to the right)
@@ -38,7 +48,7 @@
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
-  const SKY = { height: 25, run: 500, speed: 40, drop: 22, hop: 0.7 }; // (hop: s a bound along the clouds)
+  const SKY = { height: 25, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
@@ -53,7 +63,7 @@
   const FRIENDS = {
     rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
     frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
-    mushroom: { e: '🍄', h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
+    mushroom: { e: LOOK.night ? '🎃' : '🍄', h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
     bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'big'; } },
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
@@ -74,7 +84,7 @@
   layer.innerHTML = `<div class="fl-stage"><canvas></canvas>
     <div class="fl-hud"><span class="fl-pill fl-dist"><span data-k="dist">0</span> m</span>
       <span class="fl-pill fl-speed">💨 <span data-k="speed">0</span> km/h</span>
-      <span class="fl-pill fl-stars" data-k="starPill">⭐ <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
+      <span class="fl-pill fl-stars" data-k="starPill"><b data-k="starIcon">⭐</b> <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
     <div class="fl-card" data-k="end" hidden><div>
@@ -85,6 +95,8 @@
     </div></div></div>
     <div class="fl-upright"><span>📱</span>把手機轉成橫的來玩！<button data-k="close2">回到小狐</button></div>`;
   const $ = k => layer.querySelector(`[data-k="${k}"]`);
+  const STAR = LOOK.night ? '🍬' : '⭐'; // (what's caught along the way: on Halloween night, sweets)
+  if (LOOK.night) { layer.classList.add('fl-night'); $('starIcon').textContent = STAR; }
   const STAGE = { w: 800, h: 450 };   // the game's own pixels; the stage is scaled to the screen whole, bars round it where the shape differs
   const stage = layer.querySelector('.fl-stage'), cv = layer.querySelector('canvas'), g = cv.getContext('2d');
   const W = STAGE.w, H = STAGE.h;
@@ -331,7 +343,7 @@
   // up on the clouds: a road of cloud on ahead, the fox running along it away from us, three lanes and stars in
   // rows on them (a tap on the left or the right half: a lane that way); SKY.run m of it, then down off its end
   function toSky() {
-    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0, leap: -1 };
+    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0, leap: -1, intro: 0, pop: 0 };
     for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each
       const lane = Math.floor(Math.random() * 3) - 1;
       for (let k = 0; k < 4; k++) sky.stars.push({ lane, z: z + k * 3, got: false });
@@ -349,6 +361,8 @@
       if (!S.fade && sky.leap > 0.6) S.fade = { t: 0, mid: fromSky };
       return hud();
     }
+    if (!S.fade || S.fade.t > FADE * 0.75) sky.pop += dt; // (from when it's out of the black, mostly)
+    if (sky.intro < SKY.intro) { sky.intro = Math.min(SKY.intro, sky.pop); sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12); return hud(); } // (out of the cloud first)
     sky.z = Math.min(SKY.run, sky.z + SKY.speed * dt);
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
@@ -414,10 +428,11 @@
     if (S.shake > 0) g.translate((Math.random() - 0.5) * S.shake * 24, (Math.random() - 0.5) * S.shake * 24);
     // sky, hills far and near (moving less than the ground)
     const sky = g.createLinearGradient(0, 0, 0, ground());
-    sky.addColorStop(0, '#8fd0ff'); sky.addColorStop(1, '#e6f6ff');
+    sky.addColorStop(0, LOOK.sky[0]); sky.addColorStop(1, LOOK.sky[1]);
     g.fillStyle = sky; g.fillRect(-20, -20, W + 40, H + 40);
     // the layers behind, far to near, each going by faster: GPT's strips (B01, docs/gpt_background.md) once there,
     // else drawn here
+    if (LOOK.night) night(dt);
     if (BG.clouds) strip(BG.clouds, 0.05, H * 0.03, H * 0.2, S.t * 6);
     if (BG.far) strip(BG.far, 0.15, ground() - H * 0.4, H * 0.36);
     else { hills(0.15, '#bfe3c6', H * 0.18, 0.004); hills(0.35, '#9fd4a5', H * 0.12, 0.009); }
@@ -430,7 +445,7 @@
       g.beginPath(); g.ellipse(tx, ty - th * 0.6, th * 0.32, th * 0.42, 0, 0, Math.PI * 2); g.fill();
     }
     // ground
-    if (BG.ground) { g.fillStyle = '#9b7653'; g.fillRect(-20, ground(), W + 40, H); strip(BG.ground, 1, ground() - (H - ground()) * BG_LIP, (H - ground()) * (1 + BG_LIP)); }
+    if (BG.ground) { g.fillStyle = LOOK.soil; g.fillRect(-20, ground(), W + 40, H); strip(BG.ground, 1, ground() - (H - ground()) * BG_LIP, (H - ground()) * (1 + BG_LIP)); }
     else {
       g.fillStyle = '#7cc46a'; g.fillRect(-20, ground(), W + 40, H);
       g.fillStyle = '#6ab35a';
@@ -483,7 +498,7 @@
     g.textBaseline = 'middle'; g.textAlign = 'center'; g.font = `${Math.round(s * 0.8)}px sans-serif`;
     for (const a of S.stars) if (!a.got) {
       const p = toScreen(a.x, a.y), k = 1 + Math.sin(S.t * 6 + a.x * 3 + a.y) * 0.15;
-      g.save(); g.translate(p.x, p.y); g.scale(k, k); g.fillText('⭐', 0, 0); g.restore();
+      g.save(); g.translate(p.x, p.y); g.scale(k, k); if (LOOK.night) candy(0, 0, s * 0.36, a.x + a.y); else g.fillText('⭐', 0, 0); g.restore();
     }
     // the fox
     drawFox(f, s);
@@ -524,11 +539,27 @@
     g.fillStyle = shade; g.beginPath(); g.arc(x, y + r * 0.18, r, 0, 7); g.fill();
     g.fillStyle = '#fff'; g.beginPath(); g.arc(x, y, r * 0.92, 0, 7); g.fill();
   }
-  function drawSky() {
+  // a cartoon puff of smoke: round grey-white clouds with a dark outline, bursting out and up, swelling, then gone
+  const SMOKE = Array.from({ length: 9 }, (_, k) => ({ a: k / 9 * Math.PI * 2 + (k % 2) * 0.3, r: 0.8 + (k * 37 % 5) * 0.12, up: 0.5 + (k * 13 % 4) * 0.25 }));
+  function smoke(p, t) {
+    const L = LANE() * p.s, k = Math.min(1, t / 0.18), fade = Math.max(0, 1 - Math.max(0, t - 0.35) / 0.9);
+    if (fade <= 0) return;
+    g.save(); g.globalAlpha = fade; g.lineWidth = Math.max(2, L * 0.03); g.strokeStyle = '#5a4a7a';
+    for (const pass of [0, 1]) for (const m of SMOKE) {
+      const d = L * (0.25 + 0.7 * (1 - Math.exp(-t * 6))) * m.r, x = p.x + Math.cos(m.a) * d * 1.4;
+      const y = p.y + Math.sin(m.a) * d * 0.45 - L * m.up * t * 0.9, r = L * (0.1 + 0.16 * k) * m.r * (0.6 + fade * 0.4);
+      g.beginPath(); g.arc(x, y, r, 0, 7);
+      if (pass) { g.fillStyle = '#f4f1ff'; g.fill(); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x - r * 0.25, y - r * 0.25, r * 0.45, 0, 7); g.fill(); }
+      else g.stroke(); // (outlines first, all under the puffs: one cloud's outline, not each's)
+    }
+    g.restore();
+  }
+  function drawSky(dt) {
     const sky = S.sky, zv = sky.z / ZV, left = (SKY.run - sky.z) / ZV; // (left: how far on the road still goes)
     const hy = HOR(), grad = g.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, '#8fd0ff'); grad.addColorStop(0.36, '#ffe6f2'); grad.addColorStop(1, '#e9e4ff');
+    grad.addColorStop(0, LOOK.clouds[0]); grad.addColorStop(0.36, LOOK.clouds[1]); grad.addColorStop(1, LOOK.clouds[2]);
     g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    if (LOOK.night) night(dt);
     if (BG.clouds) { // high clouds drifting, and far ones along the horizon
       strip(BG.clouds, 0, H * 0.02, H * 0.16, S.t * 10);
       g.globalAlpha = 0.8; strip(BG.clouds, 0, hy - H * 0.09, H * 0.11, S.t * 4 + zv * 2); g.globalAlpha = 1;
@@ -567,13 +598,16 @@
       const a = sky.stars[i]; if (a.got) continue;
       const z = (a.z - sky.z) / ZV; if (z < -1 || z > FAR) continue;
       const p = project(a.lane, z), r = LANE() * p.s * 0.5, k = 1 + Math.sin(S.t * 6 + a.z) * 0.12;
-      g.font = `${Math.round(r * 1.4 * k)}px sans-serif`; g.fillText('⭐', p.x, p.y - r * 1.2);
+      if (LOOK.night) candy(p.x, p.y - r * 1.2, r * 0.6 * k, a.z); else { g.font = `${Math.round(r * 1.4 * k)}px sans-serif`; g.fillText('⭐', p.x, p.y - r * 1.2); }
     }
     // the fox bounding on, a bound each SKY.hop s (crouched, up, stretched out, down: back_crouch_to_back_air +
     // back_air_to_back_crouch); at the end one more, a big one out off it, away and down into the cloud below
     const up = A.up || [], down = A.down || [], hops = [...up, ...down.slice(1, -1)];
     let z = 0, lift = 0, im;
-    if (sky.leap >= 0) {
+    if (sky.intro < SKY.intro) { // up out of the cloud (from inside it, the road's top hiding its lower part), and down onto it
+      const u = sky.intro / SKY.intro; lift = -1.2 * (1 - u) + 5.2 * u * (1 - u);
+      im = u < 0.45 ? up[Math.min(up.length - 1, Math.floor(u / 0.45 * up.length))] : down[Math.min(down.length - 1, Math.floor((u - 0.45) / 0.55 * down.length))];
+    } else if (sky.leap >= 0) {
       const L = sky.leap; z = L * SKY.speed / ZV * 0.7; lift = 3.4 * L - 6 * L * L; // (lane widths)
       im = L < 0.25 ? up[Math.min(up.length - 1, Math.floor(L / 0.25 * up.length))] : up.at(-1);
     } else {
@@ -581,8 +615,11 @@
       lift = Math.sin(Math.PI * u) * 0.45; im = hops[Math.floor(u * hops.length)];
     }
     const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
-    if (sky.leap < 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
+    if (sky.pop < 1.4) smoke(project(0, -sky.z / ZV), sky.pop); // (a cartoon burst of smoke where it popped out)
+    g.save(); if (lift < 0) { g.beginPath(); g.rect(0, 0, W, p.y + (sky.leap >= 0 ? LANE() * p.s * 0.9 : 0)); g.clip(); } // (what's inside the cloud, hidden: the road, or the sea below it)
+    if (sky.leap < 0 && lift >= 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
     g.save(); g.translate(p.x, p.y - rise); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
+    if (sky.intro < SKY.intro) { const u = sky.intro / SKY.intro, k = u < 0.5 ? 0.25 * (1 - u * 2) : u > 0.85 ? -0.3 * Math.sin((u - 0.85) / 0.15 * Math.PI) : 0; g.scale(1 - k * 0.6, 1 + k); } // (stretched shooting up, squashed landing)
     if (S.ready) { // (a super bounce waiting: its glow)
       const rg = g.createRadialGradient(0, -size * 0.4, size * 0.1, 0, -size * 0.4, size * 0.6);
       rg.addColorStop(0, 'rgba(255, 225, 77, 0.6)'); rg.addColorStop(1, 'rgba(255, 225, 77, 0)');
@@ -590,7 +627,7 @@
     }
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
-    g.restore();
+    g.restore(); g.restore();
   }
 
   function offscreen(f, s) { // up out of sight: an arrow along the top where it is, and how high
@@ -635,11 +672,14 @@
   const ART_FEET = { giraffe_idle: 330, giraffe_hit: 168 };
   const ART = {};
   (async () => { // (assets/friends/index.json: the names sliced so far, e.g. ["rabbit_idle", "rabbit_hit"])
-    const r = await fetch('assets/friends/index.json').catch(() => null);
-    const names = r?.ok ? await r.json() : [];
-    for (const name of names) {
-      const [k, n] = name.split('_'), im = new Image();
-      im.onload = () => { (ART[k] ||= {})[n] = im; }; im.src = `assets/friends/${name}.png`;
+    // (on Halloween, their costumes from <LOOK.friends>/ where there, over the everyday ones: the mushroom a pumpkin)
+    for (const dir of ['assets/friends', LOOK.friends].filter(Boolean)) {
+      const r = await fetch(`${dir}/index.json`).catch(() => null);
+      const names = r?.ok ? await r.json() : [];
+      await Promise.all(names.map(name => new Promise(done => {
+        const [k, n] = name.split('_'), im = new Image();
+        im.onload = () => { (ART[k] ||= {})[n] = im; done(); }; im.onerror = done; im.src = `${dir}/${name}.png`;
+      })));
     }
   })();
   const art = (k, n) => ART[k]?.[n] || null;
@@ -751,12 +791,57 @@
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
     g.restore();
   }
-  // the background's strips (assets/bg/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
-  const BG = {}, BG_LIP = 0.25; // (BG_LIP: the ground strip's grassy top stands this much of its height over the ground line)
+  // the background's strips (<dir>/index.json: those cut so far — clouds, far, trees, ground; .webp), tiled along the way
+  const BG = {}, BG_LIP = LOOK.lip; // (BG_LIP: the ground strip's grassy top stands this much of its height over the ground line)
   (async () => {
-    const r = await fetch('assets/bg/index.json').catch(() => null);
-    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `assets/bg/${name}.webp`; }
+    const r = await fetch(`${LOOK.dir}/index.json`).catch(() => null);
+    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `${LOOK.dir}/${name}.webp`; }
   })();
+  // on Halloween night the stars are sweets: a round one in its wrapper, twisted at both ends, in one of three colours
+  const CANDY = [['#ff8a2a', '#ffd08a'], ['#9a5cff', '#d9c2ff'], ['#45c46a', '#b8f0c4']];
+  function candy(x, y, r, seed) {
+    const [c, l] = CANDY[Math.abs(Math.floor(seed * 7)) % 3];
+    g.save(); g.translate(x, y); g.rotate(Math.sin(seed) * 0.5);
+    g.lineJoin = 'round'; g.lineWidth = Math.max(1.5, r * 0.12); g.strokeStyle = '#4a2a3a'; g.fillStyle = c;
+    for (const d of [-1, 1]) { g.beginPath(); g.moveTo(d * r * 0.7, 0); g.lineTo(d * r * 1.7, -r * 0.6); g.lineTo(d * r * 1.55, 0); g.lineTo(d * r * 1.7, r * 0.6); g.closePath(); g.fill(); g.stroke(); }
+    g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke();
+    g.strokeStyle = l; g.lineWidth = r * 0.22; g.lineCap = 'round'; // (its stripes, and a shine)
+    for (const o of [-0.4, 0.15]) { g.beginPath(); g.arc(0, 0, r * 0.62, Math.PI * (0.9 + o), Math.PI * (1.3 + o)); g.stroke(); }
+    g.fillStyle = '#ffffffcc'; g.beginPath(); g.arc(-r * 0.35, -r * 0.4, r * 0.16, 0, 7); g.fill();
+    g.restore();
+  }
+  // the night's moon, and its bats: a flock now and then, small and dark, flapping across far off
+  const bats = []; let batWait = 3;
+  function night(dt) {
+    const mx = W * 0.8, my = H * 0.17, mr = H * 0.075;
+    const glow = g.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 3);
+    glow.addColorStop(0, 'rgba(255, 240, 190, 0.35)'); glow.addColorStop(1, 'rgba(255, 240, 190, 0)');
+    g.fillStyle = glow; g.fillRect(mx - mr * 3, my - mr * 3, mr * 6, mr * 6);
+    g.fillStyle = '#fff4c8'; g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
+    g.fillStyle = '#f0e2a8'; for (const [ox, oy, r] of [[-0.3, -0.2, 0.18], [0.25, 0.3, 0.13], [0.35, -0.3, 0.09]]) { g.beginPath(); g.arc(mx + ox * mr, my + oy * mr, r * mr, 0, 7); g.fill(); }
+    if ((batWait -= dt) < 0) { // a flock off, from one side across to the other
+      batWait = 7 + Math.random() * 9;
+      const dir = Math.random() < 0.5 ? 1 : -1, y = H * (0.1 + Math.random() * 0.28), n = 5 + Math.floor(Math.random() * 6);
+      bats.push({ dir, y, t: 0, speed: W * (0.12 + Math.random() * 0.06), one: Array.from({ length: n }, () => ({ dx: Math.random() * W * 0.18, dy: (Math.random() - 0.5) * H * 0.1, k: Math.random() * 7, size: H * (0.012 + Math.random() * 0.01) })) });
+    }
+    g.fillStyle = '#120c24';
+    for (let i = bats.length - 1; i >= 0; i--) {
+      const fl = bats[i]; fl.t += dt;
+      const lead = fl.dir > 0 ? -W * 0.05 + fl.t * fl.speed : W * 1.05 - fl.t * fl.speed;
+      if (fl.t * fl.speed > W * 1.4) { bats.splice(i, 1); continue; }
+      for (const b of fl.one) {
+        const x = lead - fl.dir * b.dx, y = fl.y + b.dy + Math.sin(fl.t * 2 + b.k) * H * 0.012, a = Math.sin(fl.t * 16 + b.k), z = b.size;
+        g.beginPath(); // (wings up and down from the body)
+        g.moveTo(x - z * 0.3, y);
+        g.quadraticCurveTo(x - z * 1.2, y - z * 1.6 * a - z * 0.2, x - z * 2.2, y - z * 0.9 * a);
+        g.quadraticCurveTo(x - z * 1.3, y - z * 0.2 * a + z * 0.3, x, y + z * 0.4);
+        g.quadraticCurveTo(x + z * 1.3, y - z * 0.2 * a + z * 0.3, x + z * 2.2, y - z * 0.9 * a);
+        g.quadraticCurveTo(x + z * 1.2, y - z * 1.6 * a - z * 0.2, x + z * 0.3, y);
+        g.closePath(); g.fill();
+        g.beginPath(); g.ellipse(x, y + z * 0.1, z * 0.45, z * 0.6, 0, 0, 7); g.fill();
+      }
+    }
+  }
   function strip(im, par, y, h, drift = 0) { // tiled across, going by at par of the ground's pace (plus drift px)
     const w = im.naturalWidth * h / im.naturalHeight, off = (((S.cam.scroll * par + drift) % w) + w) % w;
     for (let x = -off; x < W; x += w) g.drawImage(im, x, y, w + 1, h);
@@ -765,8 +850,8 @@
   // bottom, its leafy crown at the top where the fox sits, and between them its trunk, bent here — the stump's own
   // bark (tree_trunk: a band of it straightened out, mirror-tiled up and down) laid along the bend in short slices,
   // tapering a little from the stump's width (TREE_AT.w of the roots' picture) to the crown, the stump's outline down its sides
-  const TREE = {}, TREE_AT = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.36 }; // (m, and of the pictures)
-  for (const k of ['base', 'crown', 'trunk']) { const im = new Image(); im.onload = () => { TREE[k] = im; }; im.src = `assets/bg/tree_${k}.webp`; }
+  const TREE = {}, TREE_AT = { x: -0.5, base: 2.2, cx: 0.523, cut: 0.404, w: 0.282, crown: 1.6, tipW: 0.36, ...LOOK.tree }; // (m, and of the pictures; B04 for Halloween)
+  for (const k of ['base', 'crown', 'trunk']) { const im = new Image(); im.onload = () => { TREE[k] = im; }; im.src = `${LOOK.dir}/tree_${k}.webp`; }
   function drawTree(tx, ty, s) {
     const A_ = TREE_AT, bw = A_.base, bh = bw * TREE.base.naturalHeight / TREE.base.naturalWidth;
     const b0 = toScreen(A_.x - bw / 2, bh - 0.1); // (its picture's top left; sunk a little into the ground)
@@ -832,7 +917,7 @@
     else try { localStorage.setItem('ipet-fling-best', Math.max(best, d)); } catch (e) {}
     $('final').textContent = d;
     $('endTitle').textContent = isBest ? '🎉 新紀錄！' : '飛好遠！';
-    $('endNote').textContent = `撿到 ⭐ ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
+    $('endNote').textContent = `撿到 ${STAR} ${S.got} 顆，帶回家給小狐` + (isBest || !best ? '' : `（最遠 ${best} m）`);
     best = Math.max(best, d);
     hud();
     setTimeout(() => { $('end').hidden = false; }, 1200); // (a moment to see it cheer first)

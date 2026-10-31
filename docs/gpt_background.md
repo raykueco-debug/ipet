@@ -17,3 +17,10 @@ B01 驗收通過，很可愛。請交 B02，同樣的畫風、同樣純洋紅色
 
 收件後去背（--magenta），左半切成 `assets/bg/tree_crown.webp`；右半是個平頂樹樁，把樹樁上半截（y 510 以上、x 1600–1862）擦掉只留樹根和草，切成 `assets/bg/tree_base.webp`。
 中間會彎的樹幹由 `fling.js` 的 drawTree() 畫：從樹根的切口（寬度 TREE_AT.w）往上漸細接到樹冠，顏色取自樹樁。
+
+## 萬聖節（B03 背景、B04 起跳小樹；`?bg=halloween`，10 月 15 日起自動換）
+
+B03、B04 跟 B01、B02 同樣的要求，改成夜晚配色（深紫、深藍、橘色南瓜），底色用純綠 #00FF00（萬聖節版畫面裡沒有亮綠色）。
+- B03（雲、遠山、黑森林與南瓜燈、南瓜草地）：`greenkey.py` 去背 → `slice_bands.py assets/source/B03_keyed.png assets/bg/halloween clouds far trees ground`。地面那條草叢和南瓜比較高，所以 LOOKS.halloween.lip 是 0.64。
+- B04（紫色樹冠帶小南瓜、樹樁根部和笑臉南瓜燈）：`greenkey.py --any-colour` 去背；左半切成 `assets/bg/halloween/tree_crown.webp`；右半把樹樁上半截（y 482 以上、x 1652–1872）擦掉，切成 `tree_base.webp`；樹樁 y 440–480 那段樹皮拉直、上下鏡像接起來，存成 `tree_trunk.webp`。切口的位置寫在 LOOKS.halloween.tree。
+- 月亮、遠方的蝙蝠群、糖果、雲上的夜色由 `fling.js` 畫。

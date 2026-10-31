@@ -43,3 +43,8 @@
 .fl-card button { margin: 10px 6px 0; padding: 12px 24px; font-size: 18px; font-weight: 800; border: 0; border-radius: 999px;
   background: var(--fl-accent); color: #fff; }
 .fl-card button.fl-ghost { background: #f1e7dc; color: var(--fl-ink); }
+/* Halloween night: the counters in the night's colours */
+.fl-night .fl-pill, .fl-night .fl-x { background: #2a1d4ee0; color: #ffd9a8; box-shadow: 0 0 0 2px #ff8a2a66; }
+.fl-night .fl-meter { background: #4a3a70; }
+.fl-night .fl-meter i { background: linear-gradient(90deg, #ff8a2a, #b46cff); }
+.fl-night .fl-stars.ready { background: #4a2a70; box-shadow: 0 0 0 3px #ff8a2a, 0 0 18px #ff8a2a; }
