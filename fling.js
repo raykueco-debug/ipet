@@ -357,10 +357,13 @@
     const sky = g.createLinearGradient(0, 0, 0, ground());
     sky.addColorStop(0, '#8fd0ff'); sky.addColorStop(1, '#e6f6ff');
     g.fillStyle = sky; g.fillRect(-20, -20, W + 40, H + 40);
-    hills(0.15, '#bfe3c6', H * 0.18, 0.004);
-    hills(0.35, '#9fd4a5', H * 0.12, 0.009);
-    // trees along the back (at half the ground's pace)
-    for (let k = Math.floor((S.cam.x * 0.5 - 40) / 7); k < (S.cam.x * 0.5 + 60) / 7; k++) {
+    // the layers behind, far to near, each going by faster: GPT's strips (B01, docs/gpt_background.md) once there,
+    // else drawn here
+    if (BG.clouds) strip(BG.clouds, 0.05, H * 0.03, H * 0.2, S.t * 6);
+    if (BG.far) strip(BG.far, 0.15, ground() - H * 0.3, H * 0.3);
+    else { hills(0.15, '#bfe3c6', H * 0.18, 0.004); hills(0.35, '#9fd4a5', H * 0.12, 0.009); }
+    if (BG.trees) strip(BG.trees, 0.5, ground() - H * 0.34 + 4, H * 0.34);
+    else for (let k = Math.floor((S.cam.x * 0.5 - 40) / 7); k < (S.cam.x * 0.5 + 60) / 7; k++) { // trees along the back (at half the ground's pace)
       const tx = (k * 7 - S.cam.x * 0.5) * s + W * 0.3 + ((k * 37) % 11), ty = ground() - 2;
       const th = s * (3 + ((k * 13) % 5) * 0.6);
       g.fillStyle = '#7a5a3a'; g.fillRect(tx - s * 0.15, ty - th * 0.4, s * 0.3, th * 0.4);
@@ -368,10 +371,13 @@
       g.beginPath(); g.ellipse(tx, ty - th * 0.6, th * 0.32, th * 0.42, 0, 0, Math.PI * 2); g.fill();
     }
     // ground
-    g.fillStyle = '#7cc46a'; g.fillRect(-20, ground(), W + 40, H);
-    g.fillStyle = '#6ab35a';
-    for (let k = Math.floor((S.cam.x - 40) / 2); k < (S.cam.x + 80) / 2; k++) { const p = toScreen(k * 2, 0); if (k % 2) g.fillRect(p.x, ground(), 2 * s, H - ground()); }
-    g.fillStyle = '#9b7653'; g.fillRect(-20, ground() + Math.max(14, s * 0.6), W + 40, H);
+    if (BG.ground) { g.fillStyle = '#9b7653'; g.fillRect(-20, ground(), W + 40, H); strip(BG.ground, 1, ground() - (H - ground()) * BG_LIP, (H - ground()) * (1 + BG_LIP)); }
+    else {
+      g.fillStyle = '#7cc46a'; g.fillRect(-20, ground(), W + 40, H);
+      g.fillStyle = '#6ab35a';
+      for (let k = Math.floor((S.cam.x - 40) / 2); k < (S.cam.x + 80) / 2; k++) { const p = toScreen(k * 2, 0); if (k % 2) g.fillRect(p.x, ground(), 2 * s, H - ground()); }
+      g.fillStyle = '#9b7653'; g.fillRect(-20, ground() + Math.max(14, s * 0.6), W + 40, H);
+    }
     // distance signs every 50 m, and the farthest flag
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let m = Math.ceil((S.cam.x - 30) / 50) * 50; m < S.cam.x + 80; m += 50) {
@@ -597,6 +603,16 @@
     if (img?.complete && img.naturalWidth) g.drawImage(img, -sz / 2, -sz * 449 / 480 + size * 0.45, sz, sz); // (feet at y 449 of 480)
     else { g.font = `${Math.round(size * 0.6)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🦊', 0, 0); }
     g.restore();
+  }
+  // the background's strips (assets/bg/index.json: those cut so far — clouds, far, trees, ground), tiled along the way
+  const BG = {}, BG_LIP = 0.25; // (BG_LIP: the ground strip's grassy top stands this much of its height over the ground line)
+  (async () => {
+    const r = await fetch('assets/bg/index.json').catch(() => null);
+    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { BG[name] = im; }; im.src = `assets/bg/${name}.png`; }
+  })();
+  function strip(im, par, y, h, drift = 0) { // tiled across, going by at par of the ground's pace (plus drift px)
+    const w = im.naturalWidth * h / im.naturalHeight, off = (((S.cam.scroll * par + drift) % w) + w) % w;
+    for (let x = -off; x < W; x += w) g.drawImage(im, x, y, w + 1, h);
   }
   function hills(par, col, amp, freq) {
     g.fillStyle = col; g.beginPath(); g.moveTo(-20, ground());
