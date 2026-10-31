@@ -161,7 +161,7 @@
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0 },
     tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
-    fx: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
+    fx: [], glints: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
   });
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
@@ -346,6 +346,7 @@
   }
   function starGot() { // a star caught (in the air or on the clouds): counted, and toward the super bounce
     S.got++; SFX.star();
+    for (let k = 0; k < 6; k++) S.glints.push({ x: (Math.random() - 0.5) * 1.3, y: (Math.random() - 0.5) * 1.1, t: -k * 0.05, r: 0.08 + Math.random() * 0.07, spin: Math.random() * 3 }); // (it sparkles)
     if (!S.ready && ++S.meter >= SUPER.stars) {
       S.ready = true; SFX.ready();
       pop('SUPER BOUNCE 準備好！', S.fox.x + 2, S.fox.y + 3, '#ffe14d', 0.9);
@@ -514,6 +515,7 @@
     }
     // the fox
     drawFox(f, s);
+    { const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25; glints(p.x, p.y - size * 0.45, size, dt); }
     if (S.fade?.mid === toSky) { const q = toScreen(f.x, f.y + 0.6); smoke({ x: q.x, y: q.y, s: s * 1.6 / LANE() }, S.fade.t * 1.4); } // (up into the clouds: a puff of them)
     for (const a of carriers) drawFriend(a, s);
     // bits: dust, fire, rainbow, confetti, words
@@ -555,6 +557,24 @@
   // a cartoon puff of smoke: round grey-white clouds with a dark outline, bursting out and up, swelling, then gone
   const SMOKE = Array.from({ length: 9 }, (_, k) => ({ a: k / 9 * Math.PI * 2 + (k % 2) * 0.3, r: 0.8 + (k * 37 % 5) * 0.12, up: 0.5 + (k * 13 % 4) * 0.25 }));
   const SPLASH = (3.4 + Math.sqrt(3.4 ** 2 + 4 * 6 * 0.9)) / 12; // (s into the leap: down to the sea of cloud, 0.9 lanes below — see the leap's lift)
+  // a sweet (or a star) eaten: glints of light popping out on the fox here and there, each a four-pointed twinkle
+  // that swells and turns and is gone (S.glints: where on it, of its size)
+  function glints(x, y, size, dt) {
+    for (let i = S.glints.length - 1; i >= 0; i--) {
+      const a = S.glints[i]; a.t += dt;
+      if (a.t > 0.45) { S.glints.splice(i, 1); continue; }
+      if (a.t < 0) continue;
+      const k = Math.sin(a.t / 0.45 * Math.PI), r = a.r * size * k, px = x + a.x * size * 0.5, py = y + a.y * size * 0.5;
+      g.save(); g.translate(px, py); g.rotate(a.spin + a.t * 3);
+      const glow = g.createRadialGradient(0, 0, 0, 0, 0, r * 1.6);
+      glow.addColorStop(0, 'rgba(255, 250, 210, 0.9)'); glow.addColorStop(1, 'rgba(255, 230, 120, 0)');
+      g.fillStyle = glow; g.beginPath(); g.arc(0, 0, r * 1.6, 0, 7); g.fill();
+      g.fillStyle = '#fffbe6'; g.beginPath();
+      for (let q = 0; q < 8; q++) { const ang = q * Math.PI / 4, d = q % 2 ? r * 0.22 : r * 1.3; g.lineTo(Math.cos(ang) * d, Math.sin(ang) * d); }
+      g.closePath(); g.fill();
+      g.restore();
+    }
+  }
   function smoke(p, t) {
     const L = LANE() * p.s, k = Math.min(1, t / 0.18), fade = Math.max(0, 1 - Math.max(0, t - 0.35) / 0.9);
     if (fade <= 0) return;
@@ -644,6 +664,7 @@
     }
     if (im?.complete && im.naturalWidth) g.drawImage(im, -size / 2, -size * 449 / 480, size, size); // (feet at y 449 of 480 in its frames)
     else { g.font = `${Math.round(size * 0.5)}px sans-serif`; g.fillText('🦊', 0, -size * 0.3); }
+    glints(0, -size * 0.45, size, dt);
     g.restore(); g.restore();
   }
 
