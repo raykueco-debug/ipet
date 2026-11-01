@@ -2,8 +2,8 @@
   "name": "iPet 小狐",
   "short_name": "小狐",
   "start_url": "./",
-  "display": "standalone",
-  "orientation": "any",
+  "display": "fullscreen",
+  "orientation": "landscape",
   "background_color": "#fff3e6",
   "theme_color": "#fff3e6",
   "icons": [

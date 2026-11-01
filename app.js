@@ -22,7 +22,7 @@ const RATES_AWAKE = { hunger: -6, fun: -5, energy: -3, clean: -3 };
 const RATES_SLEEP = { hunger: -3, fun: -1, energy: +18, clean: -1 };
 const MAX_CATCHUP_H = 48;
 // energy: a fling costs FLING_ENERGY; under FLING_LEAST the fox would rather rest (sleep) or eat (a meal gives EAT_ENERGY back)
-const FLING_ENERGY = 10, FLING_LEAST = 20, EAT_ENERGY = 10;
+const FLING_ENERGY = 10, FLING_LEAST = 0, EAT_ENERGY = 10; // (FLING_LEAST 0 while it's being tried out: no limit; 20 after)
 
 // sprite layout (fractions of the square sprite canvas) — tuned to GPT's D01/B01 sprites
 const TAIL_ROOT = { x: 0.54, y: 0.92 };
@@ -937,6 +937,12 @@ function bind() {
     S.locks = { ...S.locks, [b.dataset.ff]: !S.locks?.[b.dataset.ff] };
     render(); save();
   }));
+  // landscape only, fullscreen where the phone lets it (no browser bars, to and from the fling game too): from a tap, as fling.js does
+  if (matchMedia('(pointer: coarse)').matches) document.addEventListener('pointerdown', () => {
+    if (document.fullscreenElement || matchMedia('(display-mode: fullscreen)').matches) return;
+    const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
+  }, true);
   $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runner.html'; }); // the mini game (runner.js)
   $('#renameBtn').addEventListener('click', () => {
     const n = prompt(t('renamePrompt'), S.name);

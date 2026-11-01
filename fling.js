@@ -46,8 +46,10 @@
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
   const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
   // how hard each extra throw is, over a tail's dash (DASH.up, ~10 m/s): a super bounce (stars) = a bunny bounce (the
-  // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail
-  const SUPER = { stars: 10, vx: 10, vy: 26 };     // stars for a super bounce; what it adds to vx (at least 18), vy (to)
+  // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail.
+  // A super / bunny bounce is the friend's own throw made stronger: boost times as fast, as long (an owl's carry, a
+  // boar's ride), more hops off a frog; a hedgehog springs it up and rolls off as if dived onto
+  const SUPER = { stars: 10, boost: 1.6, hops: 2 }; // stars for a super bounce; how much stronger; frog hops more
   const COMBO = 13;                                // a combo: this many m/s more, on the way the friend throws it
   const RABBIT = { run: 16, by: 1.4 };             // landed on, a rabbit runs ahead (at least this fast, m/s) to stand by the next friend
   // a frog landed on: the next dive onto the plain ground (only a dive) springs back, keeping this of its fall and at
@@ -263,23 +265,24 @@
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0; f.soar = false;
     dust(a.x, 0.2, 5);
-    if (dived && a.kind === 'hedgehog') { // curled up and rolling off along the ground, knocking flying whoever it meets
+    const power = S.ready || a.bunny; // a super bounce (the stars full), or a bunny bounce (a rabbit ran here first): as strong
+    if (power) { // (the bunny's first: the stars keep for the next)
+      const bunny = a.bunny;
+      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
+      f.rainbow = 2.2; S.shake = 0.5; SFX.super();
+      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
+    }
+    if ((dived || power) && a.kind === 'hedgehog') { // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
       FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; // (off it as off a mushroom dived onto)
-      SFX.big(); act('joy', 0.8); S.shake = 0.2;
-      pop('滾出去！', a.x, fr.h + 1.5, '#ffe14d');
+      if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; }
+      SFX.big(); act('joy', 0.8); S.shake = Math.max(S.shake, 0.2);
+      if (!power) pop('滾出去！', a.x, fr.h + 1.5, '#ffe14d');
       if (combo) comboUp(a, fr);
       return;
     }
-    if (S.ready || a.bunny) { // a super bounce (the stars full), or a bunny bounce (a rabbit ran here first): as strong
-      const bunny = a.bunny; // (the bunny's first: the stars keep for the next)
-      f.vy = SUPER.vy; f.vx = Math.max(f.vx, 18) + SUPER.vx; f.rainbow = 2.2; f.spin = 0;
-      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
-      S.shake = 0.5; act('joy', 1.2); SFX.super();
-      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
-      return;
-    }
     const s = fr.hit(f); SFX[s]?.();
+    if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; f.glide *= SUPER.boost; f.ride *= SUPER.boost; if (f.hops) f.hops += SUPER.hops; }
     if (dived && s !== 'ouch') { f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; pop('強力！', a.x + 1, fr.h + 2.4, '#ffb347', 0.6); }
     if (combo && s !== 'ouch') comboUp(a, fr);
     if (s === 'ouch') S.combo = 0; // (tripped: no combo on from it)
@@ -291,6 +294,7 @@
     if (s === 'soar') { pop('滑翔～', a.x, fr.h + 1.5, '#ffd27a'); return; } // (the squirrel's: off gliding)
     a.carry = a.kind === 'owl' || a.kind === 'boar';
     if (f.hold > 0) S.holder = a; // (the giraffe's: held in its mouth through the swing)
+    if (power) { act('joy', 1.2); return; } // (its words said already)
     if (s === 'ouch') { f.spin = 1; act('roll', 0.6); } // (tripped: tumbling over it)
     else if (s === 'big') act('joy', 0.8);
     else if (s === 'fling') { f.spin = 1.5; act('roll', 0.75); }
@@ -1085,7 +1089,8 @@
     const KEY = 'ipet-fox-v1', read = () => { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } };
     if (!read()?.stats) return null;
     return {
-      least: 20, get: () => Math.round(read()?.stats?.energy ?? 100),
+      least: 0, // (no limit while it's being tried out: 20 after)
+      get: () => Math.round(read()?.stats?.energy ?? 100),
       spend: () => {
         const p = read(); if (!p?.stats) return 100;
         p.stats.energy = Math.max(0, p.stats.energy - 10);
@@ -1163,10 +1168,10 @@
     cancelAnimationFrame(raf); raf = 0;
     bgm?.pause();
     layer.hidden = true; S = null;
+    if (opts.onClose) return opts.onClose(); // (back to the pet, landscape and fullscreen too: left as they are, no browser bars back in between)
     try { screen.orientation?.unlock?.(); } catch (e) {}
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-    if (opts.onClose) opts.onClose();
-    else if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
+    if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
   }
   window.Fling = { open, close };
   if (params.has('debug')) Fling.state = () => S; // (?debug: the run, to look at from the console)
