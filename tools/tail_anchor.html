@@ -105,7 +105,7 @@
         <div id="frames"></div>
       </div>
       <div class="box">
-        <p class="hint">在畫面上點或拖：移動尾根。拖橘色線末端的圓點：轉角度。滾輪：大小（Shift＋滾輪：展開）。<br>
+        <p class="hint">點兩下：尾根設在那裡。拖尾根圓點：移動它。在其他地方拖（繞著尾根轉）：轉角度。滾輪：大小（Shift＋滾輪：展開）。<br>
         只錨幾幀就好，中間會自動直線補上；錨點之前／之後的幀跟著最近的錨點。<br>
         ← → 換幀、空白鍵播放、Del 刪錨點。</p>
         <p class="hint legend"><span style="background:#999"></span>自動找到的<span style="background:var(--accent)"></span>目前用的<span style="background:#2bb3c9"></span>接續的動畫（頭／尾幀）<span style="background:#7a5cff"></span>上一幀</p>
@@ -137,7 +137,10 @@
     });
   }
   const fOf = r => (typeof r?.[4] === 'number' ? r[4] : 0);
-  const way = r => (r.length > 5 || +$('n').value > 1 ? r[2] : r[2] < 0 ? -ONE : ONE); // (one tail, not set by hand: its slant)
+  const way = r => { // the way its tails go, as drawn (not set by hand: one tail slants, more facing us fan round upright)
+    const n = +$('n').value, f = fOf(r) * Math.min(1, (n - 1) / 2);
+    return r.length > 5 ? r[2] : n === 1 ? (r[2] < 0 ? -ONE : ONE) : r[2] + (5 - r[2]) * f;
+  };
 
   // the clip list: the pet's tail-less clips
   function list() {
@@ -210,7 +213,7 @@
     const n = +$('n').value;
     const quick = /_loop_run|_loop$|^walk/.test(clip) && /walk|run/.test(clip);
     const f = fOf(r) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
-    const mid = mix(r[2], 5), lift = 40 * f;
+    const mid = r.length > 5 ? r[2] : mix(r[2], 5), lift = 40 * f;
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1);
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
@@ -285,12 +288,17 @@
 
   // on the picture: drag the root, or the handle at the end of its line to turn it
   const at = e => { const b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) * 512 / b.width, y: (e.clientY - b.top) * 544 / b.height }; };
+  // on the root: drag it; anywhere else: drag round it to turn them; twice: the root there
+  const near = px => px * 512 / cv.getBoundingClientRect().width; // (screen px, in the canvas's)
+  const towards = (p, q) => Math.atan2(p.x - q.x, -(p.y - q.y)) * 180 / Math.PI;
   cv.addEventListener('pointerdown', e => {
     const r = clip && resolve(clip)[i]; if (!r) return;
-    const p = at(e), h = handle(r);
-    drag = Math.hypot(p.x - h.x, p.y - h.y) < 14 ? 'turn' : 'move';
-    cv.setPointerCapture(e.pointerId); move(e);
+    const p = at(e), q = P(r);
+    drag = Math.hypot(p.x - q.x, p.y - q.y) < near(18) ? { move: true, dx: q.x - p.x, dy: q.y - p.y }
+      : { from: towards(p, q), a: way(r) }; // (turned by as much as the pointer goes round it)
+    cv.setPointerCapture(e.pointerId);
   });
+  cv.addEventListener('dblclick', e => { const p = at(e); drag = null; setKey({ 0: p.x / K, 1: (p.y - DROP) / K }); });
   cv.addEventListener('pointermove', e => drag && move(e));
   cv.addEventListener('wheel', e => { // size (shift: how wide they fan out)
     const r = clip && resolve(clip)[i]; if (!r) return;
@@ -301,8 +309,8 @@
   cv.addEventListener('pointerup', () => { drag = null; });
   function move(e) {
     const p = at(e), r = resolve(clip)[i];
-    if (drag === 'move') setKey({ 0: p.x / K, 1: (p.y - DROP) / K });
-    else { const q = P(r); setKey({ 2: Math.atan2(p.x - q.x, -(p.y - q.y)) * 180 / Math.PI }); }
+    if (drag.move) setKey({ 0: (p.x + drag.dx) / K, 1: (p.y + drag.dy - DROP) / K });
+    else setKey({ 2: drag.a + (((towards(p, P(r)) - drag.from) % 360) + 540) % 360 - 180 });
   }
   for (const [id, j] of [['x', 0], ['y', 1], ['a', 2], ['f', 3], ['s', 4], ['w', 5]]) $(id).addEventListener('input', () => setKey({ [j]: +$(id).value }));
 

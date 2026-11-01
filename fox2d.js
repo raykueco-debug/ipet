@@ -309,7 +309,7 @@
     // f: how much it faces us (tools/tail_roots.py) — then, the more tails the more so, fanned out wide to both sides
     // round straight up from behind its hips, bigger, to show past its big head; side on, round the way its own went
     const f = (typeof r[4] === 'number' ? r[4] : 0) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
-    const mid = mix(r[2], 5), lift = 40 * f;
+    const mid = r.length > 5 ? r[2] : mix(r[2], 5), lift = 40 * f; // (set by hand: as set)
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1); // (× as set by hand)
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1)); // (r.length > 5: set by hand)
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
