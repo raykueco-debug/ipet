@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="iPet">
 <meta name="theme-color" content="#fff3e6">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -14,8 +14,8 @@
 <script> // (while it's tried out on phones: a script error shown on the page itself, there being no console to look in)
 addEventListener('error', e => { if (!e.message) return; const d = document.createElement('div'); d.className = 'jsErr'; d.textContent = `⚠️ ${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`; d.onclick = () => d.remove(); (document.body || document.documentElement).appendChild(d); });
 </script>
-<link rel="stylesheet" href="style.css?v=2026.11.01-31">
-<link rel="stylesheet" href="fling.css?v=2026.11.01-31">
+<link rel="stylesheet" href="style.css?v=2026.11.01-32">
+<link rel="stylesheet" href="fling.css?v=2026.11.01-32">
 <title>iPet</title>
 </head>
 <body>
@@ -25,7 +25,7 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
       <button id="nameBtn" class="name-btn"><span id="petName">iPet</span></button>
       <span class="lv" id="tailBadge">1 尾</span>
       <span class="age" id="age"></span>
-      <span class="ver" id="ver">v2026.11.01-31</span>
+      <span class="ver" id="ver">v2026.11.01-32</span>
       <button id="menuBtn" class="icon-btn" aria-label="設定">⚙︎</button>
     </div>
     <div class="xp"><div id="growBar"></div></div>
@@ -87,6 +87,15 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
   </div>
 </div>
 
+<div id="iosAdd" class="modal hidden">
+  <div class="card">
+    <h1>加入主畫面</h1>
+    <p>iPhone 的 Safari 不讓網頁自己全螢幕。<br>加到主畫面、從那裡打開，就沒有瀏覽器列：</p>
+    <p style="text-align:left;line-height:1.8">① 點 Safari 下方（或上方）的 <b>分享</b> 按鈕 <span style="font-size:20px">⎙</span><br>② 往下找 <b>「加入主畫面」</b><br>③ 按 <b>新增</b>，之後都從主畫面的小狐圖示打開</p>
+    <button id="iosAddOk" class="primary">知道了</button>
+  </div>
+</div>
+
 <div id="menu" class="modal hidden">
   <div class="card">
     <h1 data-i18n="settings">設定</h1>
@@ -118,14 +127,14 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
 </div>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
-<script src="i18n.js?v=2026.11.01-31"></script>
-<script src="voice.js?v=2026.11.01-31"></script>
-<script src="words.js?v=2026.11.01-31"></script>
-<script src="sound.js?v=2026.11.01-31"></script>
-<script src="fling.js?v=2026.11.01-31"></script>
-<script src="app.js?v=2026.11.01-31"></script>
-  <script src="scene.js?v=2026.11.01-31"></script>
-  <script src="ball.js?v=2026.11.01-31"></script>
-<script src="learn.js?v=2026.11.01-31"></script>
+<script src="i18n.js?v=2026.11.01-32"></script>
+<script src="voice.js?v=2026.11.01-32"></script>
+<script src="words.js?v=2026.11.01-32"></script>
+<script src="sound.js?v=2026.11.01-32"></script>
+<script src="fling.js?v=2026.11.01-32"></script>
+<script src="app.js?v=2026.11.01-32"></script>
+  <script src="scene.js?v=2026.11.01-32"></script>
+  <script src="ball.js?v=2026.11.01-32"></script>
+<script src="learn.js?v=2026.11.01-32"></script>
 </body>
 </html>

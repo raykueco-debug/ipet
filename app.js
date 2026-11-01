@@ -947,7 +947,24 @@ function bind() {
 let installAsk = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); installAsk = e; $('#installBtn').hidden = false; });
 addEventListener('appinstalled', () => { $('#installBtn').hidden = true; });
-$('#installBtn').addEventListener('click', () => { installAsk?.prompt(); installAsk = null; $('#installBtn').hidden = true; });
+$('#installBtn').addEventListener('click', () => {
+  if (!installAsk) { $('#iosAdd').classList.remove('hidden'); return; } // (iPhone: Safari has no install offer — how to add it by hand)
+  installAsk.prompt(); installAsk = null; $('#installBtn').hidden = true;
+});
+$('#iosAddOk').addEventListener('click', () => $('#iosAdd').classList.add('hidden'));
+// iPhone / iPad in Safari (not opened from the home screen): no fullscreen for pages there, so the button shows how
+if ((/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !navigator.standalone) $('#installBtn').hidden = false;
+// the screen's own height, measured: on a phone it settles a moment after opening, turning round or going fullscreen,
+// and 100dvh can be read too soon (or isn't there on older ones) — the page then sat short of the screen
+function fitScreen() { document.documentElement.style.setProperty('--app-h', Math.round(window.visualViewport?.height || innerHeight) + 'px'); }
+function fitSoon() { fitScreen(); for (const ms of [100, 300, 700, 1500]) setTimeout(fitScreen, ms); }
+for (const ev of ['resize', 'orientationchange', 'pageshow', 'fullscreenchange', 'webkitfullscreenchange']) addEventListener(ev, fitSoon);
+document.addEventListener('fullscreenchange', fitSoon); window.visualViewport?.addEventListener('resize', fitScreen);
+fitSoon();
+// (while it's tried out: beside the version, whether it's running as the home-screen app or in the browser)
+{ const mode = document.createElement('span'); mode.className = 'ver';
+  const show = () => { mode.textContent = navigator.standalone || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches ? '· App' : document.fullscreenElement ? '· 全螢幕' : '· 瀏覽器'; };
+  $('#ver')?.after(mode); show(); document.addEventListener('fullscreenchange', show); setInterval(show, 2000); }
 $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runner.html'; }); // the mini game (runner.js)
   $('#renameBtn').addEventListener('click', () => {
     const n = prompt(t('renamePrompt'), S.name);

@@ -29,7 +29,7 @@ html, body {
 }
 
 #app {
-  height: 100dvh;
+  height: 100vh; height: 100dvh; height: var(--app-h, 100dvh); /* (app.js fitScreen: the screen's own height, measured) */
   display: flex;
   flex-direction: column;
   padding: calc(env(safe-area-inset-top) + 8px) 16px calc(env(safe-area-inset-bottom) + 10px);

@@ -123,19 +123,25 @@
   }
   lookUI();
   $('look').addEventListener('click', () => setLook(LOOK.night ? LOOKS.day : LOOKS.halloween));
-  const STAGE = { w: 800, h: 450 };   // the game's own pixels; the stage is scaled to the screen whole, bars round it where the shape differs
+  const STAGE = { w: 800, h: 450, wide: 2.3 }; // the game's own pixels (450 high, as wide as the screen's shape, 16:9 up to wide:1); scaled to the screen whole
   const stage = layer.querySelector('.fl-stage'), cv = layer.querySelector('canvas'), g = cv.getContext('2d');
-  const W = STAGE.w, H = STAGE.h;
+  let W = STAGE.w; const H = STAGE.h;
   let DPR = 1, zoom = 1;
   function resize() {
     if (layer.hidden) return;
-    zoom = Math.min(innerWidth / W, innerHeight / H);
+    const sw = window.visualViewport?.width || innerWidth, sh = window.visualViewport?.height || innerHeight;
+    W = Math.round(H * Math.max(STAGE.w / STAGE.h, Math.min(STAGE.wide, sw / sh))); // (a longer phone: more of the way ahead, no bars at the sides)
+    stage.style.width = W + 'px';
+    zoom = Math.min(sw / W, sh / H);
     stage.style.transform = `translate(-50%, -50%) scale(${zoom})`;
     DPR = Math.min(3, (window.devicePixelRatio || 1) * zoom); // (drawn at the screen's own sharpness)
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
   }
-  addEventListener('resize', resize);
+  // (a phone settles its size a moment after opening, turning round or going fullscreen: measured again then)
+  const resizeSoon = () => { resize(); for (const ms of [100, 300, 700, 1500]) setTimeout(resize, ms); };
+  for (const ev of ['resize', 'orientationchange', 'pageshow']) addEventListener(ev, resizeSoon);
+  document.addEventListener('fullscreenchange', resizeSoon); window.visualViewport?.addEventListener('resize', resize);
   const at = e => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) / zoom, y: (e.clientY - r.top) / zoom }; }; // (a touch, in stage pixels)
 
   // the fox's clips: run (facing right: on the ground, and its most stretched frame in the air), pounce (crouched
@@ -1219,8 +1225,8 @@
     layer.hidden = false;
     // fullscreen and locked to landscape where the phone allows it (from the tap that opened it); else it asks (CSS)
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
-    Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resize);
-    resize();
+    Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resizeSoon);
+    resizeSoon();
     energy = o.energy || petEnergy();
     start(); // (straight onto the tree, to be pulled back)
     if (energy && energy.get() < energy.least) tooTired();
