@@ -34,3 +34,4 @@
 - 兩段式（tools/notail_split.py）：剩下 6 段改成「起始 → 側面無尾巴圖 → 結尾」兩段 WAN 再接起來（13＋12 幀），中間圖：walk_back↔walk_front 夾 walk、drowsy/sleep_belly→sleep 夾 rest、sleep→normal 夾 stretch、eat→normal 夾 lick。全部乾淨，換上（walk 兩段 seed 7、drowsy/sleep_belly seed 7、sleep_to_normal/eat_to_normal seed 11）。
 - 手動錨定（11/1）：`python server.py` 後開 `/tools/tail_anchor.html`（可加 `?clip=<名字>`）。在畫面上拖尾根、拖線端圓點轉角度，只錨幾幀，中間直線補；存到 `assets/fox/tail_anchors.json`，fox2d.js 與 fling.js 載入時以它取代 tail_roots.py 找到的（`anchored()`）。每個錨點另可調尾巴大小（滾輪）與展開角度（Shift＋滾輪），存成 [x, y, 角度, 面向你, 大小, 展開]。重跑 tail_roots.py 不會蓋掉手動的。青色圈＝接續動畫的頭／尾幀錨點，方便對齊接不上的地方。
 - 預設與限制（11/1）：單條尾巴沒手動錨定時一律斜 40 度（往身體外側）；尾巴碰到腳底線（每幀最低的不透明點）會自動轉上來，仍超出的部分裁掉。尾巴圖接到尾根的那一點可在工具裡設定（所有動畫共用，存在 tail_anchors.json 的 `_pivot`）。
+- jump_joy 多一隻後腳（原圖就畫了三隻）：GPT 重畫 N09（只有這一格），notail_align.py N09 對齊，WAN 重跑 normal_to_jump_joy、jump_joy_loop、jump_joy_to_normal，尾根重算（11/1）。
