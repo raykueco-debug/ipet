@@ -29,3 +29,5 @@
 - 尚未處理：chase_tail、hug_tail、shy、shiver、tail/tail_r（尾巴是動作主角）仍用原動畫，只有 1 條尾巴；接到這些動畫時尾巴數會跳。
 - 全部 WAN 跑完後：python tools/tail_pics.py → python tools/tail_roots.py → 抽查 → commit。WAN 用 tools/wan_tailless.sh（經 tools/notail_shim.py）。
 - 第一輪（11/1 03:00）：114 段；wan_actions 因 ACTS 含它不認得的動作而中斷（已修：wan_tailless.sh 只給每支腳本它自己的動作）。抽查：14 段轉場（躺下、起身、轉身到背面、跑跳）中途被 WAN 長回尾巴 → 移除重做；notail_shim.py 現在把「尾巴」加進 WAN 的反向提示詞。
+- 第二輪（11/1 07:00）：223 段；26 段中途長回尾巴，用 tools/notail_retry.sh 以 seed 11、23 重做，每段三次（7/11/23）比對挑最乾淨的：18 段有乾淨版本。其餘 8 段（drowsy_to_sleep、eat_to_normal、play_bow_loop、sleep_belly_to_sleep、sleep_to_normal、walk_back_to_normal、walk_back_to_walk_front、walk_front_to_walk_back：側身轉向、躺下起身）再以 seed 31、47、59 重做。
+- 第三輪結果：walk_back_to_normal（seed 47）乾淨；play_bow_loop 每個 seed 都在搖擺時舉起大尾巴 → 只留沒尾巴的 0–4 幀來回播（程式尾巴負責搖）。drowsy_to_sleep、eat_to_normal、sleep_belly_to_sleep、sleep_to_normal、walk_back_to_walk_front、walk_front_to_walk_back 仍有幾幀短暫露出尾巴（側身那幾幀），已選最少的版本。之後可改成「起始 → 側面無尾巴圖 → 結尾」兩段 WAN 來根治。
