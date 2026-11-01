@@ -1,5 +1,12 @@
 {
 "clips_notail/angry_loop": {"0": [194.7, 364.2, -3.3, 1, 1, 1]},
 "clips_notail/angry_loop_2": {"0": [190.4, 365.3, -2.3, 1, 1, 1]},
-"clips_notail/angry_to_normal": {"0": [193.6, 362, -5, 1, 1, 1]}
+"clips_notail/angry_to_normal": {"0": [193.6, 362, -5, 1, 1, 1]},
+"clips_notail/back_air_to_back_crouch": {"0": [264.9, 283.9, -10.5, 0, 1.6, 2, 1]},
+"clips_notail/back_crouch_loop_slide": {"0": [218.3, 290.8, 0.6, 0, 1.6, 2, 1]},
+"clips_notail/back_crouch_to_back_air": {"0": [218.5, 295.5, -7.1, 0, 1.6, 2, 1]},
+"clips_notail/bat_r_to_walk_r": {"0": [163.3, 353.2, -87.6, 0, 1, 1, 0]},
+"clips_notail/bat_to_walk": {"0": [321.2, 355.3, 87.6, 0, 1, 1, 0]},
+"clips_notail/beg_loop": {"0": [184, 329.1, 5, 1, 1, 0.95, 0]},
+"clips_notail/belly_loop": {"0": [311.3, 416.1, 22, 0, 1.6, 1, 0]}
 }

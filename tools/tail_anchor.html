@@ -92,6 +92,7 @@
           <button id="delKey">刪除此幀錨點（Del）</button>
           <button id="copyPrev">沿用前一個錨點</button>
           <button id="clearClip">整段回到自動</button>
+          <button id="sync">同步到同系列</button>
         </div>
       </div>
       <div class="box">
@@ -165,6 +166,7 @@
     clip = name; i = 0; frames = [];
     const n = name.slice('clips_notail/'.length);
     $('name').textContent = n;
+    $('sync').textContent = `同步到同系列（${poseOf(n)}，${sameSeries(name).length} 段）`;
     const meta = await json(`assets/fox/clips_notail/${n}/meta.json`);
     const v = meta.rev ? '?v=' + meta.rev : '';
     frames = (meta.frames || []).map(f => { const im = new Image(); im.src = `assets/fox/clips_notail/${n}/${f}${v}`; im.onload = draw; return im; });
@@ -282,11 +284,45 @@
   function setKey(change = {}) {
     if (!clip) return;
     const r = resolve(clip)[i]; if (!r) return;
+    (HAND[clip] ||= {})[i] = keyOf(r, change);
+    changed();
+  }
+  function keyOf(r, change = {}) { // (a row as drawn, as a key)
     const k = [...origin(r), way(r), fOf(r), r[5] ?? 1, r[6] ?? 1, r[4] === 'over' ? 1 : 0];
     for (const [j, v] of Object.entries(change)) k[j] = v;
     k[2] = ((k[2] + 540) % 360) - 180;
-    (HAND[clip] ||= {})[i] = k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));
+    return k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));
+  }
+
+  // the same series: the clips of one pose (angry_loop, angry_loop_2, normal_to_angry, angry_to_normal…) — this
+  // frame's anchor put on all of them, at their end in that pose; a clip from or to another pose gets that pose's
+  // own (its loop's first frame) at its other end, so they join up
+  const base = s => s.split('_loop')[0];
+  function poseOf(n) { const [a, b] = n.split('_to_'); return b === undefined ? base(a) : base(a) === 'normal' ? base(b) : base(a); }
+  function sameSeries(name) {
+    const pose = poseOf(name.slice(13));
+    return Object.keys(ROOTS).filter(k => k.startsWith('clips_notail/') && k !== name).filter(k => {
+      const [a, b] = k.slice(13).split('_to_');
+      return b === undefined ? base(a) === pose : base(a) === pose || base(b) === pose;
+    });
+  }
+  function sync() {
+    const r = clip && resolve(clip)[i]; if (!r) return;
+    const pose = poseOf(clip.slice(13)), all = sameSeries(clip);
+    if (!all.length) return void ($('status').textContent = '沒有同系列的動畫');
+    if (!confirm(`把這一幀的錨點套到「${pose}」系列的另外 ${all.length} 段（原本的手動錨點會被取代）？
+
+${all.map(k => k.slice(13)).join('\n')}`)) return;
+    const k = keyOf(r), endOf = p => { const row = resolve(`clips_notail/${p}_loop`)[0]; return row && keyOf(row); };
+    for (const c of all) {
+      const [a, b] = c.slice(13).split('_to_'), last = ROOTS[c].length - 1, keys = {};
+      if (b === undefined) keys[0] = k;
+      else if (base(a) === pose) { keys[0] = k; if (base(b) !== pose && endOf(base(b))) keys[last] = endOf(base(b)); }
+      else { keys[last] = k; if (endOf(base(a))) keys[0] = endOf(base(a)); }
+      HAND[c] = keys;
+    }
     changed();
+    $('status').textContent = `已套到 ${all.length} 段，尚未儲存`;
   }
   function changed() { dirty = true; $('status').textContent = '尚未儲存'; strip(); fill(); draw(); list(); }
 
@@ -332,6 +368,7 @@
     if (before === undefined) return void ($('status').textContent = '前面沒有錨點');
     (HAND[clip] ||= {})[i] = [...keys[before]]; changed();
   };
+  $('sync').onclick = sync;
   $('clearClip').onclick = () => { if (HAND[clip] && confirm('這段的手動錨點全部刪掉，回到自動找到的？')) { delete HAND[clip]; changed(); } };
   $('prev').onclick = () => go(i - 1);
   $('next').onclick = () => go(i + 1);
