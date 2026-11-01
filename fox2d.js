@@ -422,7 +422,7 @@
 })();
 
 // the tail roots set by hand (tools/tail_anchor.html → assets/fox/tail_anchors.json: a few frames of a clip each,
-// [x, y, angle, facing us, size, fan]: size and fan ×, 1 as found) in place of those found (tools/tail_roots.py), in between them straight from one to the next
+// [x, y, angle, facing us, size, fan, over]: size and fan ×, 1 as found; over 1: tails over it, turned away) in place of those found (tools/tail_roots.py), in between them straight from one to the next
 function anchored(roots, hand) {
   for (const [clip, keys] of Object.entries(hand || {})) {
     const ks = Object.keys(keys).map(Number).sort((a, b) => a - b), auto = roots[clip];
@@ -430,7 +430,7 @@ function anchored(roots, hand) {
     roots[clip] = auto.map((r, i) => {
       const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
       const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
-      const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
+      const f = A.length > 6 ? (A[6] ? 'over' : at(3)) : r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4]; // (A[6]: its tails over it, or not)
       const k = j => (A.length > j ? at(j) : 1);
       return [at(0), at(1), at(2), true, f, k(4), k(5)];
     });

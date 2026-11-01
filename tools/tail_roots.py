@@ -71,6 +71,20 @@ def facing(pic):
     return 0 if SIDE.match(pic) or 'back' in pic else 1
 
 
+def sides(meta, n):
+    """Frame by frame, how much it faces us (from its start picture to its end one: its tails fanned round behind it
+    then, like the fling's cheer) — or 'over' while it's turned away (its tails over it): a clip turning away or back
+    round, from halfway through it or up to there."""
+    pics = meta.get('pictures') or []
+    pics = pics if len(pics) == 2 else pics[:1] * 2
+    ends, back = [facing(p) for p in pics], ['back' in p for p in pics]
+    out = []
+    for i in range(n):
+        u = i / max(1, n - 1)
+        out.append('over' if back[u >= 0.5] else round(ends[0] + (ends[1] - ends[0]) * u, 2))
+    return out
+
+
 def pet(out):
     """The pet's clips made without a tail (assets/fox/clips_notail): each from its start picture's root
     (tools/tail_pics.py: where the tail was on the picture with one), followed through the clip — tracked on the
@@ -86,15 +100,8 @@ def pet(out):
         if start not in pics:
             continue
         x, y, a = pics[start]
-        back = 'back' in start
         rows = track_slot(load_frames_named(os.path.join(d, clip), meta['frames']), x, y)
-        # how much it faces us, frame by frame (from its start picture to its end one): its tails fanned round
-        # behind it then, like the fling's cheer
-        ends = [facing(p) for p in (meta.get('pictures') or [start])]
-        ends = ends if len(ends) == 2 else ends * 2
-        out[key] = [[r[0], r[1], round(a + r[2], 1), True] + (['over'] if back else
-                    [round(ends[0] + (ends[1] - ends[0]) * i / max(1, len(rows) - 1), 2)])
-                    for i, r in enumerate(rows)]
+        out[key] = [[r[0], r[1], round(a + r[2], 1), True, side] for r, side in zip(rows, sides(meta, len(rows)))]
         print(f'{key}: {len(out[key])} frames (from {start})')
 
 

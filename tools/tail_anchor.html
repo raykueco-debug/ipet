@@ -85,6 +85,8 @@
         <div class="row"><span>面向你</span><input type="range" id="f" min="0" max="1" step="0.05"><output id="fOut"></output></div>
         <div class="row"><span>大小</span><input type="range" id="s" min="0.3" max="2" step="0.05"><output id="sOut"></output></div>
         <div class="row"><span>展開</span><input type="range" id="w" min="0" max="2" step="0.05"><output id="wOut"></output></div>
+        <div class="row"><span>圖層</span><label><input type="checkbox" id="ov"> 尾巴在上（背對）</label></div>
+        <div class="row"><span>預設</span><div class="btns"><button id="pSide">側面</button><button id="pFront">正面</button><button id="pBack">背面</button></div></div>
         <div class="btns">
           <button id="setKey">設為錨點</button>
           <button id="delKey">刪除此幀錨點（Del）</button>
@@ -131,7 +133,7 @@
     return auto.map((r, i) => {
       const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
       const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
-      const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
+      const f = A.length > 6 ? (A[6] ? 'over' : at(3)) : r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4]; // (A[6]: its tails over it, or not)
       const k = j => (A.length > j ? at(j) : 1);
       return [at(0), at(1), at(2), true, f, k(4), k(5)];
     });
@@ -271,7 +273,7 @@
   function fill() { // the sliders: this frame's root
     const r = clip && resolve(clip)[i]; if (!r) return;
     for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', way(r)], ['f', fOf(r)], ['s', r[5] ?? 1], ['w', r[6] ?? 1]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed('fsw'.includes(id) ? 2 : 1); }
-    $('f').disabled = r[4] === 'over';
+    $('f').disabled = r[4] === 'over'; $('ov').checked = r[4] === 'over';
     $('delKey').disabled = !HAND[clip]?.[i];
   }
   function go(k) { if (!frames.length) return; i = (k + frames.length) % frames.length; strip(); fill(); draw(); }
@@ -280,7 +282,7 @@
   function setKey(change = {}) {
     if (!clip) return;
     const r = resolve(clip)[i]; if (!r) return;
-    const k = [...origin(r), way(r), fOf(r), r[5] ?? 1, r[6] ?? 1];
+    const k = [...origin(r), way(r), fOf(r), r[5] ?? 1, r[6] ?? 1, r[4] === 'over' ? 1 : 0];
     for (const [j, v] of Object.entries(change)) k[j] = v;
     k[2] = ((k[2] + 540) % 360) - 180;
     (HAND[clip] ||= {})[i] = k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));
@@ -317,6 +319,13 @@
   for (const [id, j] of [['x', 0], ['y', 1], ['a', 2], ['f', 3], ['s', 4], ['w', 5]]) $(id).addEventListener('input', () => setKey({ [j]: +$(id).value }));
 
   $('setKey').onclick = () => setKey();
+  $('ov').onchange = () => setKey({ 6: $('ov').checked ? 1 : 0 });
+  // presets for this frame (where the root is stays): side on — the tails behind it, slanting up away from its body;
+  // facing us — fanned round upright behind it; turned away — fanned round upright, over it
+  const preset = (f, over, a) => setKey({ 2: a, 3: f, 4: 1, 5: 1, 6: over });
+  $('pSide').onclick = () => { const r = resolve(clip)[i]; if (r) preset(0, 0, way(r) < 0 ? -ONE : ONE); };
+  $('pFront').onclick = () => preset(1, 0, 5);
+  $('pBack').onclick = () => preset(0, 1, 10);
   $('delKey').onclick = () => { if (!HAND[clip]?.[i]) return; delete HAND[clip][i]; if (!Object.keys(HAND[clip]).length) delete HAND[clip]; changed(); };
   $('copyPrev').onclick = () => {
     const keys = HAND[clip] || {}, before = Object.keys(keys).map(Number).filter(k => k < i).pop();
