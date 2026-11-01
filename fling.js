@@ -877,8 +877,8 @@
     const front = facing && !back, mid = facing && n > 1 ? (front ? 5 : 10) : r[2], lift = front ? 40 : facing ? 50 : 0;
     if (img.cut && facing ? (layer === 'front') !== back : layer === 'front' && !img.cut) return;
     // (from the front, bigger and spread out flat to both sides, to show past its body)
-    const spread = Math.min(front ? 170 : facing ? 150 : 124, (front ? 22 : facing ? 20 : 17) * (n - 1));
-    const L = sz * (front ? 0.55 : TAIL_LEN) * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const spread = Math.min(front ? 170 : facing ? 150 : 124, (front ? 22 : facing ? 20 : 17) * (n - 1)) * (r[6] ?? 1); // (× as set by hand)
+    const L = sz * (front ? 0.55 : TAIL_LEN) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1);
     const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, i) => mid - spread / 2 + spread * i / (n - 1));
     const own = ways.reduce((b, a, i) => Math.abs(a - r[2]) < Math.abs(ways[b] - r[2]) ? i : b, 0); // (the one in the picture)
     const all = img.cut && facing; // (every one of them drawn here, its own picture's one too — none left in it)
@@ -1179,7 +1179,7 @@
 })();
 
 // the tail roots set by hand (tools/tail_anchor.html → assets/fox/tail_anchors.json: a few frames of a clip each,
-// [x, y, angle(, facing us)]) in place of those found (tools/tail_roots.py), in between them straight from one to the next
+// [x, y, angle, facing us, size, fan]: size and fan ×, 1 as found) in place of those found (tools/tail_roots.py), in between them straight from one to the next
 function anchored(roots, hand) {
   for (const [clip, keys] of Object.entries(hand || {})) {
     const ks = Object.keys(keys).map(Number).sort((a, b) => a - b), auto = roots[clip];
@@ -1188,7 +1188,8 @@ function anchored(roots, hand) {
       const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
       const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
       const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
-      return [at(0), at(1), at(2), true, f];
+      const k = j => (A.length > j ? at(j) : 1);
+      return [at(0), at(1), at(2), true, f, k(4), k(5)];
     });
   }
   return roots;

@@ -83,6 +83,8 @@
         <div class="row"><span>Y</span><input type="range" id="y" min="0" max="480" step="0.5"><output id="yOut"></output></div>
         <div class="row"><span>角度</span><input type="range" id="a" min="-180" max="180" step="0.5"><output id="aOut"></output></div>
         <div class="row"><span>面向你</span><input type="range" id="f" min="0" max="1" step="0.05"><output id="fOut"></output></div>
+        <div class="row"><span>大小</span><input type="range" id="s" min="0.3" max="2" step="0.05"><output id="sOut"></output></div>
+        <div class="row"><span>展開</span><input type="range" id="w" min="0" max="2" step="0.05"><output id="wOut"></output></div>
         <div class="btns">
           <button id="setKey">設為錨點</button>
           <button id="delKey">刪除此幀錨點（Del）</button>
@@ -95,7 +97,7 @@
         <div id="frames"></div>
       </div>
       <div class="box">
-        <p class="hint">在畫面上點或拖：移動尾根。拖橘色線末端的圓點：轉角度。<br>
+        <p class="hint">在畫面上點或拖：移動尾根。拖橘色線末端的圓點：轉角度。滾輪：大小（Shift＋滾輪：展開）。<br>
         只錨幾幀就好，中間會自動直線補上；錨點之前／之後的幀跟著最近的錨點。<br>
         ← → 換幀、空白鍵播放、Del 刪錨點。</p>
         <p class="hint legend"><span style="background:#999"></span>自動找到的<span style="background:var(--accent)"></span>目前用的<span style="background:#2bb3c9"></span>接續的動畫（頭／尾幀）<span style="background:#7a5cff"></span>上一幀</p>
@@ -122,7 +124,8 @@
       const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
       const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
       const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
-      return [at(0), at(1), at(2), true, f];
+      const k = j => (A.length > j ? at(j) : 1);
+      return [at(0), at(1), at(2), true, f, k(4), k(5)];
     });
   }
   const fOf = r => (typeof r?.[4] === 'number' ? r[4] : 0);
@@ -170,7 +173,7 @@
     const quick = /_loop_run|_loop$|^walk/.test(clip) && /walk|run/.test(clip);
     const f = fOf(r) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
     const mid = mix(r[2], 5), lift = 40 * f;
-    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1);
     const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
     for (const j of order) {
@@ -220,7 +223,7 @@
   }
   function fill() { // the sliders: this frame's root
     const r = clip && resolve(clip)[i]; if (!r) return;
-    for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', r[2]], ['f', fOf(r)]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed(id === 'f' ? 2 : 1); }
+    for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', r[2]], ['f', fOf(r)], ['s', r[5] ?? 1], ['w', r[6] ?? 1]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed('fsw'.includes(id) ? 2 : 1); }
     $('f').disabled = r[4] === 'over';
     $('delKey').disabled = !HAND[clip]?.[i];
   }
@@ -230,10 +233,10 @@
   function setKey(change = {}) {
     if (!clip) return;
     const r = resolve(clip)[i]; if (!r) return;
-    const k = [r[0], r[1], r[2], fOf(r)];
+    const k = [r[0], r[1], r[2], fOf(r), r[5] ?? 1, r[6] ?? 1];
     for (const [j, v] of Object.entries(change)) k[j] = v;
     k[2] = ((k[2] + 540) % 360) - 180;
-    (HAND[clip] ||= {})[i] = k.map(v => Math.round(v * 10) / 10);
+    (HAND[clip] ||= {})[i] = k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));
     changed();
   }
   function changed() { dirty = true; $('status').textContent = '尚未儲存'; strip(); fill(); draw(); list(); }
@@ -247,13 +250,19 @@
     cv.setPointerCapture(e.pointerId); move(e);
   });
   cv.addEventListener('pointermove', e => drag && move(e));
+  cv.addEventListener('wheel', e => { // size (shift: how wide they fan out)
+    const r = clip && resolve(clip)[i]; if (!r) return;
+    e.preventDefault();
+    const j = e.shiftKey ? 6 : 5, d = (e.deltaY || e.deltaX) < 0 ? 0.05 : -0.05;
+    setKey({ [j - 1]: Math.max(j === 5 ? 0.3 : 0, Math.min(2, (r[j] ?? 1) + d)) });
+  }, { passive: false });
   cv.addEventListener('pointerup', () => { drag = null; });
   function move(e) {
     const p = at(e), r = resolve(clip)[i];
     if (drag === 'move') setKey({ 0: p.x / K, 1: (p.y - DROP) / K });
     else { const q = P(r); setKey({ 2: Math.atan2(p.x - q.x, -(p.y - q.y)) * 180 / Math.PI }); }
   }
-  for (const [id, j] of [['x', 0], ['y', 1], ['a', 2], ['f', 3]]) $(id).addEventListener('input', () => setKey({ [j]: +$(id).value }));
+  for (const [id, j] of [['x', 0], ['y', 1], ['a', 2], ['f', 3], ['s', 4], ['w', 5]]) $(id).addEventListener('input', () => setKey({ [j]: +$(id).value }));
 
   $('setKey').onclick = () => setKey();
   $('delKey').onclick = () => { if (!HAND[clip]?.[i]) return; delete HAND[clip][i]; if (!Object.keys(HAND[clip]).length) delete HAND[clip]; changed(); };
