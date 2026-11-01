@@ -67,9 +67,9 @@
   // its tails: the clips made again without a tail (assets/fox/clips_notail, docs/tailless.md) where there are, and
   // all its tails (as many as it has) drawn on them from where the tail grows in each frame (assets/fox/tail_roots.json)
   const NOTAIL = 'assets/fox/clips_notail/';
-  let ROOTS = {};
+  let ROOTS = {}, PIVOT = [0.5, 1]; // (PIVOT: the point of a tail picture on its root, as parts of its side — set in tools/tail_anchor.html)
   const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
-  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); });
+  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); PIVOT = hand._pivot || PIVOT; });
   const TAIL_IMG = Array.from({ length: 9 }, (_, k) => { const im = new Image(); im.src = `assets/fox/tail/t${k + 1}.png`; return im; });
   let tailN = 1;
 
@@ -269,12 +269,41 @@
     g.clearRect(0, 0, 512, 512);
     const r = cur.notail && ROOTS['clips_notail/' + cur.name]?.[i];
     const over = r && r[4] === 'over'; // (seen from behind: its tails over its back)
-    if (r && !over) tails(r);
+    if (r && !over) tails(r, f);
     g.drawImage(f, 0, DROP, 512, 512);
-    if (r && over) tails(r);
+    if (r && over) tails(r, f);
   }
+  // never down past its feet: the lowest the fox goes in each frame (found once a picture) and each tail picture's
+  // shape (a few of its points); a tail that would go lower is turned, a little at a time, until it doesn't
+  const feetOf = new WeakMap(), shapeOf = new WeakMap(), probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  probe.canvas.width = probe.canvas.height = 64;
+  function alpha(im) { probe.clearRect(0, 0, 64, 64); probe.drawImage(im, 0, 0, 64, 64); return probe.getImageData(0, 0, 64, 64).data; }
+  function feet(im) { // (in its 512px picture)
+    if (!feetOf.has(im)) {
+      const d = alpha(im), solid = y => { for (let x = 0; x < 64; x++) if (d[(y * 64 + x) * 4 + 3] > 128) return true; return false; };
+      let y = 64; while (y > 0 && !solid(y - 1)) y--;
+      feetOf.set(im, y * 8);
+    }
+    return feetOf.get(im);
+  }
+  function shape(im) { // (as parts of its side, from the root at its bottom middle)
+    if (!shapeOf.has(im)) {
+      const d = alpha(im), pts = [];
+      for (let y = 0; y < 64; y += 2) for (let x = 0; x < 64; x += 2) if (d[(y * 64 + x) * 4 + 3] > 128) pts.push([(x + 1) / 64, (y + 1) / 64]);
+      shapeOf.set(im, pts);
+    }
+    return shapeOf.get(im);
+  }
+  function above(im, deg, L, y0, floor) { // (deg: how it's turned; y0: its root, floor: its feet — on the canvas)
+    const pts = shape(im), low = a => { const s = Math.sin(a * Math.PI / 180), c = Math.cos(a * Math.PI / 180); let m = -1; for (const [x, y] of pts) m = Math.max(m, (x - PIVOT[0]) * s + (y - PIVOT[1]) * c); return y0 + m * L; };
+    if (low(deg) <= floor) return deg;
+    const step = low(deg - 2) < low(deg + 2) ? -2 : 2;
+    for (let k = 0; k < 90 && low(deg) > floor; k++) deg += step;
+    return deg;
+  }
+  const ONE = 40; // one tail: slanting up this much from upright, away from its body (until set by hand)
   // fanned out from the root around the way it goes; each its own pace of sway — slow sitting, quick on the move
-  function tails(r) {
+  function tails(r, pic) {
     const n = tailN, t = performance.now() / 1000, k = 512 / 480;
     const quick = /_loop_run|_loop$|^walk/.test(cur.name) && /walk|run/.test(cur.name);
     // f: how much it faces us (tools/tail_roots.py) — then, the more tails the more so, fanned out wide to both sides
@@ -282,15 +311,18 @@
     const f = (typeof r[4] === 'number' ? r[4] : 0) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
     const mid = mix(r[2], 5), lift = 40 * f;
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1); // (× as set by hand)
-    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
+    const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1)); // (r.length > 5: set by hand)
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
+    const floor = feet(pic) + DROP, x0 = (r[0] - 51 * f) * k, y0 = (r[1] + 72 * f - lift) * k + DROP;
+    g.save(); g.beginPath(); g.rect(-512, -512, 1536, floor + 512); g.clip(); // (and should one still reach down past them)
     for (const j of order) {
       const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
       const sway = quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
-      g.save(); g.translate((r[0] - 51 * f) * k, (r[1] + 72 * f - lift) * k + DROP); g.rotate((ways[j] + sway) * Math.PI / 180); // (facing us: from its hips' middle)
-      g.drawImage(im, -L / 2, -L, L, L);
+      g.save(); g.translate(x0, y0); g.rotate(above(im, ways[j] + sway, L, y0, floor) * Math.PI / 180); // (facing us: from its hips' middle)
+      g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();
     }
+    g.restore();
   }
 
   function tick() {

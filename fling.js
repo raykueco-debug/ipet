@@ -861,9 +861,9 @@
   // its tails: one in every picture of it already; the rest (as many as it has, TAILS) fanned out behind it from where
   // that one grows (tools/tail_roots.py: found frame by frame in each clip), around the way it points — the pet's own
   // tail pictures (assets/fox/tail/t1–t9), each swaying a little on its own; more tails, each a bit smaller (as the pet's)
-  let ROOTS = {};
+  let ROOTS = {}, PIVOT = [0.5, 1]; // (PIVOT: the point of a tail picture on its root, as parts of its side — set in tools/tail_anchor.html)
   const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
-  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); });
+  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); PIVOT = hand._pivot || PIVOT; });
   const TAIL_IMG = Array.from({ length: 9 }, (_, i) => { const im = new Image(); im.src = `assets/fox/tail/t${i + 1}.png`; return im; });
   const TAIL_LEN = 0.42; // (a tail picture's side, of the fox's)
   // (mode: 'still' — a slow sway; 'fly' — shaking fast in the wind; 'soar' — streaming in long waves. layer: 'behind'
@@ -889,7 +889,7 @@
         : mode === 'fly' ? Math.sin(t * 19 + i * 1.3) * 6 + Math.sin(t * 31 + i * 2.1) * 3
         : Math.sin(t * 2.2 + i * 1.7) * 5;
       g.save(); g.translate(x + r[0] / 480 * sz, y + (r[1] - lift) / 480 * sz); g.rotate((ways[i] + sway) * Math.PI / 180);
-      g.drawImage(im, -L / 2, -L, L, L);
+      g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();
     }
   }

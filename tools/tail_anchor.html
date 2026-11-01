@@ -93,6 +93,14 @@
         </div>
       </div>
       <div class="box">
+        <b>尾巴圖的接點（所有動畫共用）</b>
+        <p class="hint" style="margin-bottom:6px">點下面的尾巴圖：哪一點接到尾根。</p>
+        <canvas id="pv" width="160" height="160" style="width:160px;aspect-ratio:1;cursor:crosshair"></canvas>
+        <div class="row"><span>左右</span><input type="range" id="pu" min="0" max="1" step="0.01"><output id="puOut"></output></div>
+        <div class="row"><span>上下</span><input type="range" id="pw" min="0" max="1" step="0.01"><output id="pwOut"></output></div>
+        <div class="btns"><button id="pReset">回到預設（底部中間）</button></div>
+      </div>
+      <div class="box">
         <b>幀（粉紅＝手動錨點）</b>
         <div id="frames"></div>
       </div>
@@ -111,7 +119,7 @@
   const cv = $('cv'), g = cv.getContext('2d');
   const DROP = 32, K = 512 / 480; // (as fox2d.js draws it: the frame 32px down, roots in the 480px square)
   const TAIL_IMG = Array.from({ length: 9 }, (_, k) => { const im = new Image(); im.src = `assets/fox/tail/t${k + 1}.png`; return im; });
-  let ROOTS = {}, HAND = {}, dirty = false;
+  let ROOTS = {}, HAND = {}, dirty = false, PIVOT = [0.5, 1];
   let clip = null, frames = [], i = 0, playing = false, drag = null, last = 0;
 
   const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
@@ -129,6 +137,7 @@
     });
   }
   const fOf = r => (typeof r?.[4] === 'number' ? r[4] : 0);
+  const way = r => (r.length > 5 || +$('n').value > 1 ? r[2] : r[2] < 0 ? -ONE : ONE); // (one tail, not set by hand: its slant)
 
   // the clip list: the pet's tail-less clips
   function list() {
@@ -167,26 +176,59 @@
     return out.filter(Boolean);
   }
 
+  // never down past its feet: the lowest the fox goes in each frame (found once a picture) and each tail picture's
+  // shape (a few of its points); a tail that would go lower is turned, a little at a time, until it doesn't
+  const feetOf = new WeakMap(), shapeOf = new WeakMap(), probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  probe.canvas.width = probe.canvas.height = 64;
+  function alpha(im) { probe.clearRect(0, 0, 64, 64); probe.drawImage(im, 0, 0, 64, 64); return probe.getImageData(0, 0, 64, 64).data; }
+  function feet(im) { // (in its 512px picture)
+    if (!feetOf.has(im)) {
+      const d = alpha(im), solid = y => { for (let x = 0; x < 64; x++) if (d[(y * 64 + x) * 4 + 3] > 128) return true; return false; };
+      let y = 64; while (y > 0 && !solid(y - 1)) y--;
+      feetOf.set(im, y * 8);
+    }
+    return feetOf.get(im);
+  }
+  function shape(im) { // (as parts of its side, from the root at its bottom middle)
+    if (!shapeOf.has(im)) {
+      const d = alpha(im), pts = [];
+      for (let y = 0; y < 64; y += 2) for (let x = 0; x < 64; x += 2) if (d[(y * 64 + x) * 4 + 3] > 128) pts.push([(x + 1) / 64, (y + 1) / 64]);
+      shapeOf.set(im, pts);
+    }
+    return shapeOf.get(im);
+  }
+  function above(im, deg, L, y0, floor) { // (deg: how it's turned; y0: its root, floor: its feet — on the canvas)
+    const pts = shape(im), low = a => { const s = Math.sin(a * Math.PI / 180), c = Math.cos(a * Math.PI / 180); let m = -1; for (const [x, y] of pts) m = Math.max(m, (x - PIVOT[0]) * s + (y - PIVOT[1]) * c); return y0 + m * L; };
+    if (low(deg) <= floor) return deg;
+    const step = low(deg - 2) < low(deg + 2) ? -2 : 2;
+    for (let k = 0; k < 90 && low(deg) > floor; k++) deg += step;
+    return deg;
+  }
+  const ONE = 40; // one tail: slanting up this much from upright, away from its body (until set by hand)
   // as fox2d.js tails()
-  function tails(r, t) {
+  function tails(r, t, pic) {
     const n = +$('n').value;
     const quick = /_loop_run|_loop$|^walk/.test(clip) && /walk|run/.test(clip);
     const f = fOf(r) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
     const mid = mix(r[2], 5), lift = 40 * f;
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1);
-    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
+    const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
+    const floor = pic?.naturalWidth ? feet(pic) + DROP : 1e4, x0 = (r[0] - 51 * f) * K, y0 = (r[1] + 72 * f - lift) * K + DROP;
+    g.save(); g.beginPath(); g.rect(-512, -512, 1536, floor + 512); g.clip();
     for (const j of order) {
       const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
       const sway = !$('sway').checked ? 0 : quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
-      g.save(); g.translate((r[0] - 51 * f) * K, (r[1] + 72 * f - lift) * K + DROP); g.rotate((ways[j] + sway) * Math.PI / 180);
-      g.drawImage(im, -L / 2, -L, L, L);
+      g.save(); g.translate(x0, y0); g.rotate(above(im, ways[j] + sway, L, y0, floor) * Math.PI / 180);
+      g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();
     }
+    g.restore();
+    if (floor < 1e4) { g.setLineDash([6, 6]); g.beginPath(); g.moveTo(0, floor); g.lineTo(512, floor); g.lineWidth = 1; g.strokeStyle = '#2bb3c999'; g.stroke(); g.setLineDash([]); } // (its feet)
   }
 
   const P = r => ({ x: r[0] * K, y: r[1] * K + DROP });
-  const handle = r => { const p = P(r), a = r[2] * Math.PI / 180; return { x: p.x + Math.sin(a) * 80, y: p.y - Math.cos(a) * 80 }; };
+  const handle = r => { const p = P(r), a = way(r) * Math.PI / 180; return { x: p.x + Math.sin(a) * 80, y: p.y - Math.cos(a) * 80 }; };
   function dot(p, c, rad = 6, ring = false) {
     g.beginPath(); g.arc(p.x, p.y, rad, 0, 7);
     if (ring) { g.lineWidth = 2.5; g.strokeStyle = c; g.stroke(); } else { g.fillStyle = c; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke(); }
@@ -197,9 +239,9 @@
     const im = frames[i]; if (!clip) return;
     const rows = resolve(clip), r = rows[i], t = performance.now() / 1000;
     $('fno').textContent = frames.length ? `幀 ${i + 1} / ${frames.length}` : '';
-    if (r && r[4] !== 'over') tails(r, t);
+    if (r && r[4] !== 'over') tails(r, t, im);
     if (im?.complete && im.naturalWidth) g.drawImage(im, 0, DROP, 512, 512);
-    if (r && r[4] === 'over') tails(r, t);
+    if (r && r[4] === 'over') tails(r, t, im);
     if (!r) return;
     const auto = ROOTS[clip][i];
     if (auto) { dot(P(auto), '#999', 4); }
@@ -223,7 +265,7 @@
   }
   function fill() { // the sliders: this frame's root
     const r = clip && resolve(clip)[i]; if (!r) return;
-    for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', r[2]], ['f', fOf(r)], ['s', r[5] ?? 1], ['w', r[6] ?? 1]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed('fsw'.includes(id) ? 2 : 1); }
+    for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', way(r)], ['f', fOf(r)], ['s', r[5] ?? 1], ['w', r[6] ?? 1]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed('fsw'.includes(id) ? 2 : 1); }
     $('f').disabled = r[4] === 'over';
     $('delKey').disabled = !HAND[clip]?.[i];
   }
@@ -233,7 +275,7 @@
   function setKey(change = {}) {
     if (!clip) return;
     const r = resolve(clip)[i]; if (!r) return;
-    const k = [r[0], r[1], r[2], fOf(r), r[5] ?? 1, r[6] ?? 1];
+    const k = [r[0], r[1], way(r), fOf(r), r[5] ?? 1, r[6] ?? 1];
     for (const [j, v] of Object.entries(change)) k[j] = v;
     k[2] = ((k[2] + 540) % 360) - 180;
     (HAND[clip] ||= {})[i] = k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));
@@ -275,7 +317,7 @@
   $('prev').onclick = () => go(i - 1);
   $('next').onclick = () => go(i + 1);
   $('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '❚❚ 暫停' : '▶ 播放'; $('play').classList.toggle('on', playing); };
-  $('n').oninput = () => { $('nOut').textContent = $('n').value; draw(); };
+  $('n').oninput = () => { $('nOut').textContent = $('n').value; fill(); draw(); };
   $('fps').oninput = () => { $('fpsOut').textContent = $('fps').value; };
   $('filter').oninput = list; $('onlyHand').onchange = list;
 
@@ -293,6 +335,32 @@
     }
   }
   $('save').onclick = save;
+
+  // the point of the tail pictures that sits on the root (all clips: HAND._pivot)
+  const pv = $('pv'), pg = pv.getContext('2d');
+  function pivotUI() {
+    $('pu').value = PIVOT[0]; $('pw').value = PIVOT[1];
+    $('puOut').textContent = PIVOT[0].toFixed(2); $('pwOut').textContent = PIVOT[1].toFixed(2);
+    pg.clearRect(0, 0, 160, 160);
+    const im = TAIL_IMG[0];
+    if (im.complete && im.naturalWidth) pg.drawImage(im, 0, 0, 160, 160);
+    pg.strokeStyle = '#e8d5c0'; pg.strokeRect(0.5, 0.5, 159, 159);
+    pg.beginPath(); pg.arc(PIVOT[0] * 160, PIVOT[1] * 160, 5, 0, 7); pg.fillStyle = '#e0457b'; pg.fill(); pg.strokeStyle = '#fff'; pg.stroke();
+  }
+  function setPivot(u, w) {
+    PIVOT = [Math.round(Math.max(0, Math.min(1, u)) * 100) / 100, Math.round(Math.max(0, Math.min(1, w)) * 100) / 100];
+    if (PIVOT[0] === 0.5 && PIVOT[1] === 1) delete HAND._pivot; else HAND._pivot = PIVOT;
+    pivotUI(); changed();
+  }
+  TAIL_IMG[0].addEventListener('load', pivotUI);
+  let pdrag = false;
+  const pat = e => { const b = pv.getBoundingClientRect(); setPivot((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height); };
+  pv.addEventListener('pointerdown', e => { pdrag = true; pv.setPointerCapture(e.pointerId); pat(e); });
+  pv.addEventListener('pointermove', e => pdrag && pat(e));
+  pv.addEventListener('pointerup', () => { pdrag = false; });
+  $('pu').oninput = () => setPivot(+$('pu').value, PIVOT[1]);
+  $('pw').oninput = () => setPivot(PIVOT[0], +$('pw').value);
+  $('pReset').onclick = () => setPivot(0.5, 1);
   addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT' && e.target.type !== 'range' && e.target.type !== 'checkbox') return;
     if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); save(); }
@@ -310,7 +378,7 @@
   })(0);
 
   Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([r, h]) => {
-    ROOTS = r; HAND = h || {};
+    ROOTS = r; HAND = h || {}; PIVOT = HAND._pivot || PIVOT; pivotUI();
     list();
     const first = new URLSearchParams(location.search).get('clip');
     open(first ? 'clips_notail/' + first : Object.keys(ROOTS).filter(k => k.startsWith('clips_notail/')).sort()[0]);
