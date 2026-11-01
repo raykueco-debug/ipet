@@ -62,9 +62,10 @@
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
   const SKY = { height: 50, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
-  // the cloud road winds: a lane wide, straight a while (gap m) then over to the lane beside, over turn m; off it, the
-  // fox falls (more than off of its middle)
-  const WIND = { first: 60, gap: [45, 80], turn: 30, half: 0.8, off: 0.85 };
+  // the cloud road winds over the lanes, a lane wide; each bend: its edge on the side it goes to out over the next
+  // lane first (over turn m), both lanes cloud a while (both m: the time to change lane), then its other edge in
+  // after it. Off it (an edge past the fox's middle), the fox falls
+  const WIND = { first: 60, gap: [60, 95], turn: 12, both: 24 };
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
   const FOX_H = 1.7;                   // the fox's drawn height, m
@@ -391,24 +392,27 @@
       lane = lane === 0 ? (Math.random() < 0.5 ? -1 : 1) : (Math.random() < 0.7 ? 0 : lane); if (lane === sky.path.at(-1).lane) continue;
       sky.path.push({ z, lane });
     }
-    const holed = (l, z) => Math.abs(roadAt(sky, z) - l) > 0.05; // (stars only on its straight stretches)
+    const holed = (l, z) => { const [a, b] = roadAt(sky, z); return b - a > 1.02 || Math.abs((a + b) / 2 - l) > 0.02; }; // (stars only on its straight stretches)
     for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each (not over a hole)
-      const l = Math.round(roadAt(sky, z));
+      const l = Math.round(roadAt(sky, z).reduce((a, b) => a + b) / 2);
       for (let k = 0; k < 4; k++) if (!holed(l, z + k * 3)) sky.stars.push({ lane: l, z: z + k * 3, got: false });
     }
     Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0, soar: false });
     S.sky = sky; S.phase = 'sky'; S.combo = 0;
     SFX.super(); hud();
   }
-  function roadAt(sky, z) { // where the road's middle is, z m along it (lanes: -1 … 1)
-    let c = sky.path[0].lane;
+  function roadAt(sky, z) { // its edges, z m along it: [left, right] (lanes: -1 … 1, a lane each side of the middle ±0.5)
+    const ease = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+    let a = sky.path[0].lane, L = a - 0.5, R = a + 0.5;
     for (let i = 1; i < sky.path.length; i++) {
       const p = sky.path[i]; if (z <= p.z) break;
-      const u = Math.min(1, (z - p.z) / WIND.turn); c += (p.lane - c) * (u * u * (3 - 2 * u));
-      if (u < 1) break;
+      const lead = ease((z - p.z) / WIND.turn), trail = ease((z - p.z - WIND.turn - WIND.both) / WIND.turn), d = p.lane - a;
+      if (d > 0) { R = a + 0.5 + d * lead; L = a - 0.5 + d * trail; } else { L = a - 0.5 + d * lead; R = a + 0.5 + d * trail; }
+      a = p.lane;
     }
-    return c;
+    return [L, R];
   }
+
   function steer(d) { if (S?.phase === 'sky') S.sky.lane = Math.max(-1, Math.min(1, S.sky.lane + d)); }
   function stepSky(dt) {
     const sky = S.sky, f = S.fox;
@@ -429,7 +433,7 @@
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; starGot(); }
-    if (Math.abs(sky.x - roadAt(sky, sky.z)) > WIND.off) { sky.fall = 0; SFX.whoosh(); return hud(); } // (off the road: down it goes)
+    { const [l, r] = roadAt(sky, sky.z); if (sky.x < l || sky.x > r) { sky.fall = 0; SFX.whoosh(); return hud(); } } // (an edge past its middle: down it goes)
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
     if (sky.z >= SKY.run) { sky.leap = 0; SFX.super(); }
     hud();
@@ -681,21 +685,20 @@
       puff(q.x, q.y + LANE() * q.s * 0.9, LANE() * q.s * 0.55, '#d9dcff');
     }
     // the road: a lane-wide ribbon of white cloud winding over the lanes, lumpy along both edges, ending where the run does
-    const end = Math.min(FAR, left), zs = [], mid = z => roadAt(sky, sky.z + z * ZV);
-    for (let k = 0; k <= 40; k++) zs.push(-CAMZ * 0.6 + (end + CAMZ * 0.6) * (k / 40) ** 1.6);
-    const edge = d => zs.map(z => project(mid(z) + d, z)), L = edge(-WIND.half), R = edge(WIND.half);
+    const end = Math.min(FAR, left), zs = [], at = z => roadAt(sky, sky.z + z * ZV);
+    for (let k = 0; k <= 120; k++) zs.push(-CAMZ * 0.6 + (end + CAMZ * 0.6) * (k / 120) ** 1.6);
+    const edge = side => zs.map(z => project(at(z)[side], z)), L = edge(0), R = edge(1);
     g.beginPath(); // (its side, in shade, under it: the road's thickness)
     L.forEach((p, i) => i ? g.lineTo(p.x, p.y + LANE() * p.s * 0.35) : g.moveTo(p.x, p.y + LANE() * p.s * 0.35)); [...R].reverse().forEach(p => g.lineTo(p.x, p.y + LANE() * p.s * 0.35));
     g.closePath(); g.fillStyle = '#b8b4e8'; g.fill();
     g.fillStyle = '#ffffff'; g.beginPath();
     L.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); [...R].reverse().forEach(p => g.lineTo(p.x, p.y));
     g.closePath(); g.fill();
-    g.strokeStyle = '#e4e8ff'; g.lineWidth = 3; g.beginPath(); edge(0).forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.stroke(); // (its middle, faint)
     for (let k = Math.ceil(end / 0.9); k >= -6; k--) { // the lumps along its edges, far to near
       const z = k * 0.9 - (zv % 0.9); if (z > end) continue;
-      for (const side of [-1, 1]) { const p = project(mid(z) + side * (WIND.half + 0.12), z); puff(p.x, p.y, LANE() * p.s * (0.24 + ((k * 7 + side + 9) % 3) * 0.04)); }
+      const e = at(z); for (const side of [-1, 1]) { const p = project(e[side > 0 ? 1 : 0], z); puff(p.x, p.y, LANE() * p.s * (0.2 + ((k * 7 + side + 9) % 3) * 0.035)); }
     }
-    if (left < FAR) { const c = mid(left); for (let x = -WIND.half; x <= WIND.half + 0.01; x += 0.32) { const q = project(c + x, left); puff(q.x, q.y, LANE() * q.s * 0.3); } } // (its far end, rounded)
+    if (left < FAR) { const [l, r] = at(left); for (let x = l; x <= r + 0.01; x += 0.3) { const q = project(x, left); puff(q.x, q.y, LANE() * q.s * 0.3); } } // (its far end, rounded)
     // stars on it, far to near, then the fox
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = sky.stars.length - 1; i >= 0; i--) {
