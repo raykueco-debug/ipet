@@ -62,6 +62,7 @@
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
   const SKY = { height: 50, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
+  const HOLES = { first: 60, gap: [55, 80], len: 24, two: 0.45 }; // m: the first, between them, how long; how often two lanes at once
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
   const FOX_H = 1.7;                   // the fox's drawn height, m
@@ -234,6 +235,7 @@
     Object.assign(S.fox, { vx: v.vx, vy: v.vy });
     S.phase = 'fly';
     SFX.big(); dust(S.fox.x, S.fox.y, 6);
+    if (params.has('sky')) S.fade = { t: 0, mid: toSky }; // (?sky: straight up onto the clouds, to try them)
     if (v.power > 0.9) pop('超強！', S.fox.x + 1, S.fox.y + 2, '#ffe14d');
   }
 
@@ -381,10 +383,16 @@
   // up on the clouds: a road of cloud on ahead, the fox running along it away from us, three lanes and stars in
   // rows on them (a tap on the left or the right half: a lane that way); SKY.run m of it, then down off its end
   function toSky() {
-    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0, leap: -1, intro: 0, pop: 0 };
-    for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each
+    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], holes: [], t: 0, leap: -1, fall: -1, intro: 0, pop: 0 };
+    // holes in it to get out of the way of (a lane or two of it gone, never all three): in one, down it falls
+    for (let z = HOLES.first; z < SKY.run - 40; z += HOLES.gap[0] + Math.random() * (HOLES.gap[1] - HOLES.gap[0])) {
+      const lanes = [-1, 0, 1].sort(() => Math.random() - 0.5).slice(0, Math.random() < HOLES.two ? 2 : 1); // (one stays whole)
+      for (const lane of lanes) sky.holes.push({ lane, z, len: HOLES.len });
+    }
+    const holed = (lane, z) => sky.holes.some(h => h.lane === lane && z > h.z - 4 && z < h.z + h.len + 4);
+    for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each (not over a hole)
       const lane = Math.floor(Math.random() * 3) - 1;
-      for (let k = 0; k < 4; k++) sky.stars.push({ lane, z: z + k * 3, got: false });
+      for (let k = 0; k < 4; k++) if (!holed(lane, z + k * 3)) sky.stars.push({ lane, z: z + k * 3, got: false });
     }
     Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0, soar: false });
     S.sky = sky; S.phase = 'sky'; S.combo = 0;
@@ -399,20 +407,27 @@
       if (!S.fade && sky.leap > 0.6) S.fade = { t: 0, mid: fromSky };
       return hud();
     }
+    if (sky.fall >= 0) { // into a hole: down through the cloud, and through black back to the forest, from where it fell
+      sky.fall += dt;
+      if (!S.fade && sky.fall > 0.45) S.fade = { t: 0, mid: () => fromSky(true) };
+      return hud();
+    }
     if (!S.fade || S.fade.t > FADE * 0.75) sky.pop += dt; // (from when it's out of the black, mostly)
     if (sky.intro < SKY.intro) { sky.intro = Math.min(SKY.intro, sky.pop); sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12); return hud(); } // (out of the cloud first)
     sky.z = Math.min(SKY.run, sky.z + SKY.speed * dt);
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; starGot(); }
+    if (sky.holes.some(h => sky.z > h.z + 1 && sky.z < h.z + h.len - 1 && Math.abs(h.lane - sky.x) < 0.4)) { sky.fall = 0; SFX.whoosh(); return hud(); } // (in a hole)
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
     if (sky.z >= SKY.run) { sky.leap = 0; SFX.super(); }
     hud();
   }
-  function fromSky() { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
-    const f = S.fox;
-    f.x = S.sky.x0 + SKY.run; f.y = SKY.drop; f.vx = 0; f.vy = 0; f.up = null;
+  function fromSky(fell) { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
+    const f = S.fox;                                     // (fell through a hole: just down from there, on as it was going)
+    f.x = S.sky.x0 + (fell ? S.sky.z : SKY.run); f.y = SKY.drop; f.vx = fell ? 8 : 0; f.vy = 0; f.up = null;
     S.sky = null; S.phase = 'fly';
+    if (fell) { S.friends = []; S.stars = []; S.nextFriend = f.x + 8; S.nextStar = f.x + 4; spawn(); act('ouch', 0.8); pop('掉下來了！', f.x, f.y + 2.5, '#fff', 0.9); return; }
     S.friends = []; S.stars = []; S.nextFriend = f.x + 14; S.nextStar = f.x + 4;
     const gi = { x: 0, x0: 0, y: 0, kind: 'giraffe', used: false, t: 0, carry: false, bunny: false };
     gi.x = gi.x0 = f.x - box(gi).cx; S.friends.push(gi); // (its head right under the fox)
@@ -663,6 +678,15 @@
       for (const side of [-1, 1]) { const p = project(side * 2.0, z); puff(p.x, p.y, LANE() * p.s * 0.38); }
     }
     if (left < FAR) for (let x = -1.6; x <= 1.61; x += 0.4) { const q = project(x, left); puff(q.x, q.y, LANE() * q.s * 0.35); } // (its far end, rounded)
+    for (const h of sky.holes) { // the holes: the sea of cloud far below showing through, ragged round their rims
+      const z1 = (h.z - sky.z) / ZV, z2 = (h.z + h.len - sky.z) / ZV; if (z2 < -CAMZ * 0.6 || z1 > end) continue;
+      const a = Math.max(z1, -CAMZ * 0.6), b = Math.min(z2, end), x1 = h.lane - 0.5 - (h.lane < 0 ? 1.2 : 0), x2 = h.lane + 0.5 + (h.lane > 0 ? 1.2 : 0);
+      const c = [project(x1, a), project(x2, a), project(x2, b), project(x1, b)];
+      const deep = g.createLinearGradient(0, c[2].y, 0, c[0].y); deep.addColorStop(0, LOOK.clouds[2]); deep.addColorStop(1, LOOK.clouds[1]);
+      g.fillStyle = deep; g.beginPath(); c.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(40, 30, 100, 0.5)'; g.fill(); // (deep down: darker)
+      for (const z of [a, b]) for (let x = x1; x <= x2 + 0.01; x += 0.25) { const q = project(x, z); puff(q.x, q.y, LANE() * q.s * 0.14); } // (cloud rims, near and far)
+    }
     // stars on it, far to near, then the fox
     g.textAlign = 'center'; g.textBaseline = 'middle';
     for (let i = sky.stars.length - 1; i >= 0; i--) {
@@ -678,6 +702,8 @@
     if (sky.intro < SKY.intro) { // up out of the cloud (from inside it, the road's top hiding its lower part), and down onto it
       const u = sky.intro / SKY.intro; lift = -1.2 * (1 - u) + 5.2 * u * (1 - u);
       im = u < 0.45 ? up[Math.min(up.length - 1, Math.floor(u / 0.45 * up.length))] : down[Math.min(down.length - 1, Math.floor((u - 0.45) / 0.55 * down.length))];
+    } else if (sky.fall >= 0) { // down through a hole
+      lift = -9 * sky.fall * sky.fall - 0.4 * sky.fall; im = A.down?.at(-1) || up.at(-1);
     } else if (sky.leap >= 0) {
       const L = sky.leap; z = L * SKY.speed / ZV * 0.7; lift = 3.4 * L - 6 * L * L; // (lane widths)
       im = L < 0.25 ? up[Math.min(up.length - 1, Math.floor(L / 0.25 * up.length))] : up.at(-1);
