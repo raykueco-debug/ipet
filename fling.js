@@ -895,11 +895,11 @@
     const all = img.cut && facing; // (every one of them drawn here, its own picture's one too — none left in it)
     const order = layer === 'front' && !all ? [own] : ways.map((a, i) => i).filter(i => all || i !== own).sort((i, j) => Math.abs(ways[j] - mid) - Math.abs(ways[i] - mid)); // (outer first)
     // (all swaying together, each a little of its own — never past the next: they may lie over each other, not cross)
-    const own = n > 1 ? Math.min(3, spread / (n - 1) * 0.3) : 0;
+    const wobble = n > 1 ? Math.min(3, spread / (n - 1) * 0.3) : 0;
     const sway = mode === 'soar' ? Math.sin(t * 9) * 10 : mode === 'fly' ? Math.sin(t * 19) * 6 + Math.sin(t * 31) * 3 : Math.sin(t * 2.2) * 5;
     for (const i of order) {
       const im = TAIL_IMG[i % 9]; if (!im.complete || !im.naturalWidth) continue;
-      const a = ways[i] + sway + own * Math.sin(t * (mode === 'still' ? 1.7 : 23) + i * 1.9) - leanOf(im);
+      const a = ways[i] + sway + wobble * Math.sin(t * (mode === 'still' ? 1.7 : 23) + i * 1.9) - leanOf(im);
       g.save(); g.translate(x + r[0] / 480 * sz, y + (r[1] - lift) / 480 * sz); g.rotate(a * Math.PI / 180);
       g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();

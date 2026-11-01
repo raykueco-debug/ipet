@@ -309,3 +309,7 @@ body.admin .ff { display: inline-block; }
 .upright span { font-size: 64px; animation: fl-turn 1.6s ease-in-out infinite; }
 @media (orientation: portrait) { .upright { display: flex; } }
 #petWrap { max-width: clamp(240px, 62vh, 460px); } /* (as big for the stage's height on a tablet as on a phone) */
+
+/* installing it (app.js: where the browser offers it), and a script error shown while it's tried out on phones */
+.install-btn { margin: 6px 0; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--accent, #ff8a65); color: #fff; font: inherit; font-size: 13px; font-weight: 700; }
+.jsErr { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 999; padding: 8px 12px; border-radius: 10px; background: #c0392b; color: #fff; font: 13px/1.4 system-ui, sans-serif; }

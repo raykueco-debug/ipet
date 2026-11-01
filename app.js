@@ -943,7 +943,12 @@ function bind() {
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {});
   }, true);
-  $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runner.html'; }); // the mini game (runner.js)
+  // installed (Android: the browser's own offer, kept for the button): the whole app fullscreen, no bars between pages
+let installAsk = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installAsk = e; $('#installBtn').hidden = false; });
+addEventListener('appinstalled', () => { $('#installBtn').hidden = true; });
+$('#installBtn').addEventListener('click', () => { installAsk?.prompt(); installAsk = null; $('#installBtn').hidden = true; });
+$('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runner.html'; }); // the mini game (runner.js)
   $('#renameBtn').addEventListener('click', () => {
     const n = prompt(t('renamePrompt'), S.name);
     if (n && n.trim()) { S.name = n.trim().slice(0, 10); save(); render(); }
