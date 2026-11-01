@@ -212,6 +212,23 @@
     return deg;
   }
   const ONE = 40; // one tail: slanting up this much from upright, away from its body (until set by hand)
+  function lean(im) { // (how far round the way a tail picture goes leans, from its root: drawn turned back by it)
+    const pts = shape(im); let x = 0, y = 0;
+    for (const p of pts) { x += p[0] - PIVOT[0]; y += p[1] - PIVOT[1]; }
+    return pts.length ? Math.atan2(x, -y) * 180 / Math.PI : 0;
+  }
+  // the ways they go, in turn round the fan: all swaying together (each a little of its own, never past the next),
+  // turned up off the floor, and none then past the next one round (they may lie over each other, not cross)
+  function fanned(ways, ims, t, quick, L, y0, floor) {
+    const gap = ways.length > 1 ? Math.abs(ways[1] - ways[0]) : 0, own = Math.min(3, gap * 0.3);
+    const all = quick ? Math.sin(t * 19) * 6 + Math.sin(t * 31) * 3 : Math.sin(t * 2.2) * 5;
+    const out = ways.map((a, j) => {
+      const w = a + all + own * Math.sin(t * (quick ? 23 : 1.7) + j * 1.9), d = ims[j] ? lean(ims[j]) : 0;
+      return ims[j] ? above(ims[j], w - d, L, y0, floor) + d : w;
+    });
+    for (let j = 1; j < out.length; j++) out[j] = Math.max(out[j], out[j - 1]);
+    return out.map((a, j) => a - (ims[j] ? lean(ims[j]) : 0)); // (as each is to be turned)
+  }
   // as fox2d.js tails()
   function tails(r, t, pic) {
     const n = +$('n').value;
@@ -222,11 +239,12 @@
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
     const floor = pic?.naturalWidth ? feet(pic) + DROP : 1e4, [ox, oy] = origin(r), x0 = ox * K, y0 = oy * K + DROP;
+    const ims = ways.map((a, j) => { const im = TAIL_IMG[j % 9]; return im.complete && im.naturalWidth ? im : null; });
+    const turn = fanned(ways, ims, $('sway').checked ? t : 0, quick, L, y0, floor);
     g.save(); g.beginPath(); g.rect(-512, -512, 1536, floor + 512); g.clip();
     for (const j of order) {
-      const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
-      const sway = !$('sway').checked ? 0 : quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
-      g.save(); g.translate(x0, y0); g.rotate(above(im, ways[j] + sway, L, y0, floor) * Math.PI / 180);
+      const im = ims[j]; if (!im) continue;
+      g.save(); g.translate(x0, y0); g.rotate(turn[j] * Math.PI / 180);
       g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();
     }

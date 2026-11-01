@@ -868,6 +868,17 @@
   const TAIL_LEN = 0.42; // (a tail picture's side, of the fox's)
   // (mode: 'still' — a slow sway; 'fly' — shaking fast in the wind; 'soar' — streaming in long waves. layer: 'behind'
   // the body, the rest; 'front' — the main one, over the stub left at its root, where the picture's own was taken off)
+  const leans = new WeakMap(); // (how far round the way a tail picture goes leans, from its root: turned back by it)
+  function leanOf(im) {
+    if (!leans.has(im)) {
+      const c = document.createElement('canvas').getContext('2d', { willReadFrequently: true }); c.canvas.width = c.canvas.height = 64;
+      c.drawImage(im, 0, 0, 64, 64);
+      const d = c.getImageData(0, 0, 64, 64).data; let x = 0, y = 0, m = 0;
+      for (let v = 0; v < 64; v++) for (let u = 0; u < 64; u++) if (d[(v * 64 + u) * 4 + 3] > 128) { x += (u + 0.5) / 64 - PIVOT[0]; y += (v + 0.5) / 64 - PIVOT[1]; m++; }
+      leans.set(im, m ? Math.atan2(x, -y) * 180 / Math.PI : 0);
+    }
+    return leans.get(im);
+  }
   function tails(img, x, y, sz, t, mode, layer = 'behind') {
     const n = TAILS, r = img?.root && ROOTS[img.root[0]]?.[img.root[1]];
     if (!r || !r[3] || (n < 2 && !img.cut)) return;
@@ -883,12 +894,13 @@
     const own = ways.reduce((b, a, i) => Math.abs(a - r[2]) < Math.abs(ways[b] - r[2]) ? i : b, 0); // (the one in the picture)
     const all = img.cut && facing; // (every one of them drawn here, its own picture's one too — none left in it)
     const order = layer === 'front' && !all ? [own] : ways.map((a, i) => i).filter(i => all || i !== own).sort((i, j) => Math.abs(ways[j] - mid) - Math.abs(ways[i] - mid)); // (outer first)
+    // (all swaying together, each a little of its own — never past the next: they may lie over each other, not cross)
+    const own = n > 1 ? Math.min(3, spread / (n - 1) * 0.3) : 0;
+    const sway = mode === 'soar' ? Math.sin(t * 9) * 10 : mode === 'fly' ? Math.sin(t * 19) * 6 + Math.sin(t * 31) * 3 : Math.sin(t * 2.2) * 5;
     for (const i of order) {
       const im = TAIL_IMG[i % 9]; if (!im.complete || !im.naturalWidth) continue;
-      const sway = mode === 'soar' ? Math.sin(t * 9 + i * 1.7) * 10
-        : mode === 'fly' ? Math.sin(t * 19 + i * 1.3) * 6 + Math.sin(t * 31 + i * 2.1) * 3
-        : Math.sin(t * 2.2 + i * 1.7) * 5;
-      g.save(); g.translate(x + r[0] / 480 * sz, y + (r[1] - lift) / 480 * sz); g.rotate((ways[i] + sway) * Math.PI / 180);
+      const a = ways[i] + sway + own * Math.sin(t * (mode === 'still' ? 1.7 : 23) + i * 1.9) - leanOf(im);
+      g.save(); g.translate(x + r[0] / 480 * sz, y + (r[1] - lift) / 480 * sz); g.rotate(a * Math.PI / 180);
       g.drawImage(im, -L * PIVOT[0], -L * PIVOT[1], L, L);
       g.restore();
     }
