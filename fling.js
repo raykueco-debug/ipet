@@ -44,7 +44,8 @@
   const LAUNCH = { min: 12, max: 42 };
   const DASH = { up: [6, 8], down: [2, -16] };     // up: a tail's dash [vx +, vy +]; down: a dive, as many as it likes [vx + (once a dive), vy at least]
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
-  const GROUND = { keep: 0.5, dive: 0.7, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy (dived down onto it: dive), this of vx; rolling slows by roll m/s²
+  const GROUND = { keep: 0.5, dive: 0.7, fade: 0.75, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy (dived down onto it: dive), this of vx; rolling slows by roll m/s²
+  // — and never higher than fade of the bounce off the ground before (a dive speeds it down, but each bounce is lower: till a friend's throw)
   // how hard each extra throw is, over a tail's dash (DASH.up, ~10 m/s): a super bounce (stars) = a bunny bounce (the
   // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail.
   // A super / bunny bounce is the friend's own throw made stronger: boost times as fast, as long (an owl's carry, a
@@ -261,6 +262,7 @@
     pop(`COMBO ×${S.combo}!`, a.x - 0.5, fr.h + 3.2, '#7cf0ff', 0.75); chime(780, 2, 70);
   }
   function landOn(a) { // onto a friend: its own throw, or a super bounce when the stars are full
+    S.fox.up = null; // (bouncing off the ground afresh after it)
     const f = S.fox, fr = FRIENDS[a.kind];
     const dived = f.dive; // (diving onto it: a hedgehog knocked away, any other friend's throw the stronger)
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
@@ -349,7 +351,7 @@
           SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
         }
         else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
-        else if (-f.vy > 3) { f.vy = -f.vy * (dived ? GROUND.dive : GROUND.keep); f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
+        else if (-f.vy > 3) { f.vy = f.up = Math.min(-f.vy * (dived ? GROUND.dive : GROUND.keep), (f.up ?? Infinity) * GROUND.fade); f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
         else f.vy = 0;
       }
       if (f.vy === 0) { // rolling to a stop
@@ -409,7 +411,7 @@
   }
   function fromSky() { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
     const f = S.fox;
-    f.x = S.sky.x0 + SKY.run; f.y = SKY.drop; f.vx = 0; f.vy = 0;
+    f.x = S.sky.x0 + SKY.run; f.y = SKY.drop; f.vx = 0; f.vy = 0; f.up = null;
     S.sky = null; S.phase = 'fly';
     S.friends = []; S.stars = []; S.nextFriend = f.x + 14; S.nextStar = f.x + 4;
     const gi = { x: 0, x0: 0, y: 0, kind: 'giraffe', used: false, t: 0, carry: false, bunny: false };
