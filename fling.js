@@ -1005,9 +1005,15 @@
       }
     }
   }
-  function strip(im, par, y, h, drift = 0) { // tiled across, going by at par of the ground's pace (plus drift px)
-    const w = im.naturalWidth * h / im.naturalHeight, off = (((S.cam.scroll * par + drift) % w) + w) % w;
-    for (let x = -off; x < W; x += w) g.drawImage(im, x, y, w + 1, h);
+  // a layer tiled across (y, h: where it is with the camera in close), going by at par of the ground's pace (plus drift
+  // px) — and zoomed with the camera as much as it's near: the ground (par 1) just as the fox and its friends, the
+  // trees (0.5) half as much, far hills and clouds hardly; round the fox's place on the screen, its bottom kept as far
+  // off the ground line as it is (so the friends stay standing on the ground, the trees behind them in step)
+  function strip(im, par, y, h, drift = 0) {
+    const z = Math.pow(S.cam.s / (H / CAM.metres), par), w = im.naturalWidth * h / im.naturalHeight, x0 = W * 0.3;
+    const at = S.cam.x * par * (H / CAM.metres) + drift; // (how far the layer has gone by, px with the camera in close)
+    const bottom = ground() - (ground() - (y + h)) * z, hz = h * z, wz = w * z;
+    for (let n = Math.floor((at - x0 / z) / w); (n * w - at) * z + x0 < W; n++) g.drawImage(im, (n * w - at) * z + x0, bottom - hz, wz + 1, hz);
   }
   // the little tree, GPT's (B02, docs/gpt_background.md): its roots and grass (the stump's top taken off) at the
   // bottom, its leafy crown at the top where the fox sits, and between them its trunk, bent here — the stump's own
