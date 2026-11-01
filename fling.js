@@ -90,6 +90,7 @@
 
   // its tails and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
   let TAILS = 1, best = 0, opts = {};
+  const MULTI = false; // (its tails drawn by the game, as many as it has, on pictures without one: put off for now — the pictures as WAN drew them, tail and all)
 
   // the layer: canvas, counters along the top, the end card (no instructions: it's found out by playing)
   const layer = document.createElement('div');
@@ -145,7 +146,7 @@
   }
   for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
     // from the front or behind: the clip made again without its tail (tools/wan_notail.py), where it's there
-    const own = await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
+    const own = MULTI && await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
     if (own?.ok) {
       const m = await own.json(), d = `${dir}_notail/${clip}`;
       into[k] = m.frames.map((f, i) => Object.assign(tailless(`assets/fox/${d}/${f}?v=${m.rev || 1}`, null, d, i), { cut: true }));
@@ -154,7 +155,7 @@
     const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
     if (!r?.ok) return;
     const m = await r.json();
-    const cut = CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
+    const cut = MULTI && CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
     into[k] = m.frames.map((f, i) => tailless(`assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`, cut && `assets/fox/notail/${dir}/${clip}/${f}?v=${m.rev || 1}`, `${dir}/${clip}`, i)); // (root: where its tail grows, in tail_roots.json)
   })();
   const A = new Proxy(PLAIN, { get: (o, k) => (LOOK.night && CAPED_CLIPS[k]) || o[k] });
@@ -851,7 +852,7 @@
   // made again in the cape (A, above); rolling and the rest stay its everyday ones.
   const CAPED = { air: [], dive: [], crouch: [] };
   for (const [k, n] of [['air', 3], ['dive', 2], ['crouch', 2]]) for (let i = 0; i < n; i++) { // (crouch_0, _1: V03, only the cape's tail blowing — the fox itself the same picture)
-    CAPED[k][i] = tailless(`assets/fox/halloween/${k}_${i}.webp`, `assets/fox/notail/halloween/${k}_${i}.webp`, `halloween/${k}`, 0);
+    CAPED[k][i] = tailless(`assets/fox/halloween/${k}_${i}.webp`, MULTI && `assets/fox/notail/halloween/${k}_${i}.webp`, `halloween/${k}`, 0);
   }
   const caped = () => LOOK.night && CAPED.crouch[0].complete && CAPED.crouch[0].naturalWidth;
   const capedOf = (k, t) => { // (its frames in turn — never still, the cape always streaming; crouched with only the one, leaning forward)
@@ -1163,7 +1164,7 @@
   }
   function open(o = {}) {
     opts = o;
-    TAILS = Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1));
+    TAILS = MULTI ? Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1)) : 1;
     best = o.best ?? (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })();
     if (!layer.isConnected) document.body.appendChild(layer);
     layer.hidden = false;

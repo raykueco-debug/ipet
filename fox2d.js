@@ -66,7 +66,7 @@
 
   // its tails: the clips made again without a tail (assets/fox/clips_notail, docs/tailless.md) where there are, and
   // all its tails (as many as it has) drawn on them from where the tail grows in each frame (assets/fox/tail_roots.json)
-  const NOTAIL = 'assets/fox/clips_notail/';
+  const NOTAIL = 'assets/fox/clips_notail/', MULTI = false; // (put off for now: the clips as WAN drew them, tail and all)
   let ROOTS = {}, PIVOT = [0.5, 1]; // (PIVOT: the point of a tail picture on its root, as parts of its side — set in tools/tail_anchor.html)
   const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
   Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); PIVOT = hand._pivot || PIVOT; });
@@ -77,7 +77,7 @@
     if (clips[name] !== undefined) return clips[name];
     clips[name] = null;
     try {
-      let root = NOTAIL, meta = await fetch(NOTAIL + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+      let root = NOTAIL, meta = MULTI && await fetch(NOTAIL + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
       if (!meta) { root = ROOT; meta = await fetch(ROOT + name + '/meta.json', { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)); }
       if (!meta) return null;
       const v = meta.rev ? '?v=' + meta.rev : ''; // a new revision (tools/clip_fill.py) skips cached frames
