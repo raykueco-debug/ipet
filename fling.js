@@ -874,7 +874,7 @@
     // (from the front or behind, its body in the way: fanned wider, round straight up, from a little higher up — and
     // from the front all of them behind the body, from behind all of them over it)
     const facing = /cheer|happy|joy|surprised|back_/.test(img.root[0]), back = /back_/.test(img.root[0]);
-    const front = facing && !back, mid = facing && n > 1 && r.length < 6 ? (front ? 5 : 10) : r[2], lift = front ? 40 : facing ? 50 : 0;
+    const front = facing && !back, mid = facing && n > 1 && r.length < 6 ? (front ? 5 : 10) : r[2], lift = r.length > 5 ? 0 : front ? 40 : facing ? 50 : 0; // (set by hand: right where it was put)
     if (img.cut && facing ? (layer === 'front') !== back : layer === 'front' && !img.cut) return;
     // (from the front, bigger and spread out flat to both sides, to show past its body)
     const spread = Math.min(front ? 170 : facing ? 150 : 124, (front ? 22 : facing ? 20 : 17) * (n - 1)) * (r[6] ?? 1); // (× as set by hand)

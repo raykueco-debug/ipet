@@ -217,7 +217,7 @@
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1);
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
-    const floor = pic?.naturalWidth ? feet(pic) + DROP : 1e4, x0 = (r[0] - 51 * f) * K, y0 = (r[1] + 72 * f - lift) * K + DROP;
+    const floor = pic?.naturalWidth ? feet(pic) + DROP : 1e4, [ox, oy] = origin(r), x0 = ox * K, y0 = oy * K + DROP;
     g.save(); g.beginPath(); g.rect(-512, -512, 1536, floor + 512); g.clip();
     for (const j of order) {
       const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
@@ -230,7 +230,9 @@
     if (floor < 1e4) { g.setLineDash([6, 6]); g.beginPath(); g.moveTo(0, floor); g.lineTo(512, floor); g.lineWidth = 1; g.strokeStyle = '#2bb3c999'; g.stroke(); g.setLineDash([]); } // (its feet)
   }
 
-  const P = r => ({ x: r[0] * K, y: r[1] * K + DROP });
+  // where its tails come out, as drawn (found ones facing us: lower down and to the middle of its hips; set by hand: there)
+  const origin = r => { const f = r.length > 5 ? 0 : fOf(r) * Math.min(1, (+$('n').value - 1) / 2); return [r[0] - 51 * f, r[1] + 72 * f - 40 * f]; };
+  const P = r => { const [x, y] = origin(r); return { x: x * K, y: y * K + DROP }; };
   const handle = r => { const p = P(r), a = way(r) * Math.PI / 180; return { x: p.x + Math.sin(a) * 80, y: p.y - Math.cos(a) * 80 }; };
   function dot(p, c, rad = 6, ring = false) {
     g.beginPath(); g.arc(p.x, p.y, rad, 0, 7);
@@ -278,7 +280,7 @@
   function setKey(change = {}) {
     if (!clip) return;
     const r = resolve(clip)[i]; if (!r) return;
-    const k = [r[0], r[1], way(r), fOf(r), r[5] ?? 1, r[6] ?? 1];
+    const k = [...origin(r), way(r), fOf(r), r[5] ?? 1, r[6] ?? 1];
     for (const [j, v] of Object.entries(change)) k[j] = v;
     k[2] = ((k[2] + 540) % 360) - 180;
     (HAND[clip] ||= {})[i] = k.map((v, j) => Math.round(v * (j > 2 ? 100 : 10)) / (j > 2 ? 100 : 10));

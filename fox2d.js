@@ -313,7 +313,8 @@
     const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1); // (× as set by hand)
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1)); // (r.length > 5: set by hand)
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
-    const floor = feet(pic) + DROP, x0 = (r[0] - 51 * f) * k, y0 = (r[1] + 72 * f - lift) * k + DROP;
+    const floor = feet(pic) + DROP, h = r.length > 5 ? 0 : 1; // (set by hand: right where it was put)
+    const x0 = (r[0] - 51 * f * h) * k, y0 = (r[1] + (72 * f - lift) * h) * k + DROP;
     g.save(); g.beginPath(); g.rect(-512, -512, 1536, floor + 512); g.clip(); // (and should one still reach down past them)
     for (const j of order) {
       const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
