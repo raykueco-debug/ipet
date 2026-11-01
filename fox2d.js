@@ -267,7 +267,7 @@
     const f = cur.frames[i];
     if (!f.complete || !f.naturalWidth) return; // keep the last picture rather than a blank
     g.clearRect(0, 0, 512, 512);
-    const r = cur.notail && ROOTS['clips_notail/' + cur.name]?.[i];
+    const r = cur.notail && shown() > 0.02 && ROOTS['clips_notail/' + cur.name]?.[i];
     const over = r && r[4] === 'over'; // (seen from behind: its tails over its back)
     if (r && !over) tails(r, f);
     g.drawImage(f, 0, DROP, 512, 512);
@@ -319,6 +319,11 @@
     for (let j = 1; j < out.length; j++) out[j] = Math.max(out[j], out[j - 1]);
     return out.map((a, j) => a - (ims[j] ? lean(ims[j]) : 0)); // (as each is to be turned)
   }
+  // asleep, its tails tucked away: none on sleep_loop (…_dream too), drawn in going to sleep, out again waking
+  function shown() {
+    const n = cur.name, u = i / Math.max(1, cur.frames.length - 1);
+    return /^sleep_loop/.test(n) ? 0 : /_to_sleep$/.test(n) ? 1 - u : /^sleep_to_/.test(n) ? u : 1;
+  }
   // fanned out from the root around the way it goes; each its own pace of sway — slow sitting, quick on the move
   function tails(r, pic) {
     const n = tailN, t = performance.now() / 1000, k = 512 / 480;
@@ -327,7 +332,7 @@
     // round straight up from behind its hips, bigger, to show past its big head; side on, round the way its own went
     const f = (typeof r[4] === 'number' ? r[4] : 0) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
     const mid = r.length > 5 ? r[2] : mix(r[2], 5), lift = 40 * f; // (set by hand: as set)
-    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1); // (× as set by hand)
+    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)) * (r[6] ?? 1), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3)) * (r[5] ?? 1) * shown(); // (× as set by hand; tucked away asleep)
     const ways = n === 1 ? [r.length > 5 ? r[2] : r[2] < 0 ? -ONE : ONE] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1)); // (r.length > 5: set by hand)
     const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
     const floor = feet(pic) + DROP, h = r.length > 5 ? 0 : 1; // (set by hand: right where it was put)
