@@ -68,7 +68,8 @@
   // all its tails (as many as it has) drawn on them from where the tail grows in each frame (assets/fox/tail_roots.json)
   const NOTAIL = 'assets/fox/clips_notail/';
   let ROOTS = {};
-  fetch('assets/fox/tail_roots.json', { cache: 'no-cache' }).then(r => r.json()).then(j => { ROOTS = j; }).catch(() => {});
+  const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([j, hand]) => { ROOTS = anchored(j, hand); });
   const TAIL_IMG = Array.from({ length: 9 }, (_, k) => { const im = new Image(); im.src = `assets/fox/tail/t${k + 1}.png`; return im; });
   let tailN = 1;
 
@@ -386,3 +387,19 @@
     ready: init().then(() => true, () => false),
   };
 })();
+
+// the tail roots set by hand (tools/tail_anchor.html → assets/fox/tail_anchors.json: a few frames of a clip each,
+// [x, y, angle(, facing us)]) in place of those found (tools/tail_roots.py), in between them straight from one to the next
+function anchored(roots, hand) {
+  for (const [clip, keys] of Object.entries(hand || {})) {
+    const ks = Object.keys(keys).map(Number).sort((a, b) => a - b), auto = roots[clip];
+    if (!ks.length || !auto) continue;
+    roots[clip] = auto.map((r, i) => {
+      const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
+      const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
+      const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
+      return [at(0), at(1), at(2), true, f];
+    });
+  }
+  return roots;
+}

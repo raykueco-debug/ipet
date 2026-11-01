@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="../">
+<title>尾根錨定</title>
+<!-- The pet's tail roots set by hand, clip by clip (python server.py, then /tools/tail_anchor.html): a few frames
+     of a clip anchored, the ones in between straight from one to the next, saved to assets/fox/tail_anchors.json,
+     which fox2d.js and fling.js take in place of what tools/tail_roots.py found (anchored() in both). -->
+<style>
+  :root { --bg: #fdf3e6; --panel: #fff; --ink: #4a2e2a; --line: #e8d5c0; --accent: #f08a3c; --key: #e0457b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px system-ui, "Noto Sans TC", sans-serif; }
+  body { display: flex; }
+  #list { width: 250px; flex: none; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--line); }
+  #list input { margin: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  #list label { margin: 0 10px 6px; font-size: 13px; }
+  #clips { flex: 1; overflow-y: auto; margin: 0; padding: 0 0 10px; list-style: none; }
+  #clips li { padding: 4px 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+  #clips li:hover { background: #fbeee0; }
+  #clips li.on { background: var(--accent); color: #fff; }
+  #clips li.hand::after { content: ' ●'; color: var(--key); }
+  #clips li.on.hand::after { color: #fff; }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 12px 16px; gap: 10px; }
+  #top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #top h1 { font-size: 17px; margin: 0 8px 0 0; }
+  #name { font-weight: 600; }
+  #work { flex: 1; display: flex; gap: 16px; min-height: 0; }
+  #view { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; }
+  canvas { max-width: 100%; max-height: 100%; aspect-ratio: 512 / 544; background: repeating-conic-gradient(#f3e7d8 0 25%, #fbf5ee 0 50%) 0 0 / 32px 32px; border-radius: 10px; cursor: crosshair; touch-action: none; }
+  #side { width: 250px; flex: none; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .box b { display: block; margin-bottom: 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .row > span:first-child { width: 52px; flex: none; }
+  .row input[type=range] { flex: 1; min-width: 0; }
+  .row output { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { font: inherit; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--ink); border-color: var(--ink); color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  #frames { display: flex; flex-wrap: wrap; gap: 3px; }
+  #frames i { font-style: normal; width: 26px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; border-radius: 5px; background: #fff; border: 1px solid var(--line); cursor: pointer; }
+  #frames i.key { background: var(--key); border-color: var(--key); color: #fff; }
+  #frames i.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+  #status { min-height: 1.4em; opacity: .8; }
+  .hint { font-size: 12px; opacity: .7; line-height: 1.6; margin: 0; }
+  .legend span { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 4px 0 8px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div id="list">
+  <input id="filter" placeholder="找動畫（例：sleep）">
+  <label><input type="checkbox" id="onlyHand"> 只看已錨定的</label>
+  <ul id="clips"></ul>
+</div>
+<div id="main">
+  <div id="top">
+    <h1>尾根錨定</h1>
+    <span id="name">—</span>
+    <span id="fno"></span>
+    <span style="flex:1"></span>
+    <span id="status"></span>
+    <button id="save" class="primary">儲存（Ctrl+S）</button>
+  </div>
+  <div id="work">
+    <div id="view"><canvas id="cv" width="512" height="544"></canvas></div>
+    <div id="side">
+      <div class="box">
+        <b>播放</b>
+        <div class="btns">
+          <button id="prev">◀ 上一幀</button><button id="next">下一幀 ▶</button><button id="play">▶ 播放</button>
+        </div>
+        <div class="row"><span>尾巴數</span><input type="range" id="n" min="1" max="9" value="5"><output id="nOut">5</output></div>
+        <div class="row"><span>擺動</span><label><input type="checkbox" id="sway" checked> 跟遊戲一樣晃</label></div>
+        <div class="row"><span>速度</span><input type="range" id="fps" min="2" max="24" value="12"><output id="fpsOut">12</output></div>
+      </div>
+      <div class="box">
+        <b>這一幀的錨點</b>
+        <div class="row"><span>X</span><input type="range" id="x" min="0" max="480" step="0.5"><output id="xOut"></output></div>
+        <div class="row"><span>Y</span><input type="range" id="y" min="0" max="480" step="0.5"><output id="yOut"></output></div>
+        <div class="row"><span>角度</span><input type="range" id="a" min="-180" max="180" step="0.5"><output id="aOut"></output></div>
+        <div class="row"><span>面向你</span><input type="range" id="f" min="0" max="1" step="0.05"><output id="fOut"></output></div>
+        <div class="btns">
+          <button id="setKey">設為錨點</button>
+          <button id="delKey">刪除此幀錨點（Del）</button>
+          <button id="copyPrev">沿用前一個錨點</button>
+          <button id="clearClip">整段回到自動</button>
+        </div>
+      </div>
+      <div class="box">
+        <b>幀（粉紅＝手動錨點）</b>
+        <div id="frames"></div>
+      </div>
+      <div class="box">
+        <p class="hint">在畫面上點或拖：移動尾根。拖橘色線末端的圓點：轉角度。<br>
+        只錨幾幀就好，中間會自動直線補上；錨點之前／之後的幀跟著最近的錨點。<br>
+        ← → 換幀、空白鍵播放、Del 刪錨點。</p>
+        <p class="hint legend"><span style="background:#999"></span>自動找到的<span style="background:var(--accent)"></span>目前用的<span style="background:#2bb3c9"></span>接續的動畫（頭／尾幀）<span style="background:#7a5cff"></span>上一幀</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), g = cv.getContext('2d');
+  const DROP = 32, K = 512 / 480; // (as fox2d.js draws it: the frame 32px down, roots in the 480px square)
+  const TAIL_IMG = Array.from({ length: 9 }, (_, k) => { const im = new Image(); im.src = `assets/fox/tail/t${k + 1}.png`; return im; });
+  let ROOTS = {}, HAND = {}, dirty = false;
+  let clip = null, frames = [], i = 0, playing = false, drag = null, last = 0;
+
+  const json = u => fetch(u, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+  // (the same as anchored() in fox2d.js / fling.js, for one clip)
+  function resolve(name) {
+    const auto = ROOTS[name] || [], keys = HAND[name];
+    const ks = keys ? Object.keys(keys).map(Number).sort((a, b) => a - b) : [];
+    if (!ks.length) return auto;
+    return auto.map((r, i) => {
+      const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
+      const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
+      const f = r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4];
+      return [at(0), at(1), at(2), true, f];
+    });
+  }
+  const fOf = r => (typeof r?.[4] === 'number' ? r[4] : 0);
+
+  // the clip list: the pet's tail-less clips
+  function list() {
+    const q = $('filter').value.trim().toLowerCase(), only = $('onlyHand').checked;
+    const names = Object.keys(ROOTS).filter(k => k.startsWith('clips_notail/')).sort();
+    $('clips').innerHTML = '';
+    for (const k of names) {
+      const n = k.slice('clips_notail/'.length);
+      if (q && !n.includes(q)) continue;
+      if (only && !HAND[k]) continue;
+      const li = document.createElement('li');
+      li.textContent = n; li.title = n;
+      li.className = (k === clip ? 'on' : '') + (HAND[k] ? ' hand' : '');
+      li.onclick = () => open(k);
+      $('clips').appendChild(li);
+    }
+  }
+
+  async function open(name) {
+    clip = name; i = 0; frames = [];
+    const n = name.slice('clips_notail/'.length);
+    $('name').textContent = n;
+    const meta = await json(`assets/fox/clips_notail/${n}/meta.json`);
+    const v = meta.rev ? '?v=' + meta.rev : '';
+    frames = (meta.frames || []).map(f => { const im = new Image(); im.src = `assets/fox/clips_notail/${n}/${f}${v}`; im.onload = draw; return im; });
+    list(); strip(); fill(); draw();
+  }
+
+  // the clips this one goes on from / on to: their first or last frame's root, to see the tails join up
+  function neighbours() {
+    const n = clip.slice('clips_notail/'.length), out = [];
+    const from = n.includes('_to_') ? n.split('_to_')[0] : n.split('_loop')[0], to = n.includes('_to_') ? n.split('_to_')[1] : from;
+    const at = (c, last) => { const r = resolve('clips_notail/' + c); return r.length ? r[last ? r.length - 1 : 0] : null; };
+    if (i === 0) out.push(at(from + '_loop', true), n.includes('_loop') ? at(n, true) : null);
+    if (i === frames.length - 1) out.push(at(to + '_loop', false), n.includes('_loop') ? at(n, false) : null);
+    return out.filter(Boolean);
+  }
+
+  // as fox2d.js tails()
+  function tails(r, t) {
+    const n = +$('n').value;
+    const quick = /_loop_run|_loop$|^walk/.test(clip) && /walk|run/.test(clip);
+    const f = fOf(r) * Math.min(1, (n - 1) / 2), mix = (a, b) => a + (b - a) * f;
+    const mid = mix(r[2], 5), lift = 40 * f;
+    const spread = Math.min(mix(124, 200), mix(17, 50) * (n - 1)), L = 512 * mix(0.42, 0.55) * Math.pow(0.85, Math.floor((n - 1) / 3));
+    const ways = n === 1 ? [r[2]] : Array.from({ length: n }, (_, j) => mid - spread / 2 + spread * j / (n - 1));
+    const order = ways.map((a, j) => j).sort((a, b) => Math.abs(ways[b] - mid) - Math.abs(ways[a] - mid));
+    for (const j of order) {
+      const im = TAIL_IMG[j % 9]; if (!im.complete || !im.naturalWidth) continue;
+      const sway = !$('sway').checked ? 0 : quick ? Math.sin(t * 19 + j * 1.3) * 6 + Math.sin(t * 31 + j * 2.1) * 3 : Math.sin(t * 2.2 + j * 1.7) * 5;
+      g.save(); g.translate((r[0] - 51 * f) * K, (r[1] + 72 * f - lift) * K + DROP); g.rotate((ways[j] + sway) * Math.PI / 180);
+      g.drawImage(im, -L / 2, -L, L, L);
+      g.restore();
+    }
+  }
+
+  const P = r => ({ x: r[0] * K, y: r[1] * K + DROP });
+  const handle = r => { const p = P(r), a = r[2] * Math.PI / 180; return { x: p.x + Math.sin(a) * 80, y: p.y - Math.cos(a) * 80 }; };
+  function dot(p, c, rad = 6, ring = false) {
+    g.beginPath(); g.arc(p.x, p.y, rad, 0, 7);
+    if (ring) { g.lineWidth = 2.5; g.strokeStyle = c; g.stroke(); } else { g.fillStyle = c; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#fff'; g.stroke(); }
+  }
+
+  function draw() {
+    g.clearRect(0, 0, 512, 544);
+    const im = frames[i]; if (!clip) return;
+    const rows = resolve(clip), r = rows[i], t = performance.now() / 1000;
+    $('fno').textContent = frames.length ? `幀 ${i + 1} / ${frames.length}` : '';
+    if (r && r[4] !== 'over') tails(r, t);
+    if (im?.complete && im.naturalWidth) g.drawImage(im, 0, DROP, 512, 512);
+    if (r && r[4] === 'over') tails(r, t);
+    if (!r) return;
+    const auto = ROOTS[clip][i];
+    if (auto) { dot(P(auto), '#999', 4); }
+    if (i > 0 && rows[i - 1]) dot(P(rows[i - 1]), '#7a5cff', 5, true);
+    for (const q of neighbours()) dot(P(q), '#2bb3c9', 8, true);
+    const p = P(r), h = handle(r);
+    g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(h.x, h.y); g.lineWidth = 2; g.strokeStyle = '#f08a3c'; g.stroke();
+    dot(h, '#f08a3c', 6, true);
+    dot(p, HAND[clip]?.[i] ? '#e0457b' : '#f08a3c', 6);
+  }
+
+  function strip() {
+    const keys = HAND[clip] || {};
+    $('frames').innerHTML = '';
+    frames.forEach((_, k) => {
+      const el = document.createElement('i');
+      el.textContent = k + 1; el.className = (keys[k] ? 'key' : '') + (k === i ? ' on' : '');
+      el.onclick = () => go(k);
+      $('frames').appendChild(el);
+    });
+  }
+  function fill() { // the sliders: this frame's root
+    const r = clip && resolve(clip)[i]; if (!r) return;
+    for (const [id, v] of [['x', r[0]], ['y', r[1]], ['a', r[2]], ['f', fOf(r)]]) { $(id).value = v; $(id + 'Out').textContent = (+v).toFixed(id === 'f' ? 2 : 1); }
+    $('f').disabled = r[4] === 'over';
+    $('delKey').disabled = !HAND[clip]?.[i];
+  }
+  function go(k) { if (!frames.length) return; i = (k + frames.length) % frames.length; strip(); fill(); draw(); }
+
+  // a key on this frame (from where its root is now, changed)
+  function setKey(change = {}) {
+    if (!clip) return;
+    const r = resolve(clip)[i]; if (!r) return;
+    const k = [r[0], r[1], r[2], fOf(r)];
+    for (const [j, v] of Object.entries(change)) k[j] = v;
+    k[2] = ((k[2] + 540) % 360) - 180;
+    (HAND[clip] ||= {})[i] = k.map(v => Math.round(v * 10) / 10);
+    changed();
+  }
+  function changed() { dirty = true; $('status').textContent = '尚未儲存'; strip(); fill(); draw(); list(); }
+
+  // on the picture: drag the root, or the handle at the end of its line to turn it
+  const at = e => { const b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) * 512 / b.width, y: (e.clientY - b.top) * 544 / b.height }; };
+  cv.addEventListener('pointerdown', e => {
+    const r = clip && resolve(clip)[i]; if (!r) return;
+    const p = at(e), h = handle(r);
+    drag = Math.hypot(p.x - h.x, p.y - h.y) < 14 ? 'turn' : 'move';
+    cv.setPointerCapture(e.pointerId); move(e);
+  });
+  cv.addEventListener('pointermove', e => drag && move(e));
+  cv.addEventListener('pointerup', () => { drag = null; });
+  function move(e) {
+    const p = at(e), r = resolve(clip)[i];
+    if (drag === 'move') setKey({ 0: p.x / K, 1: (p.y - DROP) / K });
+    else { const q = P(r); setKey({ 2: Math.atan2(p.x - q.x, -(p.y - q.y)) * 180 / Math.PI }); }
+  }
+  for (const [id, j] of [['x', 0], ['y', 1], ['a', 2], ['f', 3]]) $(id).addEventListener('input', () => setKey({ [j]: +$(id).value }));
+
+  $('setKey').onclick = () => setKey();
+  $('delKey').onclick = () => { if (!HAND[clip]?.[i]) return; delete HAND[clip][i]; if (!Object.keys(HAND[clip]).length) delete HAND[clip]; changed(); };
+  $('copyPrev').onclick = () => {
+    const keys = HAND[clip] || {}, before = Object.keys(keys).map(Number).filter(k => k < i).pop();
+    if (before === undefined) return void ($('status').textContent = '前面沒有錨點');
+    (HAND[clip] ||= {})[i] = [...keys[before]]; changed();
+  };
+  $('clearClip').onclick = () => { if (HAND[clip] && confirm('這段的手動錨點全部刪掉，回到自動找到的？')) { delete HAND[clip]; changed(); } };
+  $('prev').onclick = () => go(i - 1);
+  $('next').onclick = () => go(i + 1);
+  $('play').onclick = () => { playing = !playing; $('play').textContent = playing ? '❚❚ 暫停' : '▶ 播放'; $('play').classList.toggle('on', playing); };
+  $('n').oninput = () => { $('nOut').textContent = $('n').value; draw(); };
+  $('fps').oninput = () => { $('fpsOut').textContent = $('fps').value; };
+  $('filter').oninput = list; $('onlyHand').onchange = list;
+
+  async function save() {
+    $('status').textContent = '儲存中…';
+    try {
+      const res = await fetch('api/tail-anchors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(HAND) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error);
+      dirty = false; $('status').textContent = `已儲存 ${j.clips} 段 → ${j.saved}`;
+    } catch (e) { // (no server.py: hand the file over instead)
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(HAND)], { type: 'application/json' })); a.download = 'tail_anchors.json'; a.click();
+      $('status').textContent = '伺服器沒回應，已下載 tail_anchors.json，請放到 assets/fox/';
+    }
+  }
+  $('save').onclick = save;
+  addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' && e.target.type !== 'range' && e.target.type !== 'checkbox') return;
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); save(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); go(i - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); go(i + 1); }
+    else if (e.key === ' ') { e.preventDefault(); $('play').click(); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); $('delKey').click(); }
+  });
+  addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  (function loop(now) {
+    if (playing && frames.length && now - last > 1000 / +$('fps').value) { last = now; go(i + 1); }
+    else if ($('sway').checked) draw();
+    requestAnimationFrame(loop);
+  })(0);
+
+  Promise.all([json('assets/fox/tail_roots.json'), json('assets/fox/tail_anchors.json')]).then(([r, h]) => {
+    ROOTS = r; HAND = h || {};
+    list();
+    const first = new URLSearchParams(location.search).get('clip');
+    open(first ? 'clips_notail/' + first : Object.keys(ROOTS).filter(k => k.startsWith('clips_notail/')).sort()[0]);
+  });
+})();
+</script>
+</body>
+</html>

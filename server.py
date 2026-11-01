@@ -16,6 +16,7 @@ Endpoints (all JSON unless noted):
   GET  /api/voices         local voices + current choice (audition page)
   POST /api/voice-config   {lang, model, voice, speed}
   POST /api/fox3d-rig?model=   tail attachment from tools/rig_editor.html -> assets/fox3d/<model>/rig.json
+  POST /api/tail-anchors   tail roots set by hand in tools/tail_anchor.html -> assets/fox/tail_anchors.json
 
 TTS providers (TTS_PROVIDER=local|azure|openai forces one; otherwise the first available wins):
   local   Kokoro via sherpa-onnx, models in models/ – the same engine the iOS app can bundle (default)
@@ -294,6 +295,15 @@ class Handler(SimpleHTTPRequestHandler):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(body, f, ensure_ascii=False, indent=1)
             return self._json({"saved": os.path.relpath(path, ROOT)})
+
+        if u.path == "/api/tail-anchors":  # tools/tail_anchor.html → assets/fox/tail_anchors.json
+            if not isinstance(body, dict):
+                return self._json({"error": "bad anchors"}, 400)
+            path = os.path.join(ROOT, "assets", "fox", "tail_anchors.json")
+            lines = [f"{json.dumps(k)}: {json.dumps(v)}" for k, v in sorted(body.items())]  # (a clip a line)
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write("{\n" + ",\n".join(lines) + "\n}\n")
+            return self._json({"saved": os.path.relpath(path, ROOT).replace(os.sep, "/"), "clips": len(body)})
 
         fam = load(fam_code)
         if u.path == "/api/schedule":
