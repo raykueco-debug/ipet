@@ -883,7 +883,7 @@ async function speak(ev) {
 
 // the pet's own music, round and round on its screen (PeriTune, peritune.com) — from the first touch (browsers want
 // one), paused while the mini game has its own
-const homeMusic = Object.assign(new Audio('assets/music/PerituneMaterial_Laid_Back3_loop.m4a'), { loop: true, volume: 0.35 });
+const homeMusic = Sound.music('assets/music/PerituneMaterial_Laid_Back3_loop.m4a'); // (sound.js: brought to the same loudness as the rest, on iPhones too)
 function unlockAudio() {
   if (!document.querySelector('.fl:not([hidden])')) homeMusic.play().catch(() => {});
   if (inbox.unlocked) return;

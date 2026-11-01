@@ -3,7 +3,7 @@ placed where its fox lies best over the original's — as much of it on the orig
 (the tail gone, the rest is the same fox; its top or its bottom may have been the tail's, so no single point will do).
 → assets/fox/wan_in/notail/<pose>.png, by assets/source/notail/grids.json.
 
-usage: python tools/notail_align.py N01 [N02 …]
+usage: python tools/notail_align.py N01 [N02 …]   (--plain: pictures with their tail, onto assets/fox/wan_in itself)
 """
 import json
 import os
@@ -64,7 +64,8 @@ MIRRORS = {'bat_r': 'bat', 'header_r': 'header', 'pounce_r': 'pounce', 'swipe_r'
 def main():
     grids = json.load(open(os.path.join(SRC, 'grids.json')))
     os.makedirs(os.path.join(IN, 'notail'), exist_ok=True)
-    for g in sys.argv[1:]:
+    plain = '--plain' in sys.argv  # (a grid of pictures with their tail, fixed: back over the pictures themselves)
+    for g in [a for a in sys.argv[1:] if a != '--plain']:
         names = grids[int(g[1:]) - 1]
         src = Image.open(os.path.join(SRC, f'{g}_notail.png')).convert('RGB'); W, H = src.size
         for i, n in enumerate(names):
@@ -72,7 +73,7 @@ def main():
             k, x, y = fit(mask(Image.open(os.path.join(IN, f'{n}.png')).convert('RGB')), q)
             q2 = q.resize((round(q.size[0] * k), round(q.size[1] * k)), Image.LANCZOS)
             out = Image.new('RGB', (512, 512), (0, 255, 0)); out.paste(q2, (x, y))
-            out.save(os.path.join(IN, 'notail', f'{n}.png'))
+            out.save(os.path.join(IN, '' if plain else 'notail', f'{n}.png'))
             print(g, n, round(k, 3))
     for r, n in MIRRORS.items():
         p = os.path.join(IN, 'notail', f'{n}.png')

@@ -44,7 +44,7 @@
   const LAUNCH = { min: 12, max: 42 };
   const DASH = { up: [6, 8], down: [2, -16] };     // up: a tail's dash [vx +, vy +]; down: a dive, as many as it likes [vx + (once a dive), vy at least]
   const DIVE_BOOST = 1.3;                          // diving onto a friend: its throw this much stronger
-  const GROUND = { keep: 0.42, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy, this of vx; rolling slows by roll m/s²
+  const GROUND = { keep: 0.5, dive: 0.7, drag: 0.72, roll: 9 }; // a plain bounce keeps this of vy (dived down onto it: dive), this of vx; rolling slows by roll m/s²
   // how hard each extra throw is, over a tail's dash (DASH.up, ~10 m/s): a super bounce (stars) = a bunny bounce (the
   // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail.
   // A super / bunny bounce is the friend's own throw made stronger: boost times as fast, as long (an owl's carry, a
@@ -169,7 +169,7 @@
     const o = ac.createOscillator(), v = ac.createGain(), t = ac.currentTime;
     o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(v).connect(ac.destination); o.start(t); o.stop(t + dur);
+    o.connect(v).connect(window.Sound ? Sound.sfx : ac.destination); o.start(t); o.stop(t + dur);
   }
   const chime = (f, n, gap) => { for (let i = 0; i < n; i++) setTimeout(() => blip(f * (1 + i * 0.25), f * 1.5 * (1 + i * 0.25), 0.2), i * gap); };
   const SFX = {
@@ -225,7 +225,7 @@
     S.pull = { x: dx * k, y: Math.max(-PULL.rest[1] + 0.2, dy * k) };
   }
   function letGo() {
-    if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
     const v = aimed();
     S.spring = { x: S.pull.x, y: S.pull.y, t: 0 };
     S.pull = { x: 0, y: 0 };
@@ -238,7 +238,7 @@
 
   function tap() {
     if (!S) return;
-    if (!ac) try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
     if (S.phase !== 'fly') return;
     const f = S.fox;
     if (f.hold > 0) return; // (in the giraffe's mouth)
@@ -349,7 +349,7 @@
           SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
         }
         else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
-        else if (-f.vy > 3) { f.vy = -f.vy * GROUND.keep; f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
+        else if (-f.vy > 3) { f.vy = -f.vy * (dived ? GROUND.dive : GROUND.keep); f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
         else f.vy = 0;
       }
       if (f.vy === 0) { // rolling to a stop
@@ -1159,7 +1159,7 @@
   let bgm = null;
   function music() { // the look's music, round and round while it's open (both PeriTune, peritune.com)
     if (!LOOK.music) return;
-    bgm ||= Object.assign(new Audio(LOOK.music), { loop: true, volume: 0.45 });
+    bgm ||= window.Sound ? Sound.music(LOOK.music) : Object.assign(new Audio(LOOK.music), { loop: true, volume: 0.45 }); // (sound.js: as loud as the rest, on iPhones too)
     bgm.play().catch(() => {});
   }
   function open(o = {}) {
