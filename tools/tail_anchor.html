@@ -109,7 +109,7 @@
       </div>
       <div class="box">
         <p class="hint">點兩下：尾根設在那裡。拖尾根圓點：移動它。在其他地方拖（繞著尾根轉）：轉角度。滾輪：大小（Shift＋滾輪：展開）。<br>
-        只錨幾幀就好，中間會自動直線補上；錨點之前／之後的幀跟著最近的錨點。<br>
+        只錨一幀就好：其他幀會保持同樣的相對位置、跟著小狐身體一起動；跑掉的幀再補錨點，兩個錨點之間會漸變。<br>
         ← → 換幀、空白鍵播放、Del 刪錨點。</p>
         <p class="hint legend"><span style="background:#999"></span>自動找到的<span style="background:var(--accent)"></span>目前用的<span style="background:#2bb3c9"></span>接續的動畫（頭／尾幀）<span style="background:#7a5cff"></span>上一幀</p>
       </div>
@@ -134,9 +134,12 @@
     return auto.map((r, i) => {
       const a = ks.filter(k => k <= i).pop() ?? ks[0], b = ks.find(k => k >= i) ?? a, A = keys[a], B = keys[b];
       const u = a === b ? 0 : (i - a) / (b - a), at = j => A[j] + (B[j] - A[j]) * u;
+      // (where it is and the way it goes: as far off the found root as at the anchors, so it moves with the fox)
+      const off = (K, k) => { const q = auto[k] || r; return [K[0] - q[0], K[1] - q[1], ((K[2] - q[2] + 540) % 360) - 180]; };
+      const oa = off(A, a), ob = off(B, b), by = j => oa[j] + (ob[j] - oa[j]) * u;
       const f = A.length > 6 ? (A[6] ? 'over' : at(3)) : r[4] === 'over' ? 'over' : A.length > 3 ? at(3) : r[4]; // (A[6]: its tails over it, or not)
       const k = j => (A.length > j ? at(j) : 1);
-      return [at(0), at(1), at(2), true, f, k(4), k(5)];
+      return [r[0] + by(0), r[1] + by(1), r[2] + by(2), true, f, k(4), k(5)];
     });
   }
   const fOf = r => (typeof r?.[4] === 'number' ? r[4] : 0);
@@ -384,7 +387,8 @@ ${all.map(k => k.slice(13)).join('\n')}`)) return;
   $('copyPrev').onclick = () => {
     const keys = HAND[clip] || {}, before = Object.keys(keys).map(Number).filter(k => k < i).pop();
     if (before === undefined) return void ($('status').textContent = '前面沒有錨點');
-    (HAND[clip] ||= {})[i] = [...keys[before]]; changed();
+    const A = keys[before], p = ROOTS[clip][before], q = ROOTS[clip][i]; // (as far off the found root as there)
+    (HAND[clip] ||= {})[i] = A.map((v, j) => (j < 3 ? Math.round((v + q[j] - p[j]) * 10) / 10 : v)); changed();
   };
   $('sync').onclick = sync;
   $('clearClip').onclick = () => { if (HAND[clip] && confirm('這段的手動錨點全部刪掉，回到自動找到的？')) { delete HAND[clip]; changed(); } };
