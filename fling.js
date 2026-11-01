@@ -65,6 +65,7 @@
   // the cloud road winds over the lanes, a lane wide; each bend: its edge on the side it goes to out over the next
   // lane first (over turn m), both lanes cloud a while (both m: the time to change lane), then its other edge in
   // after it. Off it (an edge past the fox's middle), the fox falls
+  const FALL_IN = (-0.4 + Math.sqrt(0.16 + 4 * 9 * 0.9)) / 18; // (s off the edge: down to the sea of cloud, 0.9 lanes below — see the fall's lift)
   const WIND = { first: 60, gap: [60, 95], turn: 12, both: 24 };
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
@@ -424,7 +425,7 @@
     }
     if (sky.fall >= 0) { // into a hole: down through the cloud, and through black back to the forest, from where it fell
       sky.fall += dt;
-      if (!S.fade && sky.fall > 0.45) S.fade = { t: 0, mid: () => fromSky(true) };
+      if (!S.fade && sky.fall > FALL_IN + 0.35) S.fade = { t: 0, mid: () => fromSky(true) };
       return hud();
     }
     if (!S.fade || S.fade.t > FADE * 0.75) sky.pop += dt; // (from when it's out of the black, mostly)
@@ -684,6 +685,9 @@
       const q = project(x + (Math.round(z / 1.4) % 2) * 0.4, z);
       puff(q.x, q.y + LANE() * q.s * 0.9, LANE() * q.s * 0.55, '#d9dcff');
     }
+    if (sky.fall >= 0) for (let z = 6; z >= -2; z -= 1.4) for (let x = -2.4; x <= 2.41; x += 0.8) { // (the sea of cloud below, where it falls)
+      const q = project(sky.fellAt + x + (Math.round(z / 1.4) % 2) * 0.4, z); puff(q.x, q.y + LANE() * q.s * 0.9, LANE() * q.s * 0.55, '#d9dcff');
+    }
     // the road: a lane-wide ribbon of white cloud winding over the lanes, lumpy along both edges, ending where the run does
     const end = Math.min(FAR, left), zs = [], at = z => roadAt(sky, sky.z + z * ZV);
     for (let k = 0; k <= 120; k++) zs.push(-CAMZ * 0.6 + (end + CAMZ * 0.6) * (k / 120) ** 1.6);
@@ -728,10 +732,9 @@
     if (sky.leap > SPLASH) { // (and where it dives into the sea of cloud below)
       const q = project(sky.x, SPLASH * SKY.speed / ZV * 0.7); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.9, s: q.s }, sky.leap - SPLASH);
     }
-    g.save(); if (lift < 0 && sky.fall < 0) { g.beginPath(); g.rect(0, 0, W, p.y + (sky.leap >= 0 ? LANE() * p.s * 0.9 : 0)); g.clip(); } // (what's inside the cloud, hidden: the road, or the sea below it)
+    g.save(); if (lift < 0) { g.beginPath(); g.rect(0, 0, W, p.y + (sky.leap >= 0 || sky.fall >= 0 ? LANE() * p.s * 0.9 : 0)); g.clip(); } // (what's inside the cloud, hidden: the road, or the sea below it)
     if (sky.leap < 0 && lift >= 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
     g.save(); g.translate(p.x, p.y - rise); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
-    if (sky.fall >= 0) { const k = Math.max(0.35, 1 - sky.fall * 1.2); g.scale(k, k); g.globalAlpha = Math.max(0, 1 - sky.fall * 1.6); g.rotate(sky.fall * 2.5 * (sky.fellAt < 0 ? -1 : 1)); } // (tumbling down and away)
     if (sky.intro < SKY.intro) { const u = sky.intro / SKY.intro, k = u < 0.5 ? 0.25 * (1 - u * 2) : u > 0.85 ? -0.3 * Math.sin((u - 0.85) / 0.15 * Math.PI) : 0; g.scale(1 - k * 0.6, 1 + k); } // (stretched shooting up, squashed landing)
     if (S.ready) { // (a super bounce waiting: its glow)
       const rg = g.createRadialGradient(0, -size * 0.4, size * 0.1, 0, -size * 0.4, size * 0.6);
@@ -744,10 +747,7 @@
     tails(im, -size / 2, -size * 449 / 480, size, sky.t, 'fly', 'front'); // (seen from behind: its tails over its back)
     glints(0, -size * 0.45, size, dt);
     g.restore(); g.restore();
-    if (sky.fall >= 0) { // a cartoon puff of cloud where it went off the edge, and wisps trailing down after it
-      const q = project(sky.fellAt, 0); smoke({ x: q.x, y: q.y - LANE() * q.s * 0.2, s: q.s * 1.3 }, sky.fall);
-      for (let k = 1; k <= 3; k++) { const t = sky.fall - k * 0.08; if (t > 0) smoke({ x: q.x + (sky.fellAt < 0 ? -1 : 1) * k * LANE() * q.s * 0.12, y: q.y + LANE() * q.s * (0.4 + k * 0.35), s: q.s * (0.9 - k * 0.15) }, t); }
-    }
+    if (sky.fall > FALL_IN) { const q = project(sky.fellAt, 0); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.9, s: q.s }, sky.fall - FALL_IN); } // (where it plunges in: as at the road's end)
   }
 
   function offscreen(f, s) { // up out of sight: an arrow along the top where it is, and how high
