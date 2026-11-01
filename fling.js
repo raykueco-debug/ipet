@@ -156,20 +156,22 @@
     if (cutSrc) im.onerror = () => { im.onerror = null; im.cut = false; im.src = src; };
     im.src = cutSrc || src; return im;
   }
-  for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
-    // from the front or behind: the clip made again without its tail (tools/wan_notail.py), where it's there
-    const own = MULTI && await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
-    if (own?.ok) {
-      const m = await own.json(), d = `${dir}_notail/${clip}`;
-      into[k] = m.frames.map((f, i) => Object.assign(tailless(`assets/fox/${d}/${f}?v=${m.rev || 1}`, null, d, i), { cut: true }));
-      return;
-    }
-    const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
-    if (!r?.ok) return;
-    const m = await r.json();
-    const cut = MULTI && CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
-    into[k] = m.frames.map((f, i) => tailless(`assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`, cut && `assets/fox/notail/${dir}/${clip}/${f}?v=${m.rev || 1}`, `${dir}/${clip}`, i)); // (root: where its tail grows, in tail_roots.json)
-  })();
+  function loadClips() { // (its clips' frames: fetched once it's to be played — see warm())
+    for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
+      // from the front or behind: the clip made again without its tail (tools/wan_notail.py), where it's there
+      const own = MULTI && await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
+      if (own?.ok) {
+        const m = await own.json(), d = `${dir}_notail/${clip}`;
+        into[k] = m.frames.map((f, i) => Object.assign(tailless(`assets/fox/${d}/${f}?v=${m.rev || 1}`, null, d, i), { cut: true }));
+        return;
+      }
+      const r = await fetch(`assets/fox/${dir}/${clip}/meta.json`).catch(() => null);
+      if (!r?.ok) return;
+      const m = await r.json();
+      const cut = MULTI && CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
+      into[k] = m.frames.map((f, i) => tailless(`assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`, cut && `assets/fox/notail/${dir}/${clip}/${f}?v=${m.rev || 1}`, `${dir}/${clip}`, i)); // (root: where its tail grows, in tail_roots.json)
+    })();
+  }
   const A = new Proxy(PLAIN, { get: (o, k) => (LOOK.night && CAPED_CLIPS[k]) || o[k] });
   const AIR = +params.get('air') || 10, DIVE = 7, CROUCH = [0, 4]; // (frames: run's stretched, pounce's dive, pounce's crouch)
   const frameOf = (k, t, fps = 16) => A[k]?.length ? A[k][Math.floor(t * fps) % A[k].length] : null;
@@ -809,7 +811,6 @@
     }
     if (LOOK === look) ART = into; // (all at once, so no friend is half one look and half the other)
   }
-  loadFriends();
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
   function drawArt(a, s, t) {
@@ -1008,7 +1009,6 @@
     const r = await fetch(`${look.dir}/index.json`).catch(() => null);
     for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { if (LOOK === look) BG[name] = im; }; im.src = `${look.dir}/${name}.webp`; }
   }
-  loadBG();
   // on Halloween night the stars are sweets: a round one in its wrapper, twisted at both ends, in one of three colours
   const CANDY = [['#ff8a2a', '#ffd08a'], ['#9a5cff', '#d9c2ff'], ['#45c46a', '#b8f0c4']];
   function candy(x, y, r, seed) {
@@ -1074,7 +1074,6 @@
     const look = LOOK; TREE_AT = { ...TREE_DAY, ...look.tree };
     for (const k of ['base', 'crown', 'trunk']) { delete TREE[k]; const im = new Image(); im.onload = () => { if (LOOK === look) TREE[k] = im; }; im.src = `${look.dir}/tree_${k}.webp`; }
   }
-  loadTree();
   function drawTree(tx, ty, s) {
     const A_ = TREE_AT, bw = A_.base, bh = bw * TREE.base.naturalHeight / TREE.base.naturalWidth;
     const b0 = toScreen(A_.x - bw / 2, bh - 0.1); // (its picture's top left; sunk a little into the ground)
@@ -1217,7 +1216,14 @@
     bgm ||= window.Sound ? Sound.music(LOOK.music) : Object.assign(new Audio(LOOK.music), { loop: true, volume: 0.45 }); // (sound.js: as loud as the rest, on iPhones too)
     bgm.play().catch(() => {});
   }
+  // its pictures fetched only once it's wanted (opened), or a while after the pet's page is in — not at once with the
+  // pet's own: on a phone they'd fight over the network and the pet would take long to show
+  let warmed = false;
+  function warm() { if (warmed) return; warmed = true; loadClips(); loadBG(); loadTree(); loadFriends(); }
+  addEventListener('ipet-in', () => setTimeout(warm, 4000)); // (preload.js: tapped in)
+  addEventListener('load', () => setTimeout(warm, 20000));
   function open(o = {}) {
+    warm();
     opts = o;
     TAILS = MULTI ? Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1)) : 1;
     best = o.best ?? (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })();
