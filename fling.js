@@ -675,12 +675,10 @@
         puff(p.x, p.y, LANE() * p.s * (0.7 + (((k * 13) % 5) + 5) % 5 * 0.12), '#d9dcff');
       }
     }
-    // a lower sea of cloud, under the road all along (beside it where it winds, and past its end: where the fox falls)
-    // — well down below it, dimmer, so the road stands out white over it
-    for (let z = FAR; z > -CAMZ * 0.6; z -= 2.4) for (let x = -3.3; x <= 3.31; x += 1.1) {
-      const q = project(x + (Math.round(z / 2.4) % 2) * 0.55, z), r = LANE() * q.s * 0.6;
-      g.fillStyle = '#c4c0ee'; g.beginPath(); g.arc(q.x, q.y + LANE() * q.s * 1.7 + r * 0.15, r, 0, 7); g.fill();
-      g.fillStyle = '#dcd9fa'; g.beginPath(); g.arc(q.x, q.y + LANE() * q.s * 1.7, r * 0.9, 0, 7); g.fill();
+    // past the road's end, a lower sea of cloud (where the fox leaps down into it); elsewhere under the road, the sky
+    if (left < FAR) for (let z = FAR; z > left - 1; z -= 1.4) for (let x = -3.2; x <= 3.21; x += 0.8) {
+      const q = project(x + (Math.round(z / 1.4) % 2) * 0.4, z);
+      puff(q.x, q.y + LANE() * q.s * 0.9, LANE() * q.s * 0.55, '#d9dcff');
     }
     // the road: a lane-wide ribbon of white cloud winding over the lanes, lumpy along both edges, ending where the run does
     const end = Math.min(FAR, left), zs = [], mid = z => roadAt(sky, sky.z + z * ZV);
