@@ -412,7 +412,7 @@
     run(on) { running = !!on; },
     watch(on) { watching = !!on; if (!on) gaze = 0; }, // the ball held up: look up at it, the head after it
     look(g) { gaze = Math.max(-1, Math.min(1, g)); },
-    get canWatch() { return ['normal_to_ready', 'ready_to_normal', 'ready_to_walk', 'ready_to_walk_r', LOOK.r].every(c => clips[c]); },    // chasing the ball: run, not walk
+    get canWatch() { return ['normal_to_ready', 'ready_to_normal'].every(c => clips[c]); }, // (its looks and its bursts off after it, where there are)    // chasing the ball: run, not walk
     get canWalk() { return WALK.every(c => clips[c]); },
     // toward / away from the viewer: walk loops, ways in and out, and turns to and from side-on
     get canWalkDepth() {

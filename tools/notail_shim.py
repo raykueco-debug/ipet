@@ -39,6 +39,8 @@ name = os.path.splitext(os.path.basename(start))[0] + suffix
 if os.path.normpath(out) != os.path.normpath(os.path.join(FOX, 'clips')):
     sys.exit(print(f'skip {name}: not a clip of the pet ({out})'))
 nout = os.path.join(FOX, 'clips_notail')
+if not os.path.isdir(os.path.join(FOX, 'clips', name)):
+    sys.exit(print(f'skip {name}: its plain clip was taken out'))  # (a clip let go of: not made again tail-less)
 if os.path.exists(os.path.join(nout, name, 'meta.json')):
     sys.exit(print(f'skip {name}: made already'))
 if not notail(start) or (end and not notail(end)):
