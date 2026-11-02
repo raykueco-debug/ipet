@@ -61,7 +61,7 @@
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
-  const SKY = { height: 50, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
+  const SKY = { height: 100, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
   // the cloud road winds over the lanes, a lane wide; each bend: its edge on the side it goes to out over the next
   // lane first (over turn m), both lanes cloud a while (both m: the time to change lane), then its other edge in
   // after it. Off it (an edge past the fox's middle), the fox falls
@@ -151,13 +151,21 @@
   // (on Halloween, in its cape: the same clips made again with it — tools/wan_cape.py, assets/fox/clips_halloween —
   // frame for frame as the plain ones, where they're there)
   const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'], CUT = ['run', 'pounce'];
+  // every picture of the game's, counted as it comes in (Fling.preload: the loading screen's bar)
+  const LOADING = { n: 0, done: 0 };
+  function pic() {
+    const im = new Image(); LOADING.n++;
+    const fin = () => { LOADING.done++; im.removeEventListener('load', fin); im.removeEventListener('error', fin); };
+    im.addEventListener('load', fin); im.addEventListener('error', fin); return im;
+  }
   function tailless(src, cutSrc, key, i) { // a frame: its tail-less version where there is one (im.cut), else as it is
-    const im = new Image(); im.root = [key, i]; im.cut = !!cutSrc;
+    const im = pic(); im.root = [key, i]; im.cut = !!cutSrc;
     if (cutSrc) im.onerror = () => { im.onerror = null; im.cut = false; im.src = src; };
     im.src = cutSrc || src; return im;
   }
   function loadClips() { // (its clips' frames: fetched once it's to be played — see warm())
-    for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) (async () => {
+    const jobs = [];
+    for (const [k, clip] of Object.entries(CLIPS)) for (const [into, dir] of [[PLAIN, 'clips'], ...(CAPED_ONES.includes(k) ? [[CAPED_CLIPS, 'clips_halloween']] : [])]) jobs.push((async () => {
       // from the front or behind: the clip made again without its tail (tools/wan_notail.py), where it's there
       const own = MULTI && await fetch(`assets/fox/${dir}_notail/${clip}/meta.json`).catch(() => null);
       if (own?.ok) {
@@ -170,7 +178,8 @@
       const m = await r.json();
       const cut = MULTI && CUT.includes(k) && dir === 'clips'; // (side on: its tail taken off, tools/tail_cut.py — the game draws them all)
       into[k] = m.frames.map((f, i) => tailless(`assets/fox/${dir}/${clip}/${f}?v=${m.rev || 1}`, cut && `assets/fox/notail/${dir}/${clip}/${f}?v=${m.rev || 1}`, `${dir}/${clip}`, i)); // (root: where its tail grows, in tail_roots.json)
-    })();
+    })());
+    return Promise.all(jobs);
   }
   const A = new Proxy(PLAIN, { get: (o, k) => (LOOK.night && CAPED_CLIPS[k]) || o[k] });
   const AIR = +params.get('air') || 10, DIVE = 7, CROUCH = [0, 4]; // (frames: run's stretched, pounce's dive, pounce's crouch)
@@ -805,7 +814,7 @@
       const r = await fetch(`${dir}/index.json`).catch(() => null);
       const names = r?.ok ? await r.json() : [];
       await Promise.all(names.map(name => new Promise(done => {
-        const [k, n] = name.split('_'), im = new Image();
+        const [k, n] = name.split('_'), im = pic();
         im.onload = () => { (into[k] ||= {})[n] = im; done(); }; im.onerror = done; im.src = `${dir}/${name}.png`;
       })));
     }
@@ -1007,7 +1016,7 @@
   async function loadBG() {
     const look = LOOK; for (const k in BG) delete BG[k];
     const r = await fetch(`${look.dir}/index.json`).catch(() => null);
-    for (const name of r?.ok ? await r.json() : []) { const im = new Image(); im.onload = () => { if (LOOK === look) BG[name] = im; }; im.src = `${look.dir}/${name}.webp`; }
+    for (const name of r?.ok ? await r.json() : []) { const im = pic(); im.onload = () => { if (LOOK === look) BG[name] = im; }; im.src = `${look.dir}/${name}.webp`; }
   }
   // on Halloween night the stars are sweets: a round one in its wrapper, twisted at both ends, in one of three colours
   const CANDY = [['#ff8a2a', '#ffd08a'], ['#9a5cff', '#d9c2ff'], ['#45c46a', '#b8f0c4']];
@@ -1072,7 +1081,7 @@
   let TREE_AT = TREE_DAY;
   function loadTree() { // (B04 for Halloween: its own cut)
     const look = LOOK; TREE_AT = { ...TREE_DAY, ...look.tree };
-    for (const k of ['base', 'crown', 'trunk']) { delete TREE[k]; const im = new Image(); im.onload = () => { if (LOOK === look) TREE[k] = im; }; im.src = `${look.dir}/tree_${k}.webp`; }
+    for (const k of ['base', 'crown', 'trunk']) { delete TREE[k]; const im = pic(); im.onload = () => { if (LOOK === look) TREE[k] = im; }; im.src = `${look.dir}/tree_${k}.webp`; }
   }
   function drawTree(tx, ty, s) {
     const A_ = TREE_AT, bw = A_.base, bh = bw * TREE.base.naturalHeight / TREE.base.naturalWidth;
@@ -1218,8 +1227,18 @@
   }
   // its pictures fetched only once it's wanted (opened), or a while after the pet's page is in — not at once with the
   // pet's own: on a phone they'd fight over the network and the pet would take long to show
-  let warmed = false;
-  function warm() { if (warmed) return; warmed = true; loadClips(); loadBG(); loadTree(); loadFriends(); }
+  let warmed = null;
+  function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends()]).catch(() => {})); }
+  // (the loading screen before it opens: progress(0…1) as its pictures come in; done when they all have)
+  async function preload(progress) {
+    let listed = false; warm().then(() => { listed = true; });
+    for (;;) {
+      const f = LOADING.n ? LOADING.done / LOADING.n : 0;
+      progress(listed ? f : f * 0.9);
+      if (listed && LOADING.done >= LOADING.n) return;
+      await new Promise(r => setTimeout(r, 120));
+    }
+  }
   addEventListener('ipet-in', () => setTimeout(warm, 4000)); // (preload.js: tapped in)
   addEventListener('load', () => setTimeout(warm, 20000));
   function open(o = {}) {
@@ -1248,7 +1267,7 @@
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
   }
-  window.Fling = { open, close };
+  window.Fling = { open, close, preload };
   if (params.has('debug')) Fling.state = () => S; // (?debug: the run, to look at from the console)
 })();
 

@@ -465,7 +465,8 @@ const actions = {
     if (S.stats.energy < FLING_LEAST) { say(t('tooTiredToPlay'), 3000); setExpr('tired', 2200); return; } // (rest or a meal first)
     save();
     homeMusic.pause();
-    Fling.open({
+    // (the loading screen first, its pictures coming in; the tap in opens it — and goes fullscreen, where it can)
+    Preload.run({ title: '小狐飛多遠', load: p => Fling.preload(p), go: () => Fling.open({
       tails: tailCount(), best: S.fling?.best || 0,
       energy: { // a fling costs some energy, ended; under FLING_LEAST it'd rather go home and rest or eat
         get: () => Math.round(S.stats.energy), least: FLING_LEAST,
@@ -477,8 +478,8 @@ const actions = {
         S.stats.fun = clamp(S.stats.fun + 8);
         save(); render();
       },
-      onClose: () => { render(); homeMusic.play().catch(() => {}); },
-    });
+      onClose: () => Preload.run({ title: S.name || '小狐', go: () => { render(); homeMusic.play().catch(() => {}); } }), // (and back, the same)
+    }) });
   },
   feed() {
     if (RENDER === 'anim') { el.foodPick.hidden = !el.foodPick.hidden; return; } // meat, veggies or water? (eat: too full)

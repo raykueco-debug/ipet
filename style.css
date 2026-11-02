@@ -315,11 +315,11 @@ body.admin .ff { display: inline-block; }
 .jsErr { position: fixed; left: 8px; right: 8px; bottom: 8px; z-index: 999; padding: 8px 12px; border-radius: 10px; background: #c0392b; color: #fff; font: 13px/1.4 system-ui, sans-serif; }
 
 /* the loading screen (preload.js): over everything till it's all in and tapped */
-#splash { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+.splash { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
   background: radial-gradient(circle at 50% 40%, #fff7ec, #ffd9b0); transition: opacity .35s; cursor: default; }
-#splash.ready { cursor: pointer; }
-#splash.gone { opacity: 0; pointer-events: none; }
-#splash img { width: min(34vmin, 180px); height: auto; animation: splash-bob 1.6s ease-in-out infinite; }
+.splash.ready { cursor: pointer; }
+.splash.gone { opacity: 0; pointer-events: none; }
+.splash img { width: min(34vmin, 180px); height: auto; animation: splash-bob 1.6s ease-in-out infinite; }
 @keyframes splash-bob { 50% { transform: translateY(-8px) rotate(-3deg); } }
 .splash-title { font-size: 28px; font-weight: 900; color: var(--ink); }
 .splash-bar { width: min(60vw, 320px); height: 12px; border-radius: 99px; background: #0000001a; overflow: hidden; }
@@ -327,5 +327,5 @@ body.admin .ff { display: inline-block; }
 .splash-pct { font-size: 14px; font-weight: 700; color: var(--muted, #8a7a70); }
 .splash-go { border: 0; border-radius: 999px; padding: 12px 30px; font: inherit; font-size: 20px; font-weight: 900; color: #fff; background: var(--accent, #ff8a65);
   box-shadow: 0 4px 0 #0000001f; animation: splash-pulse 1.2s ease-in-out infinite; }
-#splash.ready .splash-bar, #splash.ready .splash-pct { display: none; }
+.splash.ready .splash-bar, .splash.ready .splash-pct { display: none; }
 @keyframes splash-pulse { 50% { transform: scale(1.06); } }
