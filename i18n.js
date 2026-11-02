@@ -24,7 +24,7 @@ const I18N = (() => {
       petLines: ['嘿嘿～', '再摸一下！', '喜歡你～'], hungry: '肚子餓了…', bored: '好無聊喔～陪我玩',
       sleepy: '好睏…', dirty: '身上黏黏的…', idle: ['那是什麼？', '嗅嗅…', '尾巴好蓬～', '今天要做什麼？'],
       nineTails: '九尾完成了！！', newTail: '長出第 {n} 條尾巴了！', msgWaiting: '有人傳話給你！點我聽聽看 👂',
-      giftFrom: '{from}送我 {e}！好開心～', parents: '爸媽', whisper: '🎤 爸媽的悄悄話～',
+      giftFrom: '{from}送我 {e}！好開心～', giftStored: '{from}送來 {e}，放進儲物箱了！', pantry: '儲物箱', pantryHint: '爸媽送來的東西都在這裡，想餵的時候再拿出來', pantryEmpty: '現在是空的，等爸媽送東西來吧～', feedThis: '餵牠', food_meat: '肉肉', food_veg: '蔬菜', food_water: '水', parents: '爸媽', whisper: '🎤 爸媽的悄悄話～',
       awayHours: '你離開了 {n} 小時，好想你！', back: '你回來了！',
       // learning
       learnTitle: '跟小狐學英文', mode_word: '每日單字', mode_quiz: '聽音選圖', mode_speak: '跟讀練習',
@@ -72,7 +72,7 @@ const I18N = (() => {
       petLines: ['Hehe!', 'More pets!', 'I like you!'], hungry: 'I\'m hungry…', bored: 'I\'m bored… play with me!',
       sleepy: 'So sleepy…', dirty: 'I feel sticky…', idle: ['What\'s that?', 'Sniff sniff…', 'My tail is so fluffy!', 'What shall we do today?'],
       nineTails: 'Nine tails!!', newTail: 'I grew tail number {n}!', msgWaiting: 'You have a message! Tap me 👂',
-      giftFrom: '{from} sent me {e}! Yay!', parents: 'Mom & Dad', whisper: '🎤 A message from Mom & Dad',
+      giftFrom: '{from} sent me {e}! Yay!', giftStored: "{from} sent {e} — it's in the pantry!", pantry: 'Pantry', pantryHint: 'Everything Mom & Dad send is kept here: feed it whenever you like', pantryEmpty: "It's empty — wait for Mom & Dad to send something!", feedThis: 'Feed', food_meat: 'Meat', food_veg: 'Veggies', food_water: 'Water', parents: 'Mom & Dad', whisper: '🎤 A message from Mom & Dad',
       awayHours: 'You were gone {n} hours. I missed you!', back: 'You\'re back!',
       learnTitle: 'Learn with Foxy', mode_word: 'Word of the day', mode_quiz: 'Listen & pick', mode_speak: 'Say it',
       wordOfDay: 'Today\'s word', listen: '🔊 Listen again', learned: 'I learned it!', learnedAlready: 'Learned ✓',

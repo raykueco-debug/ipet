@@ -159,6 +159,7 @@ function defaultState() {
     name: '', hatched: false, age: 0, last: now,
     stats: { hunger: 80, fun: 80, energy: 85, clean: 100 },
     bond: 0, sleeping: false, poops: [], nextPoop: now + rand(2, 4) * 36e5 / SPEED, tails: 1,
+    pantry: { meat: 0, veg: 0, water: 0 }, // (what the parent sent, kept till the child feeds it)
   };
 }
 function load() {
@@ -870,12 +871,13 @@ async function processInbox() {
 // food from the parent (meat, veggies, water): they're told who it's from, and it's eaten as a meal is
 const GIFT_FOOD = { meat: '🍖', veg: '🥕', water: '💧' };
 async function receiveGift(ev) {
-  if (ev.item in GIFT_FOOD) {
-    while (eating) await wait(500); // (finishing a meal first)
-    say(t('giftFrom', { from: ev.from || t('parents'), e: GIFT_FOOD[ev.item] }), 3000);
+  if (ev.item in GIFT_FOOD) { // into the pantry: the child decides when it's eaten (📦, pantryOpen)
+    S.pantry = { meat: 0, veg: 0, water: 0, ...S.pantry };
+    S.pantry[ev.item]++; save(); renderPantry();
+    say(t('giftStored', { from: ev.from || t('parents'), e: GIFT_FOOD[ev.item] }), 3500);
     setExpr('happy', 1500); addBond(3);
-    await wait(1600);
-    if (ev.item === 'water') await drink(); else { S.stats.hunger = Math.min(S.stats.hunger, 94); await eat(ev.item); } // (a gift is always eaten)
+    $('#pantryBtn')?.classList.remove('bump'); void $('#pantryBtn')?.offsetWidth; $('#pantryBtn')?.classList.add('bump');
+    await wait(2500);
     return;
   }
   return receiveOld(ev);
@@ -895,6 +897,24 @@ function receiveOld(ev) { // (the old snacks, an emoji each: from server.py)
     save();
     setTimeout(res, 2200);
   }, 650));
+}
+
+// the pantry: what the parent sent, a count of each; the child opens it and feeds the fox one of them (then it's gone)
+function renderPantry() {
+  const p = { meat: 0, veg: 0, water: 0, ...S.pantry }, n = p.meat + p.veg + p.water;
+  if ($('#pantryCount')) $('#pantryCount').textContent = n;
+  $('#pantryBtn')?.classList.toggle('has', n > 0);
+  const list = $('#pantryList'); if (!list) return;
+  list.innerHTML = n ? Object.keys(GIFT_FOOD).filter(k => p[k]).map(k =>
+    `<button data-k="${k}"><span class="e">${GIFT_FOOD[k]}</span><span>${t('food_' + k)} × ${p[k]}</span><b>${t('feedThis')}</b></button>`).join('')
+    : `<p>${t('pantryEmpty')}</p>`;
+}
+function pantryFeed(k) {
+  if (!S.pantry?.[k] || eating) return;
+  if (k !== 'water' && S.stats.hunger >= 95) { say(t('full')); setExpr('meh', 1500); return; } // (too full: it stays in the box)
+  $('#pantry').classList.add('hidden');
+  S.pantry[k]--; save(); renderPantry();
+  if (k === 'water') drink(); else eat(k);
 }
 
 async function speak(ev) {
@@ -1050,3 +1070,9 @@ $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runne
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 })();
+
+// the pantry's button and panel (📦: the parent's food, fed when the child likes)
+$('#pantryBtn')?.addEventListener('click', () => { renderPantry(); $('#pantry').classList.remove('hidden'); });
+$('#pantryClose')?.addEventListener('click', () => $('#pantry').classList.add('hidden'));
+$('#pantryList')?.addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b) pantryFeed(b.dataset.k); });
+renderPantry();

@@ -14,8 +14,8 @@
 <script> // (while it's tried out on phones: a script error shown on the page itself, there being no console to look in)
 addEventListener('error', e => { if (!e.message) return; const d = document.createElement('div'); d.className = 'jsErr'; d.textContent = `⚠️ ${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`; d.onclick = () => d.remove(); (document.body || document.documentElement).appendChild(d); });
 </script>
-<link rel="stylesheet" href="style.css?v=2026.11.02-2">
-<link rel="stylesheet" href="fling.css?v=2026.11.02-2">
+<link rel="stylesheet" href="style.css?v=2026.11.02-3">
+<link rel="stylesheet" href="fling.css?v=2026.11.02-3">
 <title>iPet</title>
 </head>
 <body>
@@ -27,14 +27,14 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
   <div class="splash-pct">0%</div>
   <button class="splash-go" hidden>點一下進入</button>
 </div>
-<script src="preload.js?v=2026.11.02-2"></script>
+<script src="preload.js?v=2026.11.02-3"></script>
 <div id="app">
   <header class="top">
     <div class="title-row">
       <button id="nameBtn" class="name-btn"><span id="petName">iPet</span></button>
       <span class="lv" id="tailBadge">1 尾</span>
       <span class="age" id="age"></span>
-      <span class="ver" id="ver">v2026.11.02-2</span>
+      <span class="ver" id="ver">v2026.11.02-3</span>
       <button id="menuBtn" class="icon-btn" aria-label="設定">⚙︎</button>
     </div>
     <div class="xp"><div id="growBar"></div></div>
@@ -45,6 +45,7 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
       <div class="stat" data-k="energy"><span class="ico">⚡</span><span class="lbl" data-i18n="stat_energy">精神</span><div class="bar"><i></i></div><button class="ff" data-ff="energy" aria-label="FF">FF</button></div>
       <div class="stat" data-k="clean"><span class="ico">🫧</span><span class="lbl" data-i18n="stat_clean">清潔</span><div class="bar"><i></i></div><button class="ff" data-ff="clean" aria-label="FF">FF</button></div>
     </div>
+    <button id="pantryBtn" class="pantry-btn">📦 <span data-i18n="pantry">儲物箱</span> <b id="pantryCount">0</b></button>
   </header>
 
   <main id="stage">
@@ -105,6 +106,15 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
   </div>
 </div>
 
+<div id="pantry" class="modal hidden">
+  <div class="card">
+    <h1>📦 <span data-i18n="pantry">儲物箱</span></h1>
+    <p data-i18n="pantryHint">爸媽送來的東西都在這裡，想餵的時候再拿出來</p>
+    <div id="pantryList" class="pantry-list"></div>
+    <button id="pantryClose" class="primary" data-i18n="close">關閉</button>
+  </div>
+</div>
+
 <div id="menu" class="modal hidden">
   <div class="card">
     <h1 data-i18n="settings">設定</h1>
@@ -136,15 +146,15 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
 </div>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
-<script src="i18n.js?v=2026.11.02-2"></script>
-<script src="voice.js?v=2026.11.02-2"></script>
-<script src="words.js?v=2026.11.02-2"></script>
-<script src="sound.js?v=2026.11.02-2"></script>
-<script src="fling.js?v=2026.11.02-2"></script>
-<script src="link.js?v=2026.11.02-2"></script>
-<script src="app.js?v=2026.11.02-2"></script>
-  <script src="scene.js?v=2026.11.02-2"></script>
-  <script src="ball.js?v=2026.11.02-2"></script>
-<script src="learn.js?v=2026.11.02-2"></script>
+<script src="i18n.js?v=2026.11.02-3"></script>
+<script src="voice.js?v=2026.11.02-3"></script>
+<script src="words.js?v=2026.11.02-3"></script>
+<script src="sound.js?v=2026.11.02-3"></script>
+<script src="fling.js?v=2026.11.02-3"></script>
+<script src="link.js?v=2026.11.02-3"></script>
+<script src="app.js?v=2026.11.02-3"></script>
+  <script src="scene.js?v=2026.11.02-3"></script>
+  <script src="ball.js?v=2026.11.02-3"></script>
+<script src="learn.js?v=2026.11.02-3"></script>
 </body>
 </html>

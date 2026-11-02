@@ -329,3 +329,17 @@ body.admin .ff { display: inline-block; }
   box-shadow: 0 4px 0 #0000001f; animation: splash-pulse 1.2s ease-in-out infinite; }
 .splash.ready .splash-bar, .splash.ready .splash-pct { display: none; }
 @keyframes splash-pulse { 50% { transform: scale(1.06); } }
+
+/* the pantry (app.js renderPantry): the parent's food, kept till the child feeds it */
+.pantry-btn { margin-top: 10px; display: flex; align-items: center; gap: 6px; justify-content: center; padding: 8px 10px; border: 0; border-radius: 14px;
+  background: #0000000a; color: var(--ink); font: inherit; font-size: 14px; font-weight: 700; }
+.pantry-btn b { min-width: 22px; padding: 1px 6px; border-radius: 99px; background: #0000001a; font-size: 12px; }
+.pantry-btn.has { background: #fff1d6; box-shadow: 0 0 0 2px #ffcf7a inset; }
+.pantry-btn.has b { background: var(--accent, #ff8a65); color: #fff; }
+.pantry-btn.bump { animation: pantry-bump .6s ease-out 2; }
+@keyframes pantry-bump { 30% { transform: scale(1.12) rotate(-3deg); } 60% { transform: scale(.96); } }
+.pantry-list { display: flex; flex-direction: column; gap: 8px; }
+.pantry-list button { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 0; border-radius: 16px; background: #fff7ec; font: inherit; font-size: 16px; color: var(--ink); text-align: left; }
+.pantry-list button span:nth-child(2) { flex: 1; }
+.pantry-list .e { font-size: 26px; }
+.pantry-list b { padding: 6px 14px; border-radius: 99px; background: var(--accent, #ff8a65); color: #fff; font-size: 14px; }
