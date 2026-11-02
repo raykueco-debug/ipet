@@ -48,7 +48,7 @@ const I18N = (() => {
       p_giftSent: '已送出 {e}', p_adDone: '（示意）看完廣告，獲得 10 金幣', p_buyNote: '（示意）正式版走 Apple 內購',
       p_engineNeural: '語音引擎：{p}', p_engineDevice: '語音引擎：裝置內建語音（較生硬）。設定雲端語音金鑰後會自動改用自然語音',
       p_foot: '原型：兒童端開 / ，家長端開 /parent.html，兩邊配對碼相同即可連線。金幣、廣告、購買目前只是畫面示意。',
-      g_apple: '蘋果', g_rice: '飯糰', g_fish: '小魚', g_cake: '蛋糕',
+      g_apple: '蘋果', g_rice: '飯糰', g_fish: '小魚', g_cake: '蛋糕', g_meat: '肉肉', g_veg: '蔬菜', g_water: '一碗水', p_needCode: '先輸入孩子小狐的配對碼（在小狐的設定裡）',
       p_enOnly: '小狐目前只會說英文，請輸入英文', p_localModel: '內建模型 Kokoro',
     },
     en: {
@@ -94,7 +94,7 @@ const I18N = (() => {
       p_giftSent: 'Sent {e}', p_adDone: '(demo) Ad watched: +10 coins', p_buyNote: '(demo) The real app uses Apple in-app purchase',
       p_engineNeural: 'Voice: {p}', p_engineDevice: 'Voice: device built-in (robotic). Add a cloud TTS key for a natural voice',
       p_foot: 'Prototype: child app at / , parent app at /parent.html, same pairing code on both. Coins, ads and purchases are mock-ups.',
-      g_apple: 'Apple', g_rice: 'Rice ball', g_fish: 'Fish', g_cake: 'Cake',
+      g_apple: 'Apple', g_rice: 'Rice ball', g_fish: 'Fish', g_cake: 'Cake', g_meat: 'Meat', g_veg: 'Veggies', g_water: 'Water', p_needCode: "First type in the pairing code from your child's Foxy (in its settings)",
       p_enOnly: 'Foxy only speaks English for now', p_localModel: 'built-in Kokoro',
     },
   };

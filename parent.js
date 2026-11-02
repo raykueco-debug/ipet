@@ -2,14 +2,13 @@
 /* Parent side (prototype). Coins, ads and purchases are UI placeholders only. */
 
 const $ = s => document.querySelector(s);
-const GIFTS = [
-  { e: '🍎', key: 'g_apple', cost: 5 }, { e: '🍙', key: 'g_rice', cost: 5 },
-  { e: '🐟', key: 'g_fish', cost: 8 }, { e: '🍰', key: 'g_cake', cost: 10 },
+const GIFTS = [ // (what the pet eats: its meals, and a drink — app.js receiveGift)
+  { e: '🍖', item: 'meat', key: 'g_meat', cost: 5 }, { e: '🥕', item: 'veg', key: 'g_veg', cost: 5 }, { e: '💧', item: 'water', key: 'g_water', cost: 2 },
 ];
 const KIND_ICON = { line: '💬', tts: '⌨️', voice: '🎤' };
 
 const st = {
-  family: localStorage.getItem('ipet-parent-family') || 'demo',
+  family: (localStorage.getItem('ipet-parent-family') || '').replace(/^demo$/, ''), // (the child's pairing code, typed in)
   coins: Number(localStorage.getItem('ipet-parent-coins') || 50),
   mode: 'line', lineId: PetVoice.LINES[0].id,
   speakLang: PetVoice.SPOKEN.includes(localStorage.getItem('ipet-speak-lang')) ? localStorage.getItem('ipet-speak-lang') : 'en',
@@ -27,14 +26,17 @@ function setCoins(n) {
 
 /* ---------- gifts ---------- */
 function renderGifts() {
-  $('#gifts').innerHTML = GIFTS.map(g => `<button data-e="${g.e}" data-cost="${g.cost}"><span>${g.e}</span>${t(g.key)}<small>🪙${g.cost}</small></button>`).join('');
+  $('#gifts').innerHTML = GIFTS.map(g => `<button data-e="${g.e}" data-item="${g.item}" data-cost="${g.cost}"><span>${g.e}</span>${t(g.key)}<small>🪙${g.cost}</small></button>`).join('');
   setCoins(st.coins);
 }
 $('#gifts').addEventListener('click', async e => {
   const b = e.target.closest('button');
   if (!b || st.coins < Number(b.dataset.cost)) return;
+  if (!st.family) { flash(t('p_needCode')); $('#family').focus(); return; }
   b.disabled = true;
-  const r = await postJSON('gift', { item: b.dataset.e, from: t('parents') }).catch(() => null);
+  const r = window.Link?.on // (Supabase, link.js; else server.py on the LAN)
+    ? await Link.sendGift(st.family, b.dataset.item, t('parents')).then(() => ({ ok: true }), () => null)
+    : await postJSON('gift', { item: b.dataset.item, from: t('parents') }).catch(() => null);
   if (r && r.ok) { setCoins(st.coins - Number(b.dataset.cost)); flash(t('p_giftSent', { e: b.dataset.e })); }
   else flash(t('p_fail'));
   b.disabled = st.coins < Number(b.dataset.cost);
@@ -187,7 +189,7 @@ $('#buyBtn').addEventListener('click', () => flash(t('p_buyNote')));
 
 $('#family').value = st.family;
 $('#family').addEventListener('change', () => {
-  st.family = $('#family').value.replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'demo';
+  st.family = $('#family').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
   $('#family').value = st.family;
   localStorage.setItem('ipet-parent-family', st.family);
   loadSchedule();

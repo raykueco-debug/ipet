@@ -815,15 +815,30 @@ function celebrateTail(n) {
   for (let i = 0; i < 10; i++) setTimeout(() => spawnFx(pick(['✨', '🌟', '🦊']), p.x + rand(-25, 25), p.y + rand(-5, 20)), i * 120);
 }
 
-/* ================= parent link (prototype backend: server.py) =================
-   The parent page schedules speech and sends gifts; the child page polls its inbox. */
-const FAMILY = (params.get('family') || localStorage.getItem('ipet-family') || 'demo').replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || 'demo';
+/* ================= parent link =================
+   The parent page (parent.html) sends food to this pet's pairing code; the pet asks every few seconds whether there's
+   anything new — through Supabase (link.js) when it's set up, else server.py's /api on the LAN (which also carries
+   the parent's speech). The code: made up here once, at random (shown in the settings for the parent to type in). */
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // (no 0/O, 1/I: read off a screen and typed in)
+const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(10)), b => CODE_CHARS[b % CODE_CHARS.length]).join('');
+const FAMILY = (params.get('family') || (localStorage.getItem('ipet-family') !== 'demo' && localStorage.getItem('ipet-family')) || newCode()).replace(/[^A-Za-z0-9]/g, '').slice(0, 12) || newCode();
 try { localStorage.setItem('ipet-family', FAMILY); } catch (e) {}
-const inbox = { queue: [], busy: false, unlocked: false, since: Number(localStorage.getItem('ipet-inbox-since')) || 0 };
+const inbox = { queue: [], busy: false, unlocked: false, since: Number(localStorage.getItem('ipet-inbox-since')) || 0,
+  after: localStorage.getItem('ipet-inbox-after') }; // (Supabase: the last event's id seen; none yet — start from now)
 let talkTimer = 0;
 
 async function pollInbox() {
   if (!S.hatched) return;
+  if (window.Link?.on) { // Supabase
+    try {
+      const rows = await Link.inbox(FAMILY, inbox.after == null ? null : Number(inbox.after));
+      if (inbox.after == null) inbox.after = rows.at(-1)?.id ?? 0; // (first time: from now on, not what was sent before)
+      else for (const r of rows) { inbox.queue.push({ type: 'gift', item: r.item, from: r.sender, at: Date.parse(r.created_at) }); inbox.after = r.id; }
+      try { localStorage.setItem('ipet-inbox-after', inbox.after); } catch (e) {}
+      processInbox();
+    } catch (e) {} // offline: the pet still works on its own
+    return;
+  }
   try {
     const r = await fetch(`api/inbox?family=${FAMILY}&since=${inbox.since}`, { cache: 'no-store' });
     if (!r.ok) return;
@@ -852,7 +867,20 @@ async function processInbox() {
   setTimeout(processInbox, 600);
 }
 
-function receiveGift(ev) {
+// food from the parent (meat, veggies, water): they're told who it's from, and it's eaten as a meal is
+const GIFT_FOOD = { meat: '🍖', veg: '🥕', water: '💧' };
+async function receiveGift(ev) {
+  if (ev.item in GIFT_FOOD) {
+    while (eating) await wait(500); // (finishing a meal first)
+    say(t('giftFrom', { from: ev.from || t('parents'), e: GIFT_FOOD[ev.item] }), 3000);
+    setExpr('happy', 1500); addBond(3);
+    await wait(1600);
+    if (ev.item === 'water') await drink(); else { S.stats.hunger = Math.min(S.stats.hunger, 94); await eat(ev.item); } // (a gift is always eaten)
+    return;
+  }
+  return receiveOld(ev);
+}
+function receiveOld(ev) { // (the old snacks, an emoji each: from server.py)
   const f = FOODS.find(x => x.e === ev.item) || { e: ev.item, hunger: 20 };
   const p = petPos();
   spawnFx(f.e, p.x, p.y + 8, 'drop');

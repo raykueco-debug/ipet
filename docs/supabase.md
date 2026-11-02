@@ -1,0 +1,25 @@
+# 親子連動（Supabase）
+
+父母端（`parent.html`）送食物給孩子的小狐（`index.html`），經由 Supabase 傳遞；GitHub Pages 沒有伺服器，所以不能用 server.py 的 `/api`。
+
+- 專案：Supabase「ipet」（raykueco-debug's Org，2026-11-02 建立，機房 West EU / Ireland）
+- 網址與金鑰：`link.js`（publishable key，本來就是給網頁用的；能做的事只有 SQL 裡授權的兩個函式）
+- 資料庫設定：`docs/supabase.sql`（已在 SQL Editor 執行過；改了再貼一次、按 Run 即可，可重複執行）
+
+## 怎麼運作
+
+1. 孩子的小狐第一次打開時，自動產生一組 10 碼的配對碼（不含 0/O、1/I），在小狐的「設定」裡看得到。
+2. 爸媽打開 `parent.html`，在上方「配對碼」輸入那組碼。
+3. 爸媽按「肉肉／蔬菜／一碗水」→ `send_gift(配對碼, meat|veg|water, 爸媽)` 存一筆。
+4. 孩子的小狐每 4 秒呼叫一次 `pet_inbox(配對碼, 上次看到的 id)`，有新的就說「爸媽送我 🍖！」並端碗出來吃（水就喝水）。第一次只記下目前最新的一筆，不會重播以前送的。
+
+## 安全
+
+- 表格 `pet_events` 開了 RLS、沒有任何 policy：直接讀寫一律拒絕。只能透過 `send_gift`、`pet_inbox` 兩個函式，而且一定要知道配對碼。
+- `item` 只接受 meat / veg / water，其他會被資料庫拒絕。
+- 這是原型：沒有登入，配對碼就是唯一的鑰匙。正式版要改成父母帳號登入、配對碼換成一次性的 QR 配對，並加上送禮次數限制。
+
+## 還沒接上 Supabase 的
+
+- 父母端的「讓小狐說話」（固定台詞、打字、錄音）仍走 server.py，只在區網內的本機伺服器能用。
+- 金幣、看廣告、購買都還是示意。
