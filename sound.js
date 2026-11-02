@@ -37,20 +37,27 @@
     return ac;
   }
 
+  // one piece at a time: playing one stops any other (the pet's and the game's both going at once — a touch that
+  // started the pet's as the game opened — was the music skipping on a phone)
+  const pieces = [];
   function music(src) { // a looping piece: { play(), pause() }, as loud as the rest
     const el = Object.assign(new Audio(src), { loop: true });
     const file = src.split('/').pop().split('?')[0], gain = Math.min(1, db(MIX.music - (MUSIC[file] ?? MIX.music)));
     let node = null;
     if (!WIRED) el.volume = gain;
-    return {
+    const piece = {
       el,
+      get paused() { return el.paused; },
       play() {
+        for (const p of pieces) if (p !== piece && !p.el.paused) p.el.pause();
         if (WIRED && !node) { const c = ctx(); if (c) try { node = c.createGain(); node.gain.value = gain; c.createMediaElementSource(el).connect(node); node.connect(out); } catch (e) { node = null; } }
         else ctx();
         return el.play();
       },
       pause() { el.pause(); },
     };
+    pieces.push(piece);
+    return piece;
   }
 
   window.Sound = { ctx, music, get sfx() { ctx(); return sfx; } };

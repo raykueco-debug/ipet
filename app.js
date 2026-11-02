@@ -934,7 +934,7 @@ async function speak(ev) {
 // one), paused while the mini game has its own
 const homeMusic = Sound.music('assets/music/PerituneMaterial_Laid_Back3_loop.m4a'); // (sound.js: brought to the same loudness as the rest, on iPhones too)
 function unlockAudio() {
-  if (!document.querySelector('.fl:not([hidden])')) homeMusic.play().catch(() => {});
+  if (!document.querySelector('.fl:not([hidden]), .splash:not(#splash)')) homeMusic.play().catch(() => {}); // (not under the game, nor going to or from it: there, the loading screen's tap starts the right one)
   if (inbox.unlocked) return;
   PetVoice.unlock();
   inbox.unlocked = true;

@@ -33,9 +33,10 @@
   function setLook(look) { // (the button: everything the look draws from, loaded afresh)
     LOOK = look;
     try { localStorage.setItem('ipet-fling-look', look === LOOKS.halloween ? 'halloween' : 'day'); } catch (e) {}
-    loadBG(); loadTree(); loadFriends(); lookUI(); bats.length = 0;
+    looking = Promise.all([loadBG(), loadFriends()]).catch(() => {}); loadTree(); lookUI(); bats.length = 0;
     bgm?.pause(); bgm = null; if (!layer.hidden) music();
   }
+  let looking = Promise.resolve(); // (the look's pictures listed, once it's changed)
   const G = 20;                        // gravity, m/s²
   const PACE = +params.get('pace') || 0.8; // the whole game played this much slower than real time (easier on young eyes)
   // the fling: the fox pulled back on the little tree's top (dragged from anywhere), let go to fly the other way —
@@ -122,7 +123,11 @@
     $('look').textContent = LOOK.night ? '☀️' : '🎃';
   }
   lookUI();
-  $('look').addEventListener('click', () => setLook(LOOK.night ? LOOKS.day : LOOKS.halloween));
+  $('look').addEventListener('click', () => { // (the other look: its pictures through the loading screen, as going in and out)
+    const to = LOOK.night ? LOOKS.day : LOOKS.halloween;
+    setLook(to);
+    window.Preload?.run({ title: to.night ? '萬聖節' : '白天', load: p => preload(p), go: () => { if (bgm?.paused) bgm.play().catch(() => {}); } });
+  });
   const STAGE = { w: 800, h: 450, wide: 2.3 }; // the game's own pixels (450 high, as wide as the screen's shape, 16:9 up to wide:1); scaled to the screen whole
   const stage = layer.querySelector('.fl-stage'), cv = layer.querySelector('canvas'), g = cv.getContext('2d');
   let W = STAGE.w; const H = STAGE.h;
@@ -1231,7 +1236,7 @@
   function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends()]).catch(() => {})); }
   // (the loading screen before it opens: progress(0…1) as its pictures come in; done when they all have)
   async function preload(progress) {
-    let listed = false; warm().then(() => { listed = true; });
+    let listed = false; Promise.all([warm(), looking]).then(() => { listed = true; });
     for (;;) {
       const f = LOADING.n ? LOADING.done / LOADING.n : 0;
       progress(listed ? f : f * 0.9);
