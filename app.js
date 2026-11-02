@@ -828,6 +828,21 @@ const inbox = { queue: [], busy: false, unlocked: false, since: Number(localStor
   after: localStorage.getItem('ipet-inbox-after') }; // (Supabase: the last event's id seen; none yet — start from now)
 let talkTimer = 0;
 
+// pairing a parent: the parent page's link with this code in it (parent.js keeps it), as a QR code to scan with a
+// phone's camera, or sent (the share sheet; else copied)
+const PARENT_URL = new URL(`parent.html?family=${FAMILY}`, location.href).href;
+function showPairing() {
+  if (window.qrcode) try {
+    const q = qrcode(0, 'M');
+    q.addData(PARENT_URL); q.make();
+    $('#pairQr').innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+  } catch (e) {}
+  $('#pairShare').addEventListener('click', async () => {
+    if (navigator.share) try { await navigator.share({ title: t('p_title'), url: PARENT_URL }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(PARENT_URL); say(t('pairCopied'), 3000); } catch (e) { prompt('', PARENT_URL); }
+  });
+}
+
 async function pollInbox() {
   if (!S.hatched) return;
   if (window.Link?.on) { // Supabase
@@ -1053,6 +1068,7 @@ $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runne
   }
   document.addEventListener('pointerdown', unlockAudio, { once: true });
   $('#familyCode').textContent = FAMILY;
+  showPairing();
   I18N.apply();
   document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { I18N.set(b.dataset.lang); render(); }));
   await loadAssets();

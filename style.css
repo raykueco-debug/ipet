@@ -328,3 +328,11 @@ body.admin .ff { display: inline-block; }
 .pantry-list button span:nth-child(2) { flex: 1; }
 .pantry-list .e { font-size: 26px; }
 .pantry-list b { padding: 6px 14px; border-radius: 99px; background: var(--accent, #ff8a65); color: #fff; font-size: 14px; }
+/* pairing a parent (settings): the parent page's link as a QR code; on the egg, the way to the parent page */
+.pair { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.pair-qr { width: 168px; height: 168px; padding: 6px; border-radius: 14px; background: #fff; }
+.pair-qr svg { display: block; width: 100%; height: 100%; }
+.pair-qr:empty { display: none; }
+.pair small { color: var(--muted); line-height: 1.4; }
+.pair button { width: 100%; }
+.role-link { color: var(--muted); font-size: 14px; text-decoration: underline; }

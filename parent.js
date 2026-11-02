@@ -8,7 +8,7 @@ const GIFTS = [ // (what the pet eats: its meals, and a drink — app.js receive
 const KIND_ICON = { line: '💬', tts: '⌨️', voice: '🎤' };
 
 const st = {
-  family: (localStorage.getItem('ipet-parent-family') || '').replace(/^demo$/, ''), // (the child's pairing code, typed in)
+  family: (localStorage.getItem('ipet-parent-family') || '').replace(/^demo$/, ''), // (the child's pairing code: scanned, or typed in)
   coins: Number(localStorage.getItem('ipet-parent-coins') || 50),
   mode: 'line', lineId: PetVoice.LINES[0].id,
   speakLang: PetVoice.SPOKEN.includes(localStorage.getItem('ipet-speak-lang')) ? localStorage.getItem('ipet-speak-lang') : 'en',
@@ -187,10 +187,28 @@ function flash(msg) {
 $('#adBtn').addEventListener('click', () => { setCoins(st.coins + 10); flash(t('p_adDone')); });
 $('#buyBtn').addEventListener('click', () => flash(t('p_buyNote')));
 
+// opened from the child's QR code / link (parent.html?family=CODE): paired, kept, and the code taken off the address
+const linked = (new URLSearchParams(location.search).get('family') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+if (linked) {
+  st.family = linked;
+  localStorage.setItem('ipet-parent-family', linked);
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => flash(t('p_paired', { code: linked })), 0);
+}
 $('#family').value = st.family;
+if (!st.family) setTimeout(() => flash(t('p_needCode')), 0);
 $('#family').addEventListener('change', () => {
   st.family = $('#family').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-  $('#family').value = st.family;
+  // opened from the child's QR code / link (parent.html?family=CODE): paired, kept, and the code taken off the address
+const linked = (new URLSearchParams(location.search).get('family') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+if (linked) {
+  st.family = linked;
+  localStorage.setItem('ipet-parent-family', linked);
+  history.replaceState(null, '', location.pathname);
+  setTimeout(() => flash(t('p_paired', { code: linked })), 0);
+}
+$('#family').value = st.family;
+if (!st.family) setTimeout(() => flash(t('p_needCode')), 0);
   localStorage.setItem('ipet-parent-family', st.family);
   loadSchedule();
 });
