@@ -946,8 +946,13 @@ async function speak(ev) {
 // the pet's own music, round and round on its screen (PeriTune, peritune.com) — from the first touch (browsers want
 // one), paused while the mini game has its own
 const homeMusic = Sound.music('assets/music/PerituneMaterial_Laid_Back3_loop.m4a'); // (sound.js: brought to the same loudness as the rest, on iPhones too)
+// started by a tap the browser counts as one (a click, a touch let go — on a phone a touch going down isn't: the
+// music was refused there, and with the one try spent it never came): the loading screen's tap in, else the next
+// tap; tried on each until it's playing
+let musicOn = false;
 function unlockAudio() {
-  if (!document.querySelector('.fl:not([hidden]), .splash:not(#splash)')) homeMusic.play().catch(() => {}); // (not under the game, nor going to or from it: there, the loading screen's tap starts the right one)
+  if (!musicOn && !document.querySelector('.fl:not([hidden]), .splash:not(#splash)')) // (not under the game, nor going to or from it: there, the loading screen's tap starts the right one)
+    homeMusic.play()?.then?.(() => { musicOn = true; }).catch(() => {});
   if (inbox.unlocked) return;
   PetVoice.unlock();
   inbox.unlocked = true;
@@ -1064,7 +1069,8 @@ $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runne
     js.src = 'fox3d.js';
     document.head.appendChild(js);
   }
-  document.addEventListener('pointerdown', unlockAudio, { once: true });
+  addEventListener('ipet-in', unlockAudio); // (preload.js: the loading screen tapped — a click)
+  for (const ev of ['click', 'pointerup', 'keydown']) document.addEventListener(ev, unlockAudio);
   $('#familyCode').textContent = FAMILY;
   showPairing();
   I18N.apply();
