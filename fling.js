@@ -640,6 +640,7 @@
     }
     if (sky.fall >= 0) { // into a hole: down through the cloud, and through black back to the forest, from where it fell
       sky.fall += dt;
+      sky.x += Math.sign(sky.fellAt || 0) * dt * 1.2; // (on over that side as it goes)
       if (!S.fade && sky.fall > FALL_IN + 0.35) S.fade = { t: 0, mid: () => fromSky(true) };
       return hud();
     }
@@ -1020,7 +1021,8 @@
       const u = sky.intro / SKY.intro; lift = -1.2 * (1 - u) + 5.2 * u * (1 - u);
       im = u < 0.45 ? up[Math.min(up.length - 1, Math.floor(u / 0.45 * up.length))] : down[Math.min(down.length - 1, Math.floor((u - 0.45) / 0.55 * down.length))];
     } else if (sky.fall >= 0) { // down through a hole
-      lift = -9 * sky.fall * sky.fall - 0.4 * sky.fall; im = A.down?.at(-1) || up.at(-1);
+      lift = -9 * sky.fall * sky.fall - 0.4 * sky.fall;
+      im = tipping() ? TIP[Math.min(TIP.length - 1, Math.floor(sky.fall / TIP_S))] : A.down?.at(-1) || up.at(-1);
     } else if (sky.leap >= 0) {
       const L = sky.leap; z = L * SKY.speed / ZV * 0.7; lift = 3.4 * L - 6 * L * L; // (lane widths)
       const off = sky.end && A.sitUp?.length ? A.sitUp : up; // (from sitting, at the end: up off its seat)
@@ -1045,7 +1047,8 @@
     }
     g.save(); if (lift < 0 && sky.fall < 0) { g.beginPath(); g.rect(0, 0, W, p.y + (sky.leap >= 0 ? LANE() * p.s * 0.9 : 0)); g.clip(); } // (what's inside the cloud, hidden: the road, or the sea below it)
     if (sky.leap < 0 && lift >= 0) { g.fillStyle = '#c9cdf266'; g.beginPath(); g.ellipse(p.x, p.y, size * 0.2 * (1 - lift * 0.4), size * 0.05, 0, 0, 7); g.fill(); }
-    g.save(); g.translate(p.x, p.y - rise); g.rotate((sky.lane - sky.x) * -0.25); // (leaning into a lane change)
+    g.save(); g.translate(p.x, p.y - rise); g.rotate(sky.fall >= 0 ? 0 : (sky.lane - sky.x) * -0.25); // (leaning into a lane change)
+    if (sky.fall >= 0 && tipping() && sky.fellAt < 0) g.scale(-1, 1); // (going over to its left: the frames mirrored)
     if (sky.fall >= 0) g.globalAlpha = Math.max(0, 1 - Math.max(0, sky.fall - FALL_IN) * 3); // (down out of sight, behind the puff)
     if (sky.intro < SKY.intro) { const u = sky.intro / SKY.intro, k = u < 0.5 ? 0.25 * (1 - u * 2) : u > 0.85 ? -0.3 * Math.sin((u - 0.85) / 0.15 * Math.PI) : 0; g.scale(1 - k * 0.6, 1 + k); } // (stretched shooting up, squashed landing)
     if (S.ready) { // (a super bounce waiting: its glow)
@@ -1122,7 +1125,7 @@
   const CUTIN = { dur: 1.5, in: 0.14, out: 0.15 }, CUTINS = {};
   // its ring countdown: one closing in on the ring in the middle, onto it as the burst goes (with its sound) — a tap
   // then (from <early> s before to <late> s after) and the super bounce is <boost> as strong again; too soon, missed
-  const TIMING = { early: 0.16, late: 0.12, boost: 1.5 };
+  const TIMING = { early: 0.16, late: 0.12, boost: 1.5, cue: 0.2 }; // (cue: "TAP!" up this long before it's time)
   const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
   const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
   function loadCutins() {
@@ -1148,10 +1151,21 @@
       g.strokeStyle = `rgba(255, 255, 255, ${0.35 + 0.6 * (1 - k)})`; g.lineWidth = H * 0.008;
       g.beginPath(); g.arc(cx, cy, R * (1 + 2 * k), 0, Math.PI * 2); g.stroke();
     }
-    g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = Math.max(3, H * 0.008); g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.font = `900 ${Math.round(H * (now ? 0.075 : 0.055))}px sans-serif`;
-    const word = judged ? (c.hit ? '完美！' : '太早了') : now ? '點！' : '';
-    if (word) { g.strokeText(word, cx, cy); g.fillText(word, cx, cy); }
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    const cue = !judged && left <= TIMING.early + TIMING.cue; // (a little before it's time: "TAP!", popping up)
+    if (cue) {
+      const u = Math.min(1, (TIMING.early + TIMING.cue - left) / 0.12), pop = u < 1 ? 0.4 + 0.6 * u + 0.35 * Math.sin(u * Math.PI) : 1 + Math.sin(S.t * 30) * 0.06; // (out of nothing, a bit past, settling; then throbbing)
+      g.save(); g.translate(cx, cy - R * 1.45); g.rotate(Math.sin(S.t * 18) * 0.08); g.scale(pop, pop);
+      const fs = Math.round(H * 0.13), gr = g.createLinearGradient(0, -fs / 2, 0, fs / 2); gr.addColorStop(0, '#ffe36e'); gr.addColorStop(0.55, '#ff9a5a'); gr.addColorStop(1, '#ff5fa2');
+      g.font = `900 ${fs}px 'Arial Rounded MT Bold', 'Nunito', sans-serif`; g.lineJoin = 'round';
+      g.lineWidth = fs * 0.22; g.strokeStyle = '#7a3fd0'; g.strokeText('TAP!', 0, 0);
+      g.lineWidth = fs * 0.1; g.strokeStyle = '#fff'; g.strokeText('TAP!', 0, 0);
+      g.fillStyle = gr; g.fillText('TAP!', 0, 0);
+      g.font = `${Math.round(fs * 0.7)}px sans-serif`; g.fillText('👆', fs * 1.55, fs * 0.25 + Math.sin(S.t * 24) * fs * 0.08); // (a finger tapping)
+      g.restore();
+    }
+    const word = judged ? (c.hit ? '完美！' : '太早了') : '';
+    if (word) { g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = Math.max(3, H * 0.008); g.font = `900 ${Math.round(H * 0.07)}px sans-serif`; g.strokeText(word, cx, cy); g.fillText(word, cx, cy); }
     g.restore();
   }
   function drawCutin() { // the friend's face in close-up on a band across the screen, speed lines streaming by
@@ -1275,6 +1289,10 @@
   // by day, landed and sliding along: low, leaning forward, its tail streaming (the caped dive's pose without the cape,
   // GPT: assets/fox/slide/slide_0, _1 — fitted over the same frame, so it's where the caped one is)
   const SLIDE = [0, 1].map(i => { const im = pic(); im.src = `assets/fox/slide/slide_${i}.webp`; return im; });
+  // off the cloud road's edge: mid-bound from behind, its foot finding nothing, over to the side and down — four frames
+  // going over to its right (GPT, assets/fox/tip/tip_0…3); off the left, the same mirrored
+  const TIP = [0, 1, 2, 3].map(i => { const im = pic(); im.src = `assets/fox/tip/tip_${i}.webp`; return im; }), TIP_S = 0.09;
+  const tipping = () => TIP.every(im => im.complete && im.naturalWidth);
   const sliding = () => SLIDE.every(im => im.complete && im.naturalWidth);
   const capedOf = (k, t) => { // (its frames in turn — never still, the cape always streaming; crouched with only the one, leaning forward)
     const fr = CAPED[k].filter(im => im.complete && im.naturalWidth);
