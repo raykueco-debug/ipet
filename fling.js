@@ -111,17 +111,20 @@
   // often, 🪂 gliding, 🦘 bouncing, …) and the amount in big letters — seen at a glance, no reading needed.
   // when: 'start' only before the fling (no use after it); apply(m, S): onto the run's mods
   const TIER = { blue: { w: 60, name: '藍' }, purple: { w: 30, name: '紫' }, gold: { w: 10, name: '金' } };
-  const NAME = { rabbit: '兔子', frog: '青蛙', get mushroom() { return LOOK.night ? '南瓜' : '蘑菇'; }, bear: '熊', owl: '貓頭鷹', giraffe: '長頸鹿', boar: '山豬', hedgehog: '刺蝟', squirrel: '松鼠' };
+  const NAME = { rabbit: '兔子', frog: '青蛙', get mushroom() { return LOOK.night ? '魔女缸' : '蘑菇'; }, bear: '熊', owl: '貓頭鷹', giraffe: '長頸鹿', boar: '山豬', hedgehog: '刺蝟', squirrel: '松鼠' };
   const mods = () => ({ power: {}, weight: {}, glide: {}, hops: {}, noTrip: 0, noKnock: 0, refill: 0, again: 0, magnet: 0, superLess: 0,
     launch: 0, dive: 0, ground: 0, combo: 0, shield: 0 });
   const CARDS = [];
   const card = (id, tier, icon, badge, val, name, apply, when) => CARDS.push({ id, tier, icon, badge, val, name, apply, when, art: id.replace(/-(blue|purple|gold)$/, '') });
   // its picture, drawn for it (assets/cards/<art>.png: the three tiers of a card share one), where there is one — else its emoji
   const CARD_ART = {};
-  const artOf = c => { const im = CARD_ART[c.art]; return im?.complete && im.naturalWidth ? im : null; };
-  async function loadCardArt() { // (those there: assets/cards/index.json, tools/card_split.py)
-    const r = await fetch('assets/cards/index.json').catch(() => null), names = r?.ok ? await r.json() : [];
-    await Promise.all(names.map(n => new Promise(done => { const im = pic(); im.onload = im.onerror = done; im.src = `assets/cards/${n}.png`; CARD_ART[n] = im; })));
+  const CARD_ART_NIGHT = {}; // (on Halloween: the friends in their costumes, where drawn — assets/cards/halloween/)
+  const artOf = c => { const ok = im => im?.complete && im.naturalWidth ? im : null; return (LOOK.night && ok(CARD_ART_NIGHT[c.art])) || ok(CARD_ART[c.art]); };
+  async function loadCardArt() { // (those there: assets/cards[/halloween]/index.json, tools/card_split.py)
+    await Promise.all([['assets/cards', CARD_ART], ['assets/cards/halloween', CARD_ART_NIGHT]].map(async ([dir, into]) => {
+      const r = await fetch(`${dir}/index.json`).catch(() => null), names = r?.ok ? await r.json() : [];
+      await Promise.all(names.map(n => new Promise(done => { const im = pic(); im.onload = im.onerror = done; im.src = `${dir}/${n}.png`; into[n] = im; })));
+    }));
     if (pickHand && !$('pick').hidden) $('pickRow').innerHTML = pickHand.map(cardHTML).join(''); // (cards out already, before their pictures were in)
   }
   const THROWERS = ['rabbit', 'frog', 'mushroom', 'bear', 'owl', 'giraffe', 'boar', 'squirrel'];
@@ -251,7 +254,7 @@
     brake: 'back_crouch_to_sit_back', look: 'sit_back_loop_look', sitUp: 'sit_back_to_back_air' }; // (the cloud road's end)
   // (on Halloween, in its cape: the same clips made again with it — tools/wan_cape.py, assets/fox/clips_halloween —
   // frame for frame as the plain ones, where they're there)
-  const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'], CUT = ['run', 'pounce'];
+  const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down', 'brake', 'look', 'sitUp'], CUT = ['run', 'pounce'];
   // every picture of the game's, counted as it comes in (Fling.preload: the loading screen's bar)
   const LOADING = { n: 0, done: 0 };
   function pic() {
@@ -1225,6 +1228,10 @@
     CAPED[k][i] = tailless(`assets/fox/halloween/${k}_${i}.webp`, MULTI && `assets/fox/notail/halloween/${k}_${i}.webp`, `halloween/${k}`, 0);
   }
   const caped = () => LOOK.night && CAPED.crouch[0].complete && CAPED.crouch[0].naturalWidth;
+  // by day, landed and sliding along: low, leaning forward, its tail streaming (the caped dive's pose without the cape,
+  // GPT: assets/fox/slide/slide_0, _1 — fitted over the same frame, so it's where the caped one is)
+  const SLIDE = [0, 1].map(i => { const im = pic(); im.src = `assets/fox/slide/slide_${i}.webp`; return im; });
+  const sliding = () => SLIDE.every(im => im.complete && im.naturalWidth);
   const capedOf = (k, t) => { // (its frames in turn — never still, the cape always streaming; crouched with only the one, leaning forward)
     const fr = CAPED[k].filter(im => im.complete && im.naturalWidth);
     return fr.length > 1 ? fr[Math.floor(t) % fr.length] : k === 'crouch' ? capedOf('dive', t) : fr[0];
@@ -1292,7 +1299,7 @@
   function loadGlider() { return Promise.all([0, 1, 2].map(i => new Promise(done => { const im = pic(); im.onload = im.onerror = done; im.src = `assets/fox/glider/${i}.png`; GLIDER[i] = im; }))); }
   function drawGlider(f, size) {
     if (!f.soarAt) f.soarAt = S.t;
-    const open = Math.min(1, (S.t - f.soarAt) / 0.3), k = 1 - (1 - open) ** 3, sway = Math.sin(S.t * 3) * 0.06;
+    const open = Math.min(1, (S.t - f.soarAt) / 0.3), k = 1 - (1 - open) ** 3, sway = -0.42 * k + Math.sin(S.t * 3) * 0.05; // (blown back: at a slant behind it, swaying)
     const w = size * 1.4 * k, h = w * 0.5, top = -size * 1.15 * k; // (for the wind streaks)
     g.save(); g.translate(0, -size * 0.12); g.rotate(sway); g.scale(k, k); // (from where its lines meet, on its back)
     const im = GLIDER[Math.floor(S.t * 9) % 3];
@@ -1323,6 +1330,7 @@
     else if (inAir && f.ride <= 0 && Math.hypot(f.vx, f.vy) > 8) { img = A.run?.[AIR]; // (slowing, hopping along low: its run, all the way — not a frame each hop)
       rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
     else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
+    if (!caped() && !front && S.phase === 'fly' && !inAir && Math.abs(f.vx) > 0.8 && !f.act && sliding()) img = SLIDE[Math.floor(S.t * (8 + Math.abs(f.vx) * 0.4)) % 2]; // (landed, sliding on)
     if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: diving, or leaping while well up; else crouched, its feet on the ground)
       const v = Math.hypot(f.vx, f.vy), flap = S.t * (8 + v * 0.4), up = S.phase === 'fly' && f.y > 0.05 && v > 8; // (slowing down, hopping along: crouched, all the way — not a frame each hop)
       const going = S.phase === 'fly' && v > 0.8; // (sliding or hopping along low: leaning forward, the cape streaming behind)
@@ -1492,6 +1500,8 @@
   }
   function start() {
     S = fresh(); spawn(); hud(); deckUI();
+    const el = bgm?.el || bgm; if (el) try { el.currentTime = 0; } catch (e) {} // (a run: its music from the top)
+    bgm?.play()?.catch?.(() => {});
     if (!params.has('nocards')) pick('start'); // (?nocards: straight to the fling)
     $('end').hidden = true; $('energyNote').hidden = true; $('again').hidden = false; $('home').textContent = '回到小狐';
     $('final').parentElement.hidden = false;

@@ -23,6 +23,9 @@ CLIPS = {
     'happy_loop': ('happy', None, 25, '_loop'),
     'back_crouch_to_back_air': ('back_crouch', 'back_air', 25, '_to_back_air'),
     'back_air_to_back_crouch': ('back_air', 'back_crouch', 25, '_to_back_crouch'),
+    'back_crouch_to_sit_back': ('back_crouch', 'sit_back', 25, '_to_sit_back'),   # (the cloud road's end: braking,
+    'sit_back_loop_look': ('sit_back', None, 25, '_loop_look'),                    #  sat looking at the cards,
+    'sit_back_to_back_air': ('sit_back', 'back_air', 25, '_to_back_air'),          #  off it leaps)
 }
 
 
