@@ -1330,7 +1330,8 @@
     else if (inAir && f.ride <= 0 && Math.hypot(f.vx, f.vy) > 8) { img = A.run?.[AIR]; // (slowing, hopping along low: its run, all the way — not a frame each hop)
       rot = -Math.atan2(f.vy, Math.max(4, f.vx)) * 0.6 + f.spin * Math.PI * 2; }
     else { img = A.run?.length ? (f.vx > 0.5 ? frameOf('run', S.t, 6 + f.vx) : A.run[0]) : null; }
-    if (!caped() && !front && S.phase === 'fly' && !inAir && Math.abs(f.vx) > 0.8 && !f.act && sliding()) img = SLIDE[Math.floor(S.t * (8 + Math.abs(f.vx) * 0.4)) % 2]; // (landed, sliding on)
+    { const v = Math.hypot(f.vx, f.vy); // (landed, sliding and hopping along low: leaning forward, as in the cape — not running)
+      if (!caped() && !front && S.phase === 'fly' && !f.act && !f.dive && !f.soar && v > 0.8 && !(inAir && v > 8) && sliding()) { img = SLIDE[Math.floor(S.t * (8 + v * 0.4)) % 2]; rot = 0; } }
     if (caped() && !front && !(f.act?.name === 'roll')) { // (in the cape: diving, or leaping while well up; else crouched, its feet on the ground)
       const v = Math.hypot(f.vx, f.vy), flap = S.t * (8 + v * 0.4), up = S.phase === 'fly' && f.y > 0.05 && v > 8; // (slowing down, hopping along: crouched, all the way — not a frame each hop)
       const going = S.phase === 'fly' && v > 0.8; // (sliding or hopping along low: leaning forward, the cape streaming behind)
