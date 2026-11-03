@@ -352,6 +352,7 @@
   }
 
   function tap() {
+    if (S?.cutin) return; // (the cut-in on: held till the burst)
     if (!S) return;
     ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
     if (S.phase !== 'fly') return;
@@ -387,8 +388,11 @@
     if (power) { // (the bunny's first: the stars keep for the next)
       const bunny = a.bunny;
       if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
-      f.rainbow = 2.2; S.shake = 0.5; SFX.super();
-      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60); starBurst(a.x, fr.h + 0.5, 40, 13);
+      const burst = () => {
+        f.rainbow = 2.2; S.shake = 0.5; SFX.super();
+        pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60); starBurst(a.x, fr.h + 0.5, 40, 13);
+      };
+      if (!bunny && cutinOf(a.kind)) S.cutin = { kind: a.kind, t: 0, then: burst }; else burst(); // (a super bounce: the friend's close-up first, all held meanwhile)
     }
     if ((dived || power || S.mods.noTrip) && a.kind === 'hedgehog') { // (or a card: never tripped on it) // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
@@ -934,6 +938,40 @@
     }
     if (LOOK === look) ART = into; // (all at once, so no friend is half one look and half the other)
   }
+  // the friends' close-ups for the super bounce's cut-in (not the mushroom's): <dir>/cutin/<kind>.png, on Halloween
+  // their costumed ones where there (GPT sheets assets/source/gpt/cutin_*.png, tools/grid_split.py)
+  const CUTIN = { dur: 3, in: 0.28, out: 0.3 }, CUTINS = {};
+  const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
+  const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
+  function loadCutins() {
+    return Promise.all(['assets/friends', LOOKS.halloween.friends].flatMap(dir => CUTIN_KINDS.map(k => new Promise(done => {
+      const im = pic(); im.onload = () => { (CUTINS[dir] ||= {})[k] = im; done(); }; im.onerror = done; im.src = `${dir}/cutin/${k}.png`;
+    }))));
+  }
+  const cutinOf = k => (LOOK.friends && CUTINS[LOOK.friends]?.[k]) || CUTINS['assets/friends']?.[k] || null;
+  function drawCutin() { // the friend's face in close-up on a band across the screen, speed lines streaming by
+    const c = S.cutin, im = cutinOf(c.kind), t = c.t;
+    const into = Math.min(1, t / CUTIN.in), away = Math.max(0, (t - (CUTIN.dur - CUTIN.out)) / CUTIN.out);
+    const ease = k => 1 - (1 - k) ** 3;
+    g.save();
+    g.fillStyle = `rgba(0, 0, 0, ${0.55 * into * (1 - away)})`; g.fillRect(0, 0, W, H);
+    const bh = H * 0.62 * ease(into) * (1 - ease(away)), cy = H / 2, slant = H * 0.12; // the band, opening and closing
+    g.beginPath(); g.moveTo(0, cy - bh / 2 + slant); g.lineTo(W, cy - bh / 2 - slant); g.lineTo(W, cy + bh / 2 - slant); g.lineTo(0, cy + bh / 2 + slant); g.closePath();
+    g.fillStyle = CUTIN_COLOR[c.kind] || '#ffb347'; g.fill(); g.clip();
+    g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; // (the speed lines: streaming past, right to left)
+    for (let i = 0; i < 26; i++) {
+      const y = cy - H * 0.45 + ((i * 97) % 100) / 100 * H * 0.9, len = W * (0.15 + ((i * 37) % 10) / 25);
+      const x = W - ((t * W * (2.2 + (i % 5) * 0.4) + i * 211) % (W + len * 2)) + len;
+      g.lineWidth = 2 + (i % 4) * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y - len * 0.22); g.stroke();
+    }
+    if (im) { // the face: in from the right, a little shake as it shouts, off to the left
+      const h = H * 0.86, w = h * im.width / im.height, shake = t > CUTIN.in && !away ? Math.sin(t * 60) * H * 0.004 : 0;
+      const x = W * 0.6 - w / 2 + (1 - ease(into)) * W * 0.6 - ease(away) * W * 1.2;
+      g.drawImage(im, x + shake, cy - h / 2 + shake, w, h);
+    }
+    g.restore();
+    if (t > CUTIN.dur - 0.12) { g.fillStyle = `rgba(255, 255, 255, ${(t - (CUTIN.dur - 0.12)) / 0.12})`; g.fillRect(0, 0, W, H); } // (a flash, into the burst)
+  }
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
   function drawArt(a, s, t) {
@@ -1331,7 +1369,10 @@
   let raf = 0, last = 0;
   function loop(now) {
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0)); last = now;
-    if (S) { step(dt * PACE); draw(dt * PACE); }
+    if (S?.cutin) { // (the cut-in: all held, the world under it, then the burst)
+      draw(0); drawCutin();
+      if ((S.cutin.t += dt) >= CUTIN.dur) { const then = S.cutin.then; S.cutin = null; then(); }
+    } else if (S) { step(dt * PACE); draw(dt * PACE); }
     raf = requestAnimationFrame(loop);
   }
   // open: the layer over everything, landscape, a fresh run waiting on the start card.
@@ -1345,7 +1386,7 @@
   // its pictures fetched only once it's wanted (opened), or a while after the pet's page is in — not at once with the
   // pet's own: on a phone they'd fight over the network and the pet would take long to show
   let warmed = null;
-  function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends()]).catch(() => {})); }
+  function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends(), loadCutins()]).catch(() => {})); }
   // (the loading screen before it opens: progress(0…1) as its pictures come in; done when they all have)
   async function preload(progress) {
     let listed = false; Promise.all([warm(), looking]).then(() => { listed = true; });
