@@ -86,8 +86,8 @@
   const FRIENDS = {
     rabbit:   { e: '🐰', h: 0.9, w: 30, say: '彈一下，往前跑撞飛一隻、停在下一隻旁邊：碰到牠 BUNNY BOUNCE', hit: f => { f.vy = 10; f.vx = Math.max(f.vx, 8) + 1; return 'boing'; } },
     frog:     { e: '🐸', h: 0.7, w: 14, say: '連跳三下＋之後俯衝落地彈更高', hit: f => { f.vy = 7; f.vx += 1; f.hops = 3; return 'hop'; } },
-    mushroom: { get e() { return LOOK.night ? '🫕' : '🍄'; }, h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'big'; } },
-    bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'big'; } },
+    mushroom: { get e() { return LOOK.night ? '🫕' : '🍄'; }, h: 1.1, w: 10, say: '彈超高', hit: f => { f.vy = 19; f.vx += 2; return 'spring'; } },
+    bear:     { e: '🐻', h: 1.3, r: 1.1, w: 8, say: '挺著大肚子睡覺：65° 彈飛', draw: drawBear, hit: f => { throwAt(f, 65); return 'belly'; } },
     owl:      { e: '🦉', h: 1.2, w: 8,  say: '抓著 25° 斜飛', hit: f => { throwAt(f, 25); f.glide = 1.2; return 'whoosh'; } },
     giraffe:  { e: '🦒', h: 2.7, w: 8,  say: '用脖子 45° 甩出去', draw: drawGiraffe, hit: f => { throwAt(f, 45); f.hold = NECK.hold; return 'fling'; } },
     boar:     { e: '🐗', h: 1.0, w: 10, say: '背著往前衝', hit: f => { f.vy = 0; f.vx = Math.max(f.vx, 16) + 3; f.ride = 1; return 'whoosh'; } },
@@ -278,6 +278,65 @@
     v.gain.setValueAtTime(vol, t); v.gain.exponentialRampToValueAtTime(0.001, t + dur);
     o.connect(v).connect(window.Sound ? Sound.sfx : ac.destination); o.start(t); o.stop(t + dur);
   }
+  // the super bounce's: as a fighting game's big move sounds — a metal flash as the close-up comes in, power
+  // gathering under it, and the burst: a heavy hit, distorted, ringing out in a hall (all made here, no sound files)
+  let noiseBuf = null, hall = null;
+  function noise() { if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } const n = ac.createBufferSource(); n.buffer = noiseBuf; return n; }
+  function out() { // (through a hall: a reverb made of fading noise)
+    const dest = window.Sound ? Sound.sfx : ac.destination;
+    if (!hall) {
+      const len = ac.sampleRate * 2.2, ir = ac.createBuffer(2, len, ac.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3; }
+      const cv = ac.createConvolver(), wet = ac.createGain(); cv.buffer = ir; wet.gain.value = 0.45;
+      hall = ac.createGain(); hall.connect(dest); hall.connect(cv).connect(wet).connect(dest);
+    }
+    return hall;
+  }
+  const env = (g, t, peak, a, d) => { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); };
+  function flash() { // "shing!": a bright noise burst and metal partials, a boom under it
+    if (!ac) return; const t = ac.currentTime, o = out();
+    const n = noise(), bp = ac.createBiquadFilter(), g = ac.createGain(); bp.type = 'highpass'; bp.frequency.value = 3000;
+    env(g, t, 0.5, 0.005, 0.35); n.connect(bp).connect(g).connect(o); n.start(t); n.stop(t + 0.4);
+    for (const [fr, v] of [[1870, 0.18], [2830, 0.14], [4150, 0.1], [5620, 0.07]]) {
+      const s = ac.createOscillator(), sg = ac.createGain(); s.frequency.value = fr; env(sg, t, v, 0.003, 1.4); s.connect(sg).connect(o); s.start(t); s.stop(t + 1.5);
+    }
+    const b = ac.createOscillator(), bg = ac.createGain(); b.frequency.setValueAtTime(140, t); b.frequency.exponentialRampToValueAtTime(40, t + 0.6);
+    env(bg, t, 0.7, 0.005, 0.7); b.connect(bg).connect(o); b.start(t); b.stop(t + 0.8);
+  }
+  function charge(dur) { // the power gathering: a rising roar and a chord climbing, louder to the end
+    if (!ac) return; const t = ac.currentTime + 0.25, o = out(), end = t + dur - 0.3;
+    const n = noise(); n.loop = true; const bp = ac.createBiquadFilter(), g = ac.createGain();
+    bp.type = 'bandpass'; bp.Q.value = 4; bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(3500, end);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, end); g.gain.exponentialRampToValueAtTime(0.0001, end + 0.08);
+    n.connect(bp).connect(g).connect(o); n.start(t); n.stop(end + 0.1);
+    const lp = ac.createBiquadFilter(), cg = ac.createGain(), wob = ac.createOscillator(), wg = ac.createGain();
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(400, t); lp.frequency.exponentialRampToValueAtTime(5000, end);
+    cg.gain.setValueAtTime(0.0001, t); cg.gain.exponentialRampToValueAtTime(0.12, end); cg.gain.exponentialRampToValueAtTime(0.0001, end + 0.08);
+    wob.frequency.setValueAtTime(6, t); wob.frequency.linearRampToValueAtTime(22, end); wg.gain.value = 0.05; wob.connect(wg).connect(cg.gain); wob.start(t); wob.stop(end + 0.1);
+    lp.connect(cg).connect(o);
+    for (const m of [1, 1.5, 2, 2.52]) { const s = ac.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(110 * m, t); s.frequency.exponentialRampToValueAtTime(330 * m, end); s.connect(lp); s.start(t); s.stop(end + 0.1); }
+  }
+  function boom() { // the burst: a heavy kick falling away, a distorted blast, a bright chord, all ringing in the hall
+    if (!ac) return; const t = ac.currentTime, o = out();
+    const k = ac.createOscillator(), kg = ac.createGain(); k.frequency.setValueAtTime(180, t); k.frequency.exponentialRampToValueAtTime(32, t + 0.9);
+    env(kg, t, 0.9, 0.004, 1.1); k.connect(kg).connect(o); k.start(t); k.stop(t + 1.2);
+    const n = noise(), lp = ac.createBiquadFilter(), sh = ac.createWaveShaper(), g = ac.createGain();
+    const curve = new Float32Array(1024); for (let i = 0; i < 1024; i++) { const x = i / 512 - 1; curve[i] = Math.tanh(x * 6); } sh.curve = curve;
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(8000, t); lp.frequency.exponentialRampToValueAtTime(200, t + 1.2);
+    env(g, t, 0.45, 0.003, 1.3); n.connect(sh).connect(lp).connect(g).connect(o); n.start(t); n.stop(t + 1.4);
+    for (const fr of [523, 659, 784, 1047]) { const s = ac.createOscillator(), sg = ac.createGain(); s.type = 'square'; s.frequency.value = fr; env(sg, t + 0.02, 0.035, 0.01, 0.9); s.connect(sg).connect(o); s.start(t); s.stop(t + 1.1); }
+  }
+  function wobble(f0, f1, dur, rate, depth, type, vol) { // a tone sliding f0 → f1 that shakes as it goes, the shake dying away (a spring, a belly)
+    if (!ac) return; const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.35);
+    lfo.frequency.value = rate; lg.gain.setValueAtTime(depth, t); lg.gain.exponentialRampToValueAtTime(depth * 0.05, t + dur); lfo.connect(lg).connect(o.frequency);
+    env(g, t, vol, 0.006, dur); o.connect(g).connect(window.Sound ? Sound.sfx : ac.destination);
+    o.start(t); lfo.start(t); o.stop(t + dur + 0.05); lfo.stop(t + dur + 0.05);
+  }
+  function thump(freq, dur, vol) { // a soft, muffled hit (noise through a low filter)
+    if (!ac) return; const t = ac.currentTime, n = noise(), lp = ac.createBiquadFilter(), g = ac.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = freq; env(g, t, vol, 0.004, dur); n.connect(lp).connect(g).connect(window.Sound ? Sound.sfx : ac.destination); n.start(t); n.stop(t + dur + 0.05);
+  }
   const chime = (f, n, gap) => { for (let i = 0; i < n; i++) setTimeout(() => blip(f * (1 + i * 0.25), f * 1.5 * (1 + i * 0.25), 0.2), i * gap); };
   const SFX = {
     boing: () => blip(220, 660, 0.25), hop: () => blip(400, 800, 0.12), big: () => blip(120, 520, 0.45, 'triangle', 0.25),
@@ -285,6 +344,9 @@
     star: () => blip(1200 + Math.random() * 600, 2400, 0.08, 'sine', 0.08), dash: () => blip(300, 1200, 0.3, 'sawtooth', 0.08), dive: () => blip(1000, 250, 0.2, 'triangle', 0.1),
     thud: () => blip(160, 60, 0.15, 'sine', 0.2), soar: () => { blip(500, 900, 0.5, 'triangle', 0.12); chime(990, 2, 90); }, best: () => chime(660, 3, 120), ready: () => chime(880, 4, 80),
     super: () => { blip(100, 900, 0.7, 'sawtooth', 0.12); chime(660, 5, 90); },
+    belly: () => { thump(260, 0.25, 0.5); wobble(85, 210, 0.7, 11, 28, 'sine', 0.5); wobble(170, 420, 0.5, 11, 40, 'triangle', 0.12); }, // (a big soft belly: pomf, boyoyoing)
+    spring: () => { blip(900, 1500, 0.05, 'sine', 0.15); wobble(260, 820, 0.85, 17, 120, 'triangle', 0.3); wobble(520, 1640, 0.6, 17, 220, 'sine', 0.08); }, // (the cap: pop, boinnng)
+    cutin: dur => { flash(); charge(dur); }, boom: () => { boom(); chime(660, 5, 90); },
   };
 
   let S = null; // the run
@@ -389,10 +451,10 @@
       const bunny = a.bunny;
       if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
       const burst = () => {
-        f.rainbow = 2.2; S.shake = 0.5; SFX.super();
+        f.rainbow = 2.2; S.shake = 0.5; if (bunny) SFX.super(); else SFX.boom();
         pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60); starBurst(a.x, fr.h + 0.5, 40, 13);
       };
-      if (!bunny && cutinOf(a.kind)) S.cutin = { kind: a.kind, t: 0, then: burst }; else burst(); // (a super bounce: the friend's close-up first, all held meanwhile)
+      if (!bunny && cutinOf(a.kind)) { S.cutin = { kind: a.kind, t: 0, then: burst }; SFX.cutin(CUTIN.dur); } else burst(); // (a super bounce: the friend's close-up first, all held meanwhile)
     }
     if ((dived || power || S.mods.noTrip) && a.kind === 'hedgehog') { // (or a card: never tripped on it) // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
@@ -422,10 +484,10 @@
     if (f.hold > 0) S.holder = a; // (the giraffe's: held in its mouth through the swing)
     if (power) { act('joy', 1.2); return; } // (its words said already)
     if (s === 'ouch') { f.spin = 1; act('roll', 0.6); } // (tripped: tumbling over it)
-    else if (s === 'big') act('joy', 0.8);
+    else if (s === 'big' || s === 'belly' || s === 'spring') act('joy', 0.8);
     else if (s === 'fling') { f.spin = 1.5; act('roll', 0.75); }
     else if (!a.carry) { f.spin = 1; act('roll', 0.5); }
-    pop({ boing: '彈！', hop: '呱呱！', big: '飛高高！', whoosh: '咻～', fling: '甩～！', ouch: '絆倒！' }[s], a.x, fr.h + 1.5, s === 'ouch' ? '#ff8a8a' : '#fff');
+    pop({ boing: '彈！', hop: '呱呱！', big: '飛高高！', belly: '噗～飛高高！', spring: '咚～彈超高！', whoosh: '咻～', fling: '甩～！', ouch: '絆倒！' }[s], a.x, fr.h + 1.5, s === 'ouch' ? '#ff8a8a' : '#fff');
   }
 
   function step(dt) {
