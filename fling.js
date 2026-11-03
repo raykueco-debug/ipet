@@ -12,6 +12,8 @@
    Flung high enough (SKY.height), it goes up onto the clouds: a run along a cloud road, seen from behind (left /
    right for a lane, stars on them), bounding along, SKY.run m of it, then a leap off its end and, through black,
    down onto a giraffe, flying on.
+   Cards (a roguelike run, CARDS): one of three picked before the fling, and one more of three at each cloud road's
+   end (picked, off it jumps) — friends stronger or more often, gliding or bouncing off them, and special ones; this run only.
    World: x metres along, y metres up (the ground at 0), seen from the side.
    It plays in a layer of its own, landscape only (fullscreen and locked where the phone lets it; held upright, it
    asks to be turned), on a stage of one fixed size and shape (STAGE, 16:9) scaled to fit the screen, so every
@@ -69,6 +71,7 @@
   const FALL_IN = (-0.4 + Math.sqrt(0.16 + 4 * 9 * 0.9)) / 18; // (s off the edge: down to the sea of cloud, 0.9 lanes below — see the fall's lift)
   const WIND = { first: 60, gap: [60, 95], turn: 12, both: 24 };
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
+  const AUTO = params.has('auto');
   const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
   const FOX_H = 1.7;                   // the fox's drawn height, m
   // a throw at an angle (the bear's belly, the owl's carry, the giraffe's neck): all as strong, only the angle theirs —
@@ -93,7 +96,81 @@
   };
   const KINDS = Object.keys(FRIENDS), WSUM = KINDS.reduce((a, k) => a + FRIENDS[k].w, 0);
   const ONLY = FRIENDS[params.get('friend')] && params.get('friend'); // (?friend=squirrel: all of one kind, to try it)
-  const pickKind = () => { if (ONLY) return ONLY; let r = Math.random() * WSUM; for (const k of KINDS) if ((r -= FRIENDS[k].w) < 0) return k; return 'rabbit'; };
+  const pickKind = () => { // (cards may make some friends come more often)
+    if (ONLY) return ONLY;
+    const w = k => FRIENDS[k].w * (1 + (S?.mods.weight[k] || 0)), sum = KINDS.reduce((a, k) => a + w(k), 0);
+    let r = Math.random() * sum; for (const k of KINDS) if ((r -= w(k)) < 0) return k; return 'rabbit';
+  };
+
+  // the cards (a roguelike run): three to pick one from before the fling, and three more at each cloud road's end
+  // (picked, off it jumps) — all of them for this run only, adding up. Blue, purple, gold: commoner to rarer, stronger.
+  // Each drawn as what it's about, big (a friend, the fox, a star…), with a badge for what it does (💪 stronger, 🎲 more
+  // often, 🪂 gliding, 🦘 bouncing, …) and the amount in big letters — seen at a glance, no reading needed.
+  // when: 'start' only before the fling (no use after it); apply(m, S): onto the run's mods
+  const TIER = { blue: { w: 60, name: '藍' }, purple: { w: 30, name: '紫' }, gold: { w: 10, name: '金' } };
+  const NAME = { rabbit: '兔子', frog: '青蛙', get mushroom() { return LOOK.night ? '南瓜' : '蘑菇'; }, bear: '熊', owl: '貓頭鷹', giraffe: '長頸鹿', boar: '山豬', hedgehog: '刺蝟', squirrel: '松鼠' };
+  const mods = () => ({ power: {}, weight: {}, glide: {}, hops: {}, noTrip: 0, noKnock: 0, refill: 0, again: 0, magnet: 0, superLess: 0,
+    launch: 0, dive: 0, ground: 0, combo: 0, shield: 0 });
+  const CARDS = [];
+  const card = (id, tier, icon, badge, val, name, apply, when) => CARDS.push({ id, tier, icon, badge, val, name, apply, when });
+  const THROWERS = ['rabbit', 'frog', 'mushroom', 'bear', 'owl', 'giraffe', 'boar', 'squirrel'];
+  const fe = k => () => FRIENDS[k].e; // (its emoji as the look has it: the mushroom a pot on Halloween night)
+  for (const k of THROWERS) {
+    // 加強: its throw stronger (adds up)
+    [['blue', 0.1], ['purple', 0.15], ['gold', 0.2]].forEach(([t, v]) =>
+      card(`power-${k}-${t}`, t, fe(k), '💪', `+${Math.round(v * 100)}%`, () => `${NAME[k]}力量`, m => { m.power[k] = (m.power[k] || 0) + v; }));
+    // 機率: comes along more often
+    [['blue', 0.5], ['purple', 1], ['gold', 2]].forEach(([t, v]) =>
+      card(`more-${k}-${t}`, t, fe(k), '🎲', v < 1 ? `+${v * 100}%` : `×${v + 1}`, () => `${NAME[k]}更常出現`, m => { m.weight[k] = (m.weight[k] || 0) + v; }));
+    // 功能: glides off it (as off a squirrel), bounces on after it (as after a frog)
+    if (k !== 'squirrel') card(`glide-${k}`, 'purple', fe(k), '🪂', '滑翔', () => `${NAME[k]}彈完會滑翔`, m => { m.glide[k] = 1; });
+    if (k !== 'frog') card(`hops-${k}`, 'blue', fe(k), '🦘', '跳跳', () => `${NAME[k]}之後再彈 2 下`, m => { m.hops[k] = (m.hops[k] || 0) + 2; });
+  }
+  // 特殊
+  card('noTrip', 'purple', () => '🦔', '🚫', '不絆倒', () => '刺蝟不絆腳（踩到就彈起來）', m => { m.noTrip = 1; });
+  card('noKnock', 'blue', () => '🐰', '🤝', '不撞飛', () => '兔子跑過去不撞飛朋友', m => { m.noKnock = 1; });
+  card('refill', 'blue', () => '🔥', '♻️', '+1', () => '尾巴加速用完回復一次', m => { m.refill++; });
+  card('again', 'purple', () => '🦊', '↗️', '再跳', () => '停下來後再往前跳一次', m => { m.again++; });
+  // (more of them)
+  card('magnet', 'blue', () => star(), '🧲', '吸更遠', () => `${star()}離遠一點也吃得到`, m => { m.magnet += 0.6; });
+  card('superLess', 'purple', () => '🌈', '⭐', '−3', () => 'SUPER BOUNCE 少集 3 顆', m => { m.superLess += 3; });
+  card('superNow', 'gold', () => '🌈', '⚡', '馬上', () => 'SUPER BOUNCE 立刻準備好', (m, S) => { S.ready = true; });
+  [['blue', 0.1], ['purple', 0.15], ['gold', 0.25]].forEach(([t, v]) =>
+    card(`launch-${t}`, t, () => '🌳', '🚀', `+${Math.round(v * 100)}%`, () => '樹枝彈射更遠', m => { m.launch += v; }, 'start'));
+  card('dive', 'blue', () => '🦊', '⬇️', '+20%', () => '俯衝撲到朋友更強', m => { m.dive += 0.2; });
+  card('ground', 'purple', () => '🟫', '⤴️', '彈更高', () => '落在地上彈得更高', m => { m.ground += 0.1; });
+  card('combo', 'purple', () => '✨', '🔗', 'COMBO+', () => '連續踩朋友加更多速度', m => { m.combo += 6; });
+  card('shield', 'gold', () => '☁️', '🛡️', '救一次', () => '雲路上掉下去救回來一次', m => { m.shield++; });
+  card('tails', 'gold', () => '🔥', '➕', '+2', () => '多兩次尾巴加速', m => { m.refill += 2; });
+
+  function deal(when) { // three different cards: each a tier drawn by its rarity, then a card of it
+    const pool = CARDS.filter(c => !c.when || c.when === when), hand = [];
+    while (hand.length < 3) {
+      let r = Math.random() * 100, tier = 'blue';
+      for (const t in TIER) if ((r -= TIER[t].w) < 0) { tier = t; break; }
+      const of = pool.filter(c => c.tier === tier && !hand.includes(c));
+      if (of.length) hand.push(of[Math.floor(Math.random() * of.length)]);
+    }
+    return hand;
+  }
+  const cardHTML = (c, i) => `<button class="fl-cd fl-${c.tier}" data-i="${i}"><span class="fl-cd-ic">${c.icon()}<i>${c.badge}</i></span>
+    <b>${c.val}</b><small>${c.name()}</small><em>${TIER[c.tier].name}卡</em></button>`;
+  function pick(when, then) { // the three, laid out: the one tapped is the run's (and then on)
+    const hand = deal(when), el = $('pick');
+    $('pickTitle').textContent = when === 'start' ? '選一張卡出發！' : '選一張卡跳下去！';
+    $('pickRow').innerHTML = hand.map(cardHTML).join('');
+    el.hidden = false; S.picking = true;
+    el.onclick = e => {
+      const b = e.target.closest('.fl-cd'); if (!b || !S) return;
+      const c = hand[+b.dataset.i];
+      el.onclick = null; el.hidden = true; S.picking = false;
+      c.apply(S.mods, S); S.deck.push(c); SFX.ready(); deckUI(); hud();
+      then?.();
+    };
+  }
+  function deckUI() { // the run's cards, small, along the bottom
+    $('deck').innerHTML = S.deck.map(c => `<span class="fl-chip fl-${c.tier}" title="${c.name()}">${c.icon()}<i>${c.badge}</i></span>`).join('');
+  }
 
   // its tails and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
   let TAILS = 1, best = 0, opts = {};
@@ -108,6 +185,8 @@
       <span class="fl-pill fl-stars" data-k="starPill"><b data-k="starIcon">⭐</b> <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
       <div class="fl-tails" data-k="tails"></div><button class="fl-x fl-look" data-k="look" aria-label="換普通版或萬聖節版">🎃</button><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
+    <div class="fl-deck" data-k="deck"></div>
+    <div class="fl-card fl-pick" data-k="pick" hidden><div><h1 data-k="pickTitle">選一張卡</h1><div class="fl-cds" data-k="pickRow"></div></div></div>
     <div class="fl-card" data-k="end" hidden><div>
       <h1 data-k="endTitle">飛好遠！</h1>
       <div class="fl-big"><span data-k="final">0</span> m</div>
@@ -214,7 +293,9 @@
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0, soar: false },
     tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
     fx: [], glints: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
+    mods: mods(), deck: [], picking: false,
   });
+  const need = () => Math.max(4, SUPER.stars - S.mods.superLess); // (stars for a super bounce, fewer with cards)
 
   function spawn() { // keep the way ahead filled, a screen and more past the fox
     const ahead = S.fox.x + 60;
@@ -254,7 +335,7 @@
   }
   function letGo() {
     ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
-    const v = aimed();
+    const v = aimed(), up = 1 + S.mods.launch; v.vx *= up; v.vy *= up; // (cards: the branch flings harder)
     S.spring = { x: S.pull.x, y: S.pull.y, t: 0 };
     S.pull = { x: 0, y: 0 };
     if (v.power * PULL.max < PULL.least) return; // (hardly pulled: back on the tree)
@@ -277,7 +358,7 @@
       f.glide = f.ride = 0; f.hops = 0; f.act = null; f.spin = 0;
       SFX.dive(); return;
     }
-    if (S.tails <= 0) return; // rising (or rolling): up at a slant, a tail each
+    if (S.tails <= 0) { if (!S.mods.refill) return; S.mods.refill--; S.tails++; pop('加速回復！', f.x, f.y + 2.2, '#ffb347', 0.6); } // (a card: one more)
     S.tails--;
     f.vx += DASH.up[0]; f.vy = Math.max(f.vy, 0) + DASH.up[1]; f.dive = false;
     f.glide = f.ride = 0; f.hops = 0; f.still = 0; f.dash = 0.5; f.act = null; f.spin = 0;
@@ -286,7 +367,7 @@
 
   function comboUp(a, fr) { // onto a friend from a friend, the ground not touched between: COMBO m/s more, on the way it's thrown
     const f = S.fox, v = Math.hypot(f.vx, f.vy) || 1;
-    f.vx += f.vx / v * COMBO; f.vy += f.vy / v * COMBO; S.shake = Math.max(S.shake, 0.2);
+    const c = COMBO + S.mods.combo; f.vx += f.vx / v * c; f.vy += f.vy / v * c; S.shake = Math.max(S.shake, 0.2);
     pop(`COMBO ×${S.combo}!`, a.x - 0.5, fr.h + 3.2, '#7cf0ff', 0.75); chime(780, 2, 70);
   }
   function landOn(a) { // onto a friend: its own throw, or a super bounce when the stars are full
@@ -303,9 +384,9 @@
       f.rainbow = 2.2; S.shake = 0.5; SFX.super();
       pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
     }
-    if ((dived || power) && a.kind === 'hedgehog') { // curled up and rolling off along the ground, knocking flying whoever it meets
+    if ((dived || power || S.mods.noTrip) && a.kind === 'hedgehog') { // (or a card: never tripped on it) // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
-      FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; // (off it as off a mushroom dived onto)
+      FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST + S.mods.dive; f.vy *= DIVE_BOOST + S.mods.dive; // (off it as off a mushroom dived onto)
       if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; }
       SFX.big(); act('joy', 0.8); S.shake = Math.max(S.shake, 0.2);
       if (!power) pop('滾出去！', a.x, fr.h + 1.5, '#ffe14d');
@@ -313,13 +394,17 @@
       return;
     }
     const s = fr.hit(f); SFX[s]?.();
+    const M = S.mods, pw = 1 + (M.power[a.kind] || 0); // (cards: stronger, gliding off it, bouncing on after it)
+    if (pw > 1) { f.vx *= pw; f.vy *= pw; f.glide *= pw; f.ride *= pw; }
+    if (M.glide[a.kind]) f.soar = true;
+    if (M.hops[a.kind]) f.hops += M.hops[a.kind];
     if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; f.glide *= SUPER.boost; f.ride *= SUPER.boost; if (f.hops) f.hops += SUPER.hops; }
-    if (dived && s !== 'ouch') { f.vx *= DIVE_BOOST; f.vy *= DIVE_BOOST; pop('強力！', a.x + 1, fr.h + 2.4, '#ffb347', 0.6); }
+    if (dived && s !== 'ouch') { f.vx *= DIVE_BOOST + M.dive; f.vy *= DIVE_BOOST + M.dive; pop('強力！', a.x + 1, fr.h + 2.4, '#ffb347', 0.6); }
     if (combo && s !== 'ouch') comboUp(a, fr);
     if (s === 'ouch') S.combo = 0; // (tripped: no combo on from it)
     if (a.kind === 'rabbit') { // off ahead past two friends: the first knocked flying on the way, by the second it stops — a bunny bounce off that one
       const [k, b] = S.friends.filter(o => !o.used && !o.bunny && o.x > a.x + 2);
-      if (b) { b.bunny = true; a.runTo = b; a.knock = k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
+      if (b) { b.bunny = true; a.runTo = b; a.knock = M.noKnock ? null : k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
     }
     if (a.kind === 'frog') { S.frog = true; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
     if (s === 'soar') { pop('滑翔～', a.x, fr.h + 1.5, '#ffd27a'); return; } // (the squirrel's: off gliding)
@@ -379,16 +464,20 @@
           SFX.hop(); dust(f.x, 0, 8); act('roll', 0.4); f.spin = 1; pop('呱彈！', f.x, 1.8, '#9be27a', 0.6);
         }
         else if (f.hops > 0) { f.hops--; f.vy = 7; f.vx *= 0.97; SFX.hop(); dust(f.x, 0); }
-        else if (-f.vy > 3) { f.vy = f.up = Math.min(-f.vy * (dived ? GROUND.dive : GROUND.keep), (f.up ?? Infinity) * GROUND.fade); f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
+        else if (-f.vy > 3) { f.vy = f.up = Math.min(-f.vy * ((dived ? GROUND.dive : GROUND.keep) + S.mods.ground), (f.up ?? Infinity) * Math.min(0.9, GROUND.fade + S.mods.ground)); f.vx *= GROUND.drag; SFX.thud(); dust(f.x, 0, 8); if (-f.vy > 6) act('roll', 0.4); }
         else f.vy = 0;
       }
       if (f.vy === 0) { // rolling to a stop
         f.vx = Math.max(0, f.vx - GROUND.roll * dt);
-        if (f.vx === 0 && (f.still += dt) > (S.tails > 0 ? 1.2 : 0.6)) return end(); // (a beat to dash again, if a tail is left)
+        if (f.vx === 0 && (f.still += dt) > (S.tails > 0 ? 1.2 : 0.6)) {
+          if (!S.mods.again) return end(); // (a beat to dash again, if a tail is left)
+          S.mods.again--; f.still = 0; f.vx = 14; f.vy = 12; f.up = null; // (a card: one more leap on)
+          SFX.dash(); act('joy', 0.8); pop('再跳一次！', f.x, 2.2, '#ffe14d', 0.8);
+        }
       }
     }
     // stars (and the super bounce they fill)
-    for (const a of S.stars) if (!a.got && Math.hypot(a.x - f.x, a.y - (f.y + 0.7)) < 1.1) {
+    for (const a of S.stars) if (!a.got && Math.hypot(a.x - f.x, a.y - (f.y + 0.7)) < 1.1 * (1 + S.mods.magnet)) {
       a.got = true; pop('+1', a.x, a.y + 0.6, '#ffe14d', 0.5); starGot();
     }
     if (f.y > SKY.height && !(f.hold > 0) && !S.fade) S.fade = { t: 0, mid: toSky }; // high enough: up onto the clouds
@@ -400,7 +489,7 @@
   function starGot() { // a star caught (in the air or on the clouds): counted, and toward the super bounce
     S.got++; SFX.star();
     for (let k = 0; k < 6; k++) S.glints.push({ x: (Math.random() - 0.5) * 1.3, y: (Math.random() - 0.5) * 1.1, t: -k * 0.05, r: 0.08 + Math.random() * 0.07, spin: Math.random() * 3 }); // (it sparkles)
-    if (!S.ready && ++S.meter >= SUPER.stars) {
+    if (!S.ready && ++S.meter >= need()) {
       S.ready = true; SFX.ready();
       pop('SUPER BOUNCE 準備好！', S.fox.x + 2, S.fox.y + 3, '#ffe14d', 0.9);
     }
@@ -450,15 +539,18 @@
       if (!S.fade && sky.fall > FALL_IN + 0.35) S.fade = { t: 0, mid: () => fromSky(true) };
       return hud();
     }
+    if (S.picking) return hud(); // (at its end, the cards out: waiting for one)
     if (!S.fade || S.fade.t > FADE * 0.75) sky.pop += dt; // (from when it's out of the black, mostly)
     if (sky.intro < SKY.intro) { sky.intro = Math.min(SKY.intro, sky.pop); sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12); return hud(); } // (out of the cloud first)
     sky.z = Math.min(SKY.run, sky.z + SKY.speed * dt);
+    if (AUTO) { const [l, r] = roadAt(sky, sky.z + 8); sky.lane = Math.max(-1, Math.min(1, Math.round((l + r) / 2))); } // (?auto: it keeps on the road by itself, to try the end)
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; starGot(); }
+    { const [l, r] = roadAt(sky, sky.z); if ((sky.x < l || sky.x > r) && S.mods.shield) { S.mods.shield--; sky.lane = sky.x = Math.max(-1, Math.min(1, Math.round((l + r) / 2))); SFX.boing(); S.shake = 0.3; } } // (a card: saved, back on it)
     { const [l, r] = roadAt(sky, sky.z); if (sky.x < l || sky.x > r) { sky.fall = 0; sky.fellAt = sky.x; SFX.whoosh(); return hud(); } } // (an edge past its middle: down it goes)
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
-    if (sky.z >= SKY.run) { sky.leap = 0; SFX.super(); }
+    if (sky.z >= SKY.run) pick('cloud', () => { sky.leap = 0; SFX.super(); }); // (each time up here: one more card, then off)
     hud();
   }
   function fromSky(fell) { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
@@ -1136,7 +1228,7 @@
     $('dist').textContent = Math.max(0, Math.floor(S.fox.x));
     $('speed').textContent = Math.round((S.phase === 'sky' ? SKY.speed : S.phase === 'fly' ? Math.hypot(S.fox.vx, S.fox.vy) : 0) * 3.6 * PACE); // (how fast it flies, km/h)
     $('stars').textContent = S.got;
-    $('meterBar').style.width = `${(S.ready ? 1 : S.meter / SUPER.stars) * 100}%`;
+    $('meterBar').style.width = `${(S.ready ? 1 : Math.min(1, S.meter / need())) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
     $('frogPill').hidden = !S.frog;
     const el = $('tails');
@@ -1160,7 +1252,8 @@
     setTimeout(() => { $('end').hidden = false; }, 1200); // (a moment to see it cheer first)
   }
   function start() {
-    S = fresh(); spawn(); hud();
+    S = fresh(); spawn(); hud(); deckUI();
+    if (!params.has('nocards')) pick('start'); // (?nocards: straight to the fling)
     $('end').hidden = true; $('energyNote').hidden = true; $('again').hidden = false; $('home').textContent = '回到小狐';
     $('final').parentElement.hidden = false;
   }
@@ -1189,6 +1282,7 @@
     $('again').hidden = tired; $('home').textContent = tired ? '回家休息' : '回到小狐';
   }
   function tooTired() { // opened too tired to fly: only the card, saying so
+    $('pick').hidden = true; S.picking = false;
     $('endTitle').textContent = '小狐好累…'; $('final').parentElement.hidden = true; $('endNote').textContent = '今天飛太多次了';
     energyCard(energy.get()); $('end').hidden = false;
   }
@@ -1206,6 +1300,7 @@
   layer.addEventListener('pointerup', up); layer.addEventListener('pointercancel', up);
   addEventListener('keydown', e => {
     if (layer.hidden) return;
+    if (S?.picking) { const b = $('pickRow').children[+e.key - 1]; if (b) b.click(); return; } // (the cards: 1 2 3)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); steer(e.key === 'ArrowLeft' ? -1 : 1); return; }
     if (e.code !== 'Space' && e.key !== 'ArrowUp') return;
     e.preventDefault();
