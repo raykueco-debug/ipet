@@ -1143,12 +1143,23 @@
   function drawRing(c) { // the countdown: a ring closing in on the one in the middle, onto it at the burst
     const left = CUTIN.dur - c.t, k = Math.max(0, left / CUTIN.dur), cx = W / 2, cy = H * 0.5, R = H * 0.16;
     const now = left <= TIMING.early, judged = c.hit !== undefined;
-    if (judged && !c.hit) { // too soon: the rings blown up and fading away, gone
-      const u = Math.min(1, (c.t - c.at) / 0.35); if (u >= 1) return;
-      g.save(); g.globalAlpha = 1 - u; g.strokeStyle = '#fff'; g.lineWidth = H * 0.012 * (1 - u * 0.6);
-      const grow = 1 + u * 1.4, was = 1 + 2 * Math.max(0, (CUTIN.dur - c.at) / CUTIN.dur);
-      g.beginPath(); g.arc(cx, cy, R * grow, 0, Math.PI * 2); g.stroke();
-      g.lineWidth = H * 0.008 * (1 - u * 0.6); g.beginPath(); g.arc(cx, cy, R * was * grow, 0, Math.PI * 2); g.stroke();
+    if (judged && !c.hit) { // too soon: the rings blown up and fading away fast, and the word a little longer
+      const since = c.t - c.at, u = Math.min(1, since / 0.2);
+      g.save();
+      if (u < 1) {
+        g.globalAlpha = 1 - u; g.strokeStyle = '#fff'; g.lineWidth = H * 0.012 * (1 - u * 0.6);
+        const grow = 1 + u * 1.6, was = 1 + 2 * Math.max(0, (CUTIN.dur - c.at) / CUTIN.dur);
+        g.beginPath(); g.arc(cx, cy, R * grow, 0, Math.PI * 2); g.stroke();
+        g.lineWidth = H * 0.008 * (1 - u * 0.6); g.beginPath(); g.arc(cx, cy, R * was * grow, 0, Math.PI * 2); g.stroke();
+      }
+      const w = Math.min(1, since / 0.6);
+      if (w < 1) {
+        g.globalAlpha = 1 - w * w; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+        const fs = Math.round(H * 0.08), y = cy - w * H * 0.06;
+        g.font = `900 ${fs}px 'Arial Rounded MT Bold', 'Nunito', sans-serif`;
+        g.lineWidth = fs * 0.2; g.strokeStyle = '#7a3fd0'; g.strokeText('太早了', cx, y);
+        g.fillStyle = '#fff'; g.fillText('太早了', cx, y);
+      }
       g.restore(); return;
     }
     g.save(); g.lineCap = 'round';
