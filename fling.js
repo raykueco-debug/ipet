@@ -5,7 +5,7 @@
    high off the ground), an owl carries it, a boar runs it forward, a mushroom springs it up, a squirrel sets it gliding (till it dives or lands) —
    a hedgehog only slows it (dived onto, it springs it up as a mushroom does and rolls off along the ground, knocking
    flying whoever it meets). Knocked flying, a friend goes off up and back, out of sight for good; a boar that's run
-   on, or a hedgehog, once out of sight, are gone too. Its tails are its dashes, one each: a tap while rising, off up and on at a slant; a tap while falling is a
+   on, or a hedgehog, once out of sight, are gone too. Its dashes, one a level of the pet's: a tap while rising, off up and on at a slant (a burst of rainbow stars); a tap while falling is a
    dive down at a slant (onto the next friend), free. It bounces on the plain ground less and less, rolls, and stops: that's how far.
    Stars in the air on the way (more the higher it flies) go home with it (with the farthest it has gone, kept in the pet's own save); every
    SUPER of them caught, the next friend it lands on is a super bounce, off far and high.
@@ -17,7 +17,7 @@
    World: x metres along, y metres up (the ground at 0), seen from the side.
    It plays in a layer of its own, landscape only (fullscreen and locked where the phone lets it; held upright, it
    asks to be turned), on a stage of one fixed size and shape (STAGE, 16:9) scaled to fit the screen, so every
-   phone sees the same stretch of the world; opened by the pet (app.js: Fling.open with its tails, farthest and what to
+   phone sees the same stretch of the world; opened by the pet (app.js: Fling.open with its level, farthest and what to
    do with the stars it brings home) or on a page of its own (fling.html). */
 (function () {
   const params = new URLSearchParams(location.search);
@@ -129,7 +129,7 @@
   // 特殊
   card('noTrip', 'purple', () => '🦔', '🚫', '不絆倒', () => '刺蝟不絆腳（踩到就彈起來）', m => { m.noTrip = 1; });
   card('noKnock', 'blue', () => '🐰', '🤝', '不撞飛', () => '兔子跑過去不撞飛朋友', m => { m.noKnock = 1; });
-  card('refill', 'blue', () => '🔥', '♻️', '+1', () => '尾巴加速用完回復一次', m => { m.refill++; });
+  card('refill', 'blue', () => '🔥', '♻️', '+1', () => '噴射用完回復一次', m => { m.refill++; });
   card('again', 'purple', () => '🦊', '↗️', '再跳', () => '停下來後再往前跳一次', m => { m.again++; });
   // (more of them)
   card('magnet', 'blue', () => star(), '🧲', '吸更遠', () => `${star()}離遠一點也吃得到`, m => { m.magnet += 0.6; });
@@ -141,7 +141,7 @@
   card('ground', 'purple', () => '🟫', '⤴️', '彈更高', () => '落在地上彈得更高', m => { m.ground += 0.1; });
   card('combo', 'purple', () => '✨', '🔗', 'COMBO+', () => '連續踩朋友加更多速度', m => { m.combo += 6; });
   card('shield', 'gold', () => '☁️', '🛡️', '救一次', () => '雲路上掉下去救回來一次', m => { m.shield++; });
-  card('tails', 'gold', () => '🔥', '➕', '+2', () => '多兩次尾巴加速', m => { m.refill += 2; });
+  card('tails', 'gold', () => '🔥', '➕', '+2', () => '多兩次噴射', m => { m.refill += 2; });
 
   function deal(when) { // three different cards: each a tier drawn by its rarity, then a card of it
     const pool = CARDS.filter(c => !c.when || c.when === when), hand = [];
@@ -172,8 +172,8 @@
     $('deck').innerHTML = S.deck.map(c => `<span class="fl-chip fl-${c.tier}" title="${c.name()}">${c.icon()}<i>${c.badge}</i></span>`).join('');
   }
 
-  // its tails and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
-  let TAILS = 1, best = 0, opts = {};
+  // its dashes (one a level) and its farthest: from whoever opens it (the pet), else (on its own page) this browser's own
+  let DASHES = 1, best = 0, opts = {};
   const MULTI = false; // (its tails drawn by the game, as many as it has, on pictures without one: put off for now — the pictures as WAN drew them, tail and all)
 
   // the layer: canvas, counters along the top, the end card (no instructions: it's found out by playing)
@@ -291,7 +291,7 @@
   const fresh = () => ({
     phase: 'aim', t: 0, power: 0, pull: { x: 0, y: 0 }, drag: null, spring: null,
     fox: { x: PULL.rest[0], y: PULL.rest[1], vx: 0, vy: 0, spin: 0, glide: 0, ride: 0, hops: 0, still: 0, dash: 0, dive: false, act: null, rainbow: 0, soar: false },
-    tails: TAILS, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
+    dashes: DASHES, combo: 0, frog: false, friends: [], stars: [], nextFriend: 8, nextStar: 4, got: 0, meter: 0, ready: params.has('ready'), // (?ready: a super bounce waiting from the start, to try it)
     fx: [], glints: [], cam: { x: 0, s: 1, scroll: 0 }, shake: 0, fade: null, sky: null, passedBest: !best,
     mods: mods(), deck: [], picking: false,
   });
@@ -319,6 +319,11 @@
   function confetti(x, y, n = 40) {
     const cs = ['#ff8a65', '#ffd34d', '#7cc7ff', '#9be27a', '#e58cff'];
     for (let k = 0; k < n; k++) S.fx.push({ kind: 'bit', x, y, vx: (Math.random() - 0.5) * 12, vy: Math.random() * 10, t: 0, c: cs[k % cs.length] });
+  }
+  function starBurst(x, y, n = 30, speed = 9) { // stars in every colour of the rainbow, bursting out all round
+    for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + Math.random() * 0.3, v = speed * (0.55 + Math.random() * 0.6);
+      S.fx.push({ kind: 'star', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, c: `hsl(${(k / n) * 360}, 95%, 62%)`, r: 0.25 + Math.random() * 0.25, spin: Math.random() * 6 }); }
+    S.fx.push({ kind: 'ring', x, y, t: 0 });
   }
   const act = (name, dur) => { S.fox.act = { name, t: 0, dur }; }; // a pose played for a while (over the flying one)
 
@@ -358,8 +363,9 @@
       f.glide = f.ride = 0; f.hops = 0; f.act = null; f.spin = 0;
       SFX.dive(); return;
     }
-    if (S.tails <= 0) { if (!S.mods.refill) return; S.mods.refill--; S.tails++; pop('加速回復！', f.x, f.y + 2.2, '#ffb347', 0.6); } // (a card: one more)
-    S.tails--;
+    if (S.dashes <= 0) { if (!S.mods.refill) return; S.mods.refill--; S.dashes++; pop('噴射回復！', f.x, f.y + 2.2, '#ffb347', 0.6); } // (a card: one more)
+    S.dashes--;
+    starBurst(f.x, f.y + 0.6, 22); // (off it goes in a burst of rainbow stars)
     f.vx += DASH.up[0]; f.vy = Math.max(f.vy, 0) + DASH.up[1]; f.dive = false;
     f.glide = f.ride = 0; f.hops = 0; f.still = 0; f.dash = 0.5; f.act = null; f.spin = 0;
     SFX.dash(); hud();
@@ -382,7 +388,7 @@
       const bunny = a.bunny;
       if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
       f.rainbow = 2.2; S.shake = 0.5; SFX.super();
-      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60);
+      pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60); starBurst(a.x, fr.h + 0.5, 40, 13);
     }
     if ((dived || power || S.mods.noTrip) && a.kind === 'hedgehog') { // (or a card: never tripped on it) // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
@@ -469,8 +475,8 @@
       }
       if (f.vy === 0) { // rolling to a stop
         f.vx = Math.max(0, f.vx - GROUND.roll * dt);
-        if (f.vx === 0 && (f.still += dt) > (S.tails > 0 ? 1.2 : 0.6)) {
-          if (!S.mods.again) return end(); // (a beat to dash again, if a tail is left)
+        if (f.vx === 0 && (f.still += dt) > (S.dashes > 0 ? 1.2 : 0.6)) {
+          if (!S.mods.again) return end(); // (a beat to dash again, if one is left)
           S.mods.again--; f.still = 0; f.vx = 14; f.vy = 12; f.up = null; // (a card: one more leap on)
           SFX.dash(); act('joy', 0.8); pop('再跳一次！', f.x, 2.2, '#ffe14d', 0.8);
         }
@@ -706,16 +712,27 @@
     if (S.fade?.mid === toSky) { const q = toScreen(f.x, f.y + 0.6); smoke({ x: q.x, y: q.y, s: s * 1.6 / LANE() }, S.fade.t * 1.4); } // (up into the clouds: a puff of them)
     for (const a of carriers) drawFriend(a, s);
     // bits: dust, fire, rainbow, confetti, words
-    const life = e => e.kind === 'text' ? 1 : e.kind === 'bit' ? 2 : e.kind === 'rain' ? 0.8 : 0.6;
+    const life = e => e.kind === 'text' ? 1 : e.kind === 'bit' ? 2 : e.kind === 'rain' ? 0.8 : e.kind === 'star' ? 0.9 : e.kind === 'ring' ? 0.45 : 0.6;
     S.fx = S.fx.filter(e => (e.t += dt) < life(e));
     for (const e of S.fx) {
-      if (e.kind !== 'text') { e.x += (e.vx || 0) * dt; e.y += (e.vy || 0) * dt; if (e.kind === 'bit') e.vy -= G * 0.5 * dt; }
+      if (e.kind !== 'text') { e.x += (e.vx || 0) * dt; e.y += (e.vy || 0) * dt; if (e.kind === 'bit') e.vy -= G * 0.5 * dt; if (e.kind === 'star') { e.vx *= 0.94; e.vy = e.vy * 0.94 - 2 * dt; } }
       const p = toScreen(e.x, e.y + (e.kind === 'text' ? e.t * 1.2 : 0));
       g.globalAlpha = Math.max(0, 1 - e.t / life(e));
       if (e.kind === 'dust') { g.fillStyle = '#e8d8c0'; g.beginPath(); g.arc(p.x, p.y, s * (0.2 + e.t * 0.4), 0, Math.PI * 2); g.fill(); }
       else if (e.kind === 'fire') { g.fillStyle = e.t < 0.2 ? '#ffe14d' : '#ff8a3d'; g.beginPath(); g.arc(p.x, p.y, s * (0.45 - e.t * 0.6), 0, Math.PI * 2); g.fill(); }
       else if (e.kind === 'rain') { g.fillStyle = e.c; g.beginPath(); g.arc(p.x, p.y, s * (0.5 - e.t * 0.5), 0, Math.PI * 2); g.fill(); }
       else if (e.kind === 'bit') { g.fillStyle = e.c; g.fillRect(p.x, p.y, s * 0.2, s * 0.3); }
+      else if (e.kind === 'star') { // a rainbow star, spinning, shrinking away
+        const r = s * e.r * (1 - e.t / 0.9 * 0.7), a0 = e.spin + e.t * 8;
+        g.globalAlpha = 1 - e.t / 0.9; g.fillStyle = e.c; g.beginPath();
+        for (let i = 0; i < 10; i++) { const a = a0 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; g.lineTo(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr); }
+        g.closePath(); g.fill(); g.globalAlpha = 1;
+      }
+      else if (e.kind === 'ring') { // the burst's flash: a rainbow ring going out
+        const k = e.t / 0.45; g.globalAlpha = 1 - k; g.lineWidth = s * 0.25 * (1 - k);
+        const gr = g.createLinearGradient(p.x - s * 4, p.y, p.x + s * 4, p.y); ['#ff5e5e', '#ffb347', '#ffe14d', '#7be37b', '#5ec8ff', '#b07cff'].forEach((c, i) => gr.addColorStop(i / 5, c));
+        g.strokeStyle = gr; g.beginPath(); g.arc(p.x, p.y, s * (0.5 + k * 4), 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1;
+      }
       else {
         g.textAlign = 'center'; g.font = `900 ${Math.round(s * e.size)}px sans-serif`; g.lineWidth = 4; g.strokeStyle = '#0005';
         g.strokeText(e.text, p.x, p.y); g.fillStyle = e.color; g.fillText(e.text, p.x, p.y);
@@ -1037,7 +1054,7 @@
     return leans.get(im);
   }
   function tails(img, x, y, sz, t, mode, layer = 'behind') {
-    const n = TAILS, r = img?.root && ROOTS[img.root[0]]?.[img.root[1]];
+    const n = 1, r = img?.root && ROOTS[img.root[0]]?.[img.root[1]];
     if (!r || !r[3] || (n < 2 && !img.cut)) return;
     // (from the front or behind, its body in the way: fanned wider, round straight up, from a little higher up — and
     // from the front all of them behind the body, from behind all of them over it)
@@ -1232,8 +1249,8 @@
     $('starPill').classList.toggle('ready', S.ready);
     $('frogPill').hidden = !S.frog;
     const el = $('tails');
-    if (el.children.length !== TAILS) el.innerHTML = '<i>🔥</i>'.repeat(TAILS);
-    [...el.children].forEach((c, i) => c.classList.toggle('used', i >= S.tails));
+    if (el.children.length !== DASHES) el.innerHTML = '<i>🔥</i>'.repeat(DASHES);
+    [...el.children].forEach((c, i) => c.classList.toggle('used', i >= S.dashes));
   }
 
   function end() {
@@ -1344,7 +1361,7 @@
   function open(o = {}) {
     warm();
     opts = o;
-    TAILS = MULTI ? Math.max(1, Math.min(9, +params.get('tails') || o.tails || 1)) : 1;
+    DASHES = Math.max(1, Math.min(30, +params.get('level') || o.level || 1)); // (?level=n to try)
     best = o.best ?? (() => { try { return +localStorage.getItem('ipet-fling-best') || 0; } catch (e) { return 0; } })();
     if (!layer.isConnected) document.body.appendChild(layer);
     layer.hidden = false;

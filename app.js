@@ -174,8 +174,10 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e
 let S = load();
 
 const weeks = () => FORCE_WEEK || Math.floor(S.age / (7 * DAY)) + 1;
-// tailsOverride: set by hand with the tail buttons on the stage (0 = follow the weeks)
-const tailCount = () => S.tailsOverride || clamp(weeks(), 1, 9);
+// its level: one a week (tailsOverride: set by hand with the buttons on the stage, 0 = follow the weeks) — no more
+// tails to grow: a level is one more dash in the fling game (fling.js); tailCount: the pictures' set, up to t9
+const level = () => S.tailsOverride || Math.max(1, weeks());
+const tailCount = () => Math.min(9, level());
 function currentStage() { const t = tailCount(); return STAGES.find(s => t <= s.maxTails); }
 
 /* advance the world by real elapsed time (scaled by SPEED) */
@@ -307,13 +309,13 @@ function render() {
     document.querySelector(`.ff[data-ff="${k}"]`)?.classList.toggle('on', !!S.locks?.[k]);
   }
   el.name.textContent = S.name || t('foxName');
-  const n = tailCount(), wk = weeks();
-  el.tailBadge.textContent = t('tails', { n });
+  const n = level(), wk = weeks();
+  el.tailBadge.textContent = t('level', { n });
   $('#tailN').textContent = n;
   $('#tailCtl').classList.toggle('manual', !!S.tailsOverride);
   const days = Math.floor(S.age / DAY);
   const toNext = 7 - (S.age / DAY) % 7;
-  el.age.textContent = `${t('week', { w: wk })} · ` + (n >= 9 ? t('nineDone') : t('nextTail', { t: toNext < 1 ? t('hours', { n: Math.ceil(toNext * 24) }) : t('days', { n: Math.ceil(toNext) }) }));
+  el.age.textContent = `${t('week', { w: wk })} · ` + t('nextLevel', { t: toNext < 1 ? t('hours', { n: Math.ceil(toNext * 24) }) : t('days', { n: Math.ceil(toNext) }) });
   el.growBar.style.width = (n >= 9 ? 100 : ((S.age / DAY) % 7) / 7 * 100) + '%';
 
   const st = currentStage();
@@ -468,7 +470,7 @@ const actions = {
     homeMusic.pause();
     // (the loading screen first, its pictures coming in; the tap in opens it — and goes fullscreen, where it can)
     Preload.run({ title: '小狐飛多遠', load: p => Fling.preload(p), go: () => Fling.open({
-      tails: tailCount(), best: S.fling?.best || 0,
+      level: level(), best: S.fling?.best || 0,
       energy: { // a fling costs some energy, ended; under FLING_LEAST it'd rather go home and rest or eat
         get: () => Math.round(S.stats.energy), least: FLING_LEAST,
         spend: () => { S.stats.energy = clamp(S.stats.energy - FLING_ENERGY); save(); return Math.round(S.stats.energy); },
@@ -779,8 +781,8 @@ function bindWalk() {
 }
 
 function setTailsByHand(d) {
-  S.tailsOverride = d === 0 ? 0 : clamp(tailCount() + d, 1, 9);
-  S.tails = tailCount();
+  S.tailsOverride = d === 0 ? 0 : clamp(level() + d, 1, 99);
+  S.level = level();
   save();
   loadAssets().then(render);
 }
@@ -800,19 +802,19 @@ function chatter() {
 }
 
 function tick() {
-  const before = S.tails;
+  const before = S.level || level(), art = tailCount();
   simulate(Date.now());
-  const now = tailCount();
-  S.tails = now;
-  if (now > before) celebrateTail(now);
-  if (now !== before) loadAssets().then(render); // each tail count has its own whole-fox art
+  const now = level();
+  S.level = now;
+  if (now > before) celebrateLevel(now);
+  if (tailCount() !== art) loadAssets().then(render); // (the pictures' set)
   render();
 }
 
-function celebrateTail(n) {
+function celebrateLevel(n) {
   const p = petPos();
   setExpr('happy', 2500);
-  say(n === 9 ? t('nineTails') : t('newTail', { n }), 3500);
+  say(t('levelUp', { n }), 3500);
   for (let i = 0; i < 10; i++) setTimeout(() => spawnFx(pick(['✨', '🌟', '🦊']), p.x + rand(-25, 25), p.y + rand(-5, 20)), i * 120);
 }
 
@@ -1074,7 +1076,7 @@ $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runne
   await loadAssets();
   if (!S.hatched) $('#intro').classList.remove('hidden');
   simulate(Date.now());
-  S.tails = tailCount();
+  S.level = level();
   render();
   setInterval(tick, 1000);
   setInterval(save, 5000);

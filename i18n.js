@@ -4,7 +4,7 @@
 const I18N = (() => {
   const DICT = {
     zh: {
-      foxName: '小狐', tails: '{n} 尾', week: '第 {w} 週', nineDone: '九尾完成',
+      foxName: '小狐', tails: '{n} 尾', level: 'Lv {n}', nextLevel: '下一級 {t}', levelUp: '升到 Lv {n} 了！飛多遠可以多噴射一次！', week: '第 {w} 週', nineDone: '九尾完成',
       nextTail: '下一條尾巴 {t}', hours: '{n} 小時', days: '{n} 天', tailAuto: '自動',
       stat_hunger: '飽足', stat_fun: '快樂', stat_energy: '精神', stat_clean: '清潔',
       food_meat: '肉肉', food_veg: '青菜',
@@ -52,7 +52,7 @@ const I18N = (() => {
       p_enOnly: '小狐目前只會說英文，請輸入英文', p_localModel: '內建模型 Kokoro',
     },
     en: {
-      foxName: 'Foxy', tails: '{n} tail(s)', week: 'Week {w}', nineDone: 'Nine tails!',
+      foxName: 'Foxy', tails: '{n} tail(s)', level: 'Lv {n}', nextLevel: 'next level in {t}', levelUp: 'Level {n}! One more dash in the flying game!', week: 'Week {w}', nineDone: 'Nine tails!',
       nextTail: 'next tail in {t}', hours: '{n}h', days: '{n}d', tailAuto: 'Auto',
       stat_hunger: 'Food', stat_fun: 'Fun', stat_energy: 'Energy', stat_clean: 'Clean',
       food_meat: 'Meat', food_veg: 'Veggies',
