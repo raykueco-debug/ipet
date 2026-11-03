@@ -384,7 +384,7 @@
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0; f.soar = false;
     dust(a.x, 0.2, 5);
-    const power = S.ready || a.bunny; // a super bounce (the stars full), or a bunny bounce (a rabbit ran here first): as strong
+    const power = (S.ready && a.kind !== 'mushroom') || a.bunny; // a super bounce (the stars full; not off the mushroom / the witch's pot: its own bounce, the stars kept for the next), or a bunny bounce (a rabbit ran here first): as strong
     if (power) { // (the bunny's first: the stars keep for the next)
       const bunny = a.bunny;
       if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
@@ -958,15 +958,15 @@
     const bh = H * 0.62 * ease(into) * (1 - ease(away)), cy = H / 2, slant = H * 0.12; // the band, opening and closing
     g.beginPath(); g.moveTo(0, cy - bh / 2 + slant); g.lineTo(W, cy - bh / 2 - slant); g.lineTo(W, cy + bh / 2 - slant); g.lineTo(0, cy + bh / 2 + slant); g.closePath();
     g.fillStyle = CUTIN_COLOR[c.kind] || '#ffb347'; g.fill(); g.clip();
-    g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; // (the speed lines: streaming past, right to left)
+    g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; // (the speed lines: streaming past, right to left, the way it looks)
     for (let i = 0; i < 26; i++) {
       const y = cy - H * 0.45 + ((i * 97) % 100) / 100 * H * 0.9, len = W * (0.15 + ((i * 37) % 10) / 25);
       const x = W - ((t * W * (2.2 + (i % 5) * 0.4) + i * 211) % (W + len * 2)) + len;
       g.lineWidth = 2 + (i % 4) * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y - len * 0.22); g.stroke();
     }
-    if (im) { // the face: in from the right, a little shake as it shouts, off to the left
+    if (im) { // the face (looking right): in from the left, a little shake as it shouts, off to the right
       const h = H * 0.86, w = h * im.width / im.height, shake = t > CUTIN.in && !away ? Math.sin(t * 60) * H * 0.004 : 0;
-      const x = W * 0.6 - w / 2 + (1 - ease(into)) * W * 0.6 - ease(away) * W * 1.2;
+      const x = W * 0.42 - w / 2 - (1 - ease(into)) * W * 0.6 + ease(away) * W * 1.2;
       g.drawImage(im, x + shake, cy - h / 2 + shake, w, h);
     }
     g.restore();
