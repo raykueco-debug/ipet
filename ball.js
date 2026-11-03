@@ -41,7 +41,7 @@
   const W = () => stage.clientWidth, H = () => stage.clientHeight;
   function place(elm, x, z, h, w) {
     elm.style.left = x + '%';
-    elm.style.bottom = groundAt(z) + h - (h ? 0 : sinkAt(x, z, 0.5)) + '%'; // sinks into the soft bed a little
+    elm.style.bottom = groundAt(z) + h - (h ? 0 : sinkAt(x, z, 0.5)) + '%'; // sinks into a soft thing a little (none now)
     elm.style.width = w + 'px';
     elm.style.zIndex = layerAt(z) + 1;
   }
@@ -50,7 +50,7 @@
     const home = b.mode === 'home';
     ballEl.style.display = home ? 'none' : ''; // put away: in the 玩耍 button, not in the scene
     homeBtn?.classList.toggle('ball-out', !home);
-    pressed.ball = !home && !b.h ? sinkAt(b.x, b.z, 0.5) : 0; // (scene.js: the bed gives under it)
+    pressed.ball = !home && !b.h ? sinkAt(b.x, b.z, 0.5) : 0; // (scene.js: a soft thing gives under it)
     if (home) { shadowEl.style.opacity = 0; return; }
     place(ballEl, b.x, b.z, b.h, w);
     ballEl.style.transform = `translateX(-50%) rotate(${b.spin}deg)`;

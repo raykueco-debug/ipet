@@ -117,8 +117,7 @@
     ['bush', 32, 1.05, 0.22], ['bush', 68, 1.06, 0.2],
     // decoration stays at the back and the far sides: the ground in front, where the fox and the ball go, is clear
     ['mushrooms', 58, 1.02, 0.1], ['flowers', 44, 1.0, 0.11], ['stump', 90, 0.95, 0.15], ['rock', 76, 1.0, 0.12],
-    ['bed', BED.x, BED.z + 0.04, 0.34], // (its water comes in a bowl when it is given a drink: app.js drink)
-  ];
+  ]; // (no bed: taken out; its water comes in a bowl when it is given a drink: app.js drink)
   Promise.all([...new Set(PROPS.map(p => p[0]))].map(n => new Promise((ok, no) => {
     const im = new Image(); im.onload = () => ok(); im.onerror = no; im.src = `assets/scene/props/${n}.png`;
   }))).then(() => {
@@ -135,25 +134,12 @@
       d.style.left = x + '%';
       d.style.bottom = groundAt(z) - 1.5 + '%';
       d.style.width = stage.clientWidth * w * sizeAt(z) + 'px';
-      // past the back of the ground still above the drawn layers; the bed lies flat on the ground: under the fox and
-      // the ball always, they go over it
-      d.style.zIndex = n === 'bed' ? 9 : Math.max(1, layerAt(z));
+      // past the back of the ground still above the drawn layers
+      d.style.zIndex = Math.max(1, layerAt(z));
     });
     place();
     addEventListener('resize', place);
     layers.mid.style.display = layers.props.style.display = 'none';
-    // the bed is soft: a weight on it (app.js pressed: the fox, the ball) squashes it where it presses, and it
-    // springs back up when the weight goes — a little past, then settles
-    const bedEl = els[PROPS.findIndex(p => p[0] === 'bed')]?.[0], bed = THINGS.find(t => t.name === 'bed');
-    let give = 0, speed = 0;
-    if (bedEl && bed) setInterval(() => {
-      const want = Math.min(1, Math.max(pressed.fox, pressed.ball * 0.6) / 1.6);
-      speed = (speed + (want - give) * 0.3) * 0.72;
-      give += speed;
-      const at = pressed.fox ? foxX : (window.Ball?.state.x ?? bed.x); // where it presses (% of the bed's width)
-      bedEl.style.transformOrigin = `${50 + Math.max(-40, Math.min(40, ((at - bed.x) / bed.rx) * 40))}% 100%`;
-      bedEl.style.transform = `translateX(-50%) scale(${1 + 0.04 * give}, ${1 - 0.12 * give})`;
-    }, 1000 / 30);
   }, () => {});
 
   // slide the layers against each other: with the fox's position, and with the tablet's tilt

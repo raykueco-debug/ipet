@@ -534,8 +534,7 @@ const actions = {
     } else {
       if (S.stats.energy > 80) { say(t('notSleepy')); setExpr('play', 1500); return; }
       S.sleeping = true;
-      say(t('goodnight'));
-      walk2d(BED.x, BED.z + 0.02); // off to its bed first (2D fox), then it dozes off and curls up
+      say(t('goodnight')); // (it dozes off and curls up where it is: no bed in the scene now)
     }
     save();
     render();
@@ -649,13 +648,10 @@ const sizeAt = z => 1 - DEPTH.shrink * z;
 const layerAt = z => 10 + Math.round((1 - z) * 80);                // z-index
 const zFromY = y => { const r = el.stage.getBoundingClientRect(); return clamp(((r.bottom - y) / r.height * 100 - DEPTH.near) / (DEPTH.far - DEPTH.near) * 100) / 100; };
 let foxX = 50, foxZ = 0;
-const BED = { x: 20, z: 0.5 }; // its cushion in the scene (scene.js draws it here): it goes there to sleep
 // things on the ground the fox and the ball meet (scene.js draws them; x %, z, and their half size on the ground
-// rx %, rz): a soft one is walked over and gives under a weight (the bed); a solid one, h % high, would be
-// walked round and bounce the ball off it
-const THINGS = [
-  { name: 'bed', x: BED.x, z: BED.z + 0.04, rx: 13, rz: 0.08, soft: true },
-];
+// rx %, rz): a soft one is walked over and gives under a weight; a solid one, h % high, would be walked round and
+// bounce the ball off it — none now (the bed taken out)
+const THINGS = [];
 const within = (t, x, z, mx = 0, mz = 0) => ((x - t.x) / (t.rx + mx)) ** 2 + ((z - t.z) / (t.rz + mz)) ** 2 < 1;
 const pressed = { fox: 0, ball: 0 }; // how far each sinks into a soft thing now (% of the stage height; scene.js)
 const sinkAt = (x, z, k = 1) => { // standing on a soft thing: sinks in, most in the middle
