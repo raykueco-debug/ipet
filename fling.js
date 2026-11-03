@@ -1125,7 +1125,7 @@
   const CUTIN = { dur: 1.5, in: 0.14, out: 0.15 }, CUTINS = {};
   // its ring countdown: one closing in on the ring in the middle, onto it as the burst goes (with its sound) — a tap
   // then (from <early> s before to <late> s after) and the super bounce is <boost> as strong again; too soon, missed
-  const TIMING = { early: 0.16, late: 0.12, boost: 1.5, cue: 0.2 }; // (cue: "TAP!" up this long before it's time)
+  const TIMING = { early: 0.3, late: 0.1, boost: 1.5, cue: 0.1 }; // (a window of 0.4 s round the burst; "TAP!" up 0.1 s before it opens)
   const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
   const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
   function loadCutins() {
