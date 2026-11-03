@@ -104,6 +104,9 @@
     })));
   }
 
+  // what a clip may move the fox by (the rule: no going anywhere unless its legs are): walk — its walk loops (the
+  // feet stepping), jump — a pounce's way in (off the ground, landing further on); none — every other clip
+  const moveTag = name => /^walk(_r|_front|_back)?_loop/.test(name) ? 'walk' : /_to_pounce(_r)?$/.test(name) ? 'jump' : null;
   const isLoop = name => name.includes('_loop');
   const endsOn = name => (isLoop(name) ? name.split('_loop')[0]
     : name.endsWith('_turn') ? (name === 'walk_turn' ? 'walk_r' : 'walk') : name.split('_to_')[1]);
@@ -413,7 +416,7 @@
     nudge(x, y) {
       const on = x != null;
       canvas.style.transition = `transform ${on ? 0.12 : 0.35}s ease-out`;
-      canvas.style.transform = on ? `translate(${x * 4}px, ${y * 3}px) rotate(${x * 3}deg)` : '';
+      canvas.style.transform = on ? `rotate(${x * 3}deg)` : ''; // (leaning into it only: not moved, its legs aren't going)
     },
     eat(on) { eating = !!on; },     // bowl in front: eat until it's taken away
     drink(on) { drinking = !!on; }, // at the water bowl: lap until it's had enough
@@ -442,6 +445,7 @@
                view: cur ? endsOn(cur.name) : null, // the picture it is on, or on its way to
                facing: !cur ? 0 : (a => a === 'walk_r' || (a.endsWith('_r') && MOVES.includes(a.slice(0, -2))) ? 1
                  : a === 'walk' || MOVES.includes(a) ? -1 : 0)(endsOn(cur.name)),
+               moves: cur ? moveTag(cur.name) : null, // (walk / jump: the only clips it may be moved on — app.js, ball.js)
                stride: !!cur && /^walk(_r|_front|_back)?_loop/.test(cur.name) && !cur.name.endsWith('_push'),
                strideLeft: cur ? (cur.exits.find(k => k >= i) ?? cur.frames.length - 1) - i : 0 };
     },

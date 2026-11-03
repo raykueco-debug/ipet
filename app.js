@@ -718,7 +718,7 @@ function paceNow() {
 }
 function walkStep() {
   const st = Fox2D.state;
-  const move = (x, z) => { foxX += x; foxZ += z; walkDir = { x, z }; placeFox(); };
+  const move = (x, z) => { if (Fox2D.state.moves !== 'walk') return; foxX += x; foxZ += z; walkDir = { x, z }; placeFox(); }; // (only on a walk loop: fox2d.js moves)
   if (walkTarget == null || walkTarget.last) {
     if (st.stride && walkDir) {
       const w = walkTarget; // on its last stride: just onto the spot; called off: on as it was going

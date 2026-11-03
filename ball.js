@@ -355,7 +355,7 @@
   async function leapIn(clip, dist, run) {
     if (!(await until(() => Fox2D.state.clip === clip, run, 4000))) return;
     let done = 0;
-    while (Fox2D.state.clip === clip && run === fetchRun) {
+    while (Fox2D.state.clip === clip && Fox2D.state.moves === 'jump' && run === fetchRun) { // (only on the pounce itself: fox2d.js moves)
       const u = Math.min(1, Math.max(0, (Fox2D.state.frame / Fox2D.state.frames - 0.3) / 0.5));
       const to = dist * (1 - Math.cos(u * Math.PI)) / 2;
       foxX = Math.max(4, Math.min(96, foxX + to - done));
