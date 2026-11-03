@@ -452,7 +452,7 @@
   }
 
   function tap() {
-    if (S?.cutin) { const c = S.cutin; if (c.hit === undefined) c.hit = c.t >= CUTIN.dur - TIMING.early; return; } // (the cut-in on: a tap judged, nothing else)
+    if (S?.cutin) { const c = S.cutin; if (c.hit === undefined) { c.hit = c.t >= CUTIN.dur - TIMING.early; c.at = c.t; } return; } // (the cut-in on: a tap judged, nothing else)
     if (S?.late && S.t < S.late.until) { S.late = null; superBoost(); return; } // (just after the burst: still in time — not a dash)
     if (!S) return;
     ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
@@ -1143,8 +1143,16 @@
   function drawRing(c) { // the countdown: a ring closing in on the one in the middle, onto it at the burst
     const left = CUTIN.dur - c.t, k = Math.max(0, left / CUTIN.dur), cx = W / 2, cy = H * 0.5, R = H * 0.16;
     const now = left <= TIMING.early, judged = c.hit !== undefined;
+    if (judged && !c.hit) { // too soon: the rings blown up and fading away, gone
+      const u = Math.min(1, (c.t - c.at) / 0.35); if (u >= 1) return;
+      g.save(); g.globalAlpha = 1 - u; g.strokeStyle = '#fff'; g.lineWidth = H * 0.012 * (1 - u * 0.6);
+      const grow = 1 + u * 1.4, was = 1 + 2 * Math.max(0, (CUTIN.dur - c.at) / CUTIN.dur);
+      g.beginPath(); g.arc(cx, cy, R * grow, 0, Math.PI * 2); g.stroke();
+      g.lineWidth = H * 0.008 * (1 - u * 0.6); g.beginPath(); g.arc(cx, cy, R * was * grow, 0, Math.PI * 2); g.stroke();
+      g.restore(); return;
+    }
     g.save(); g.lineCap = 'round';
-    g.strokeStyle = judged ? (c.hit ? '#fff27a' : '#ff8a8a') : now ? '#fff27a' : 'rgba(255, 255, 255, 0.85)'; // (the target)
+    g.strokeStyle = judged || now ? '#fff27a' : 'rgba(255, 255, 255, 0.85)'; // (the target)
     g.lineWidth = H * (now && !judged ? 0.018 : 0.012); g.shadowColor = '#fff27a'; g.shadowBlur = now ? H * 0.04 : 0;
     g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke(); g.shadowBlur = 0;
     if (!judged) { // (the one closing in: from three times as big)
@@ -1164,7 +1172,7 @@
       g.font = `${Math.round(fs * 0.7)}px sans-serif`; g.fillText('👆', fs * 1.55, fs * 0.25 + Math.sin(S.t * 24) * fs * 0.08); // (a finger tapping)
       g.restore();
     }
-    const word = judged ? (c.hit ? '完美！' : '太早了') : '';
+    const word = judged ? '完美！' : '';
     if (word) { g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = Math.max(3, H * 0.008); g.font = `900 ${Math.round(H * 0.07)}px sans-serif`; g.strokeText(word, cx, cy); g.fillText(word, cx, cy); }
     g.restore();
   }
