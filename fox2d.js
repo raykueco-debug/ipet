@@ -220,6 +220,7 @@
     if (name === cur.name) { i = 0; return; } // keep looping
     if (switchTo(name, skip)) return;
     // that clip isn't there yet: keep looping where the fox is (no jump) until it is; else back home
+    if (!(name in clips)) console.warn(`fox2d: no clip ${name} (after ${cur.name}): falling back — a break in the chain`);
     for (const alt of [`${endsOn(cur.name)}_loop`, 'normal_loop']) if (switchTo(alt, false)) return;
     i = 0;
   }
@@ -234,6 +235,9 @@
       return;
     }
     if (hold > 0) { hold--; return; }
+    // down in the crouch with the ball held up, no look clips to play there (taken out): held on its picture, still
+    // — not off to a loop it hasn't got (which fell back to sitting: down, up, down again as long as it was held)
+    if (endsOn(cur.name) === 'ready' && watching && !clips[LOOK.r] && !isLoop(cur.name)) return;
     const act = endsOn(cur.name);
     if (isAction(act) && !go) { // at an action's pose: its own loop a round or two, if it has one
       if (!isLoop(cur.name) && clips[`${act}_loop`]) { holdLoops = 1 + (Math.random() < 0.5 ? 1 : 0); switchTo(`${act}_loop`, true); return; }
@@ -387,6 +391,7 @@
   window.Fox2D = {
     tails(n) { tailN = Math.max(1, Math.min(9, n | 0)); }, // how many tails it has (app.js)
     get hasTails() { return !!cur?.notail; },              // drawing them itself, on this clip
+    get clip() { return cur ? `${cur.name}:${i}` : ''; },   // (what's playing, and its frame: to look into)
     set({ mood: m }) {
       want = MAP[m] || 'normal';
       if (want !== 'normal') { load(`normal_to_${want}`); load(`${want}_loop`); load(`${want}_to_normal`); }

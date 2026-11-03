@@ -219,6 +219,7 @@
     const move = ev => { drag.push({ t: performance.now(), x: ev.clientX, y: ev.clientY }); if (drag.length > 8) drag.shift(); hold(ev); };
     const up = ev => {
       removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      if (!drag) return; // (let go over the ball itself: its own pointerup has thrown it already)
       const moved = Math.hypot(ev.clientX - drag[0].x, ev.clientY - drag[0].y) > 20;
       if (moved) return letGo(ev);
       drag = null; // a tap: it drops in front of the fox, and the fox goes for it
