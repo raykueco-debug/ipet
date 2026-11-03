@@ -296,15 +296,15 @@
   function flash() { // "shing!": a bright noise burst and metal partials, a boom under it
     if (!ac) return; const t = ac.currentTime, o = out();
     const n = noise(), bp = ac.createBiquadFilter(), g = ac.createGain(); bp.type = 'highpass'; bp.frequency.value = 3000;
-    env(g, t, 0.5, 0.005, 0.35); n.connect(bp).connect(g).connect(o); n.start(t); n.stop(t + 0.4);
+    env(g, t, 0.5, 0.003, 0.18); n.connect(bp).connect(g).connect(o); n.start(t); n.stop(t + 0.2);
     for (const [fr, v] of [[1870, 0.18], [2830, 0.14], [4150, 0.1], [5620, 0.07]]) {
-      const s = ac.createOscillator(), sg = ac.createGain(); s.frequency.value = fr; env(sg, t, v, 0.003, 1.4); s.connect(sg).connect(o); s.start(t); s.stop(t + 1.5);
+      const s = ac.createOscillator(), sg = ac.createGain(); s.frequency.value = fr; env(sg, t, v, 0.002, 0.7); s.connect(sg).connect(o); s.start(t); s.stop(t + 0.75);
     }
-    const b = ac.createOscillator(), bg = ac.createGain(); b.frequency.setValueAtTime(140, t); b.frequency.exponentialRampToValueAtTime(40, t + 0.6);
-    env(bg, t, 0.7, 0.005, 0.7); b.connect(bg).connect(o); b.start(t); b.stop(t + 0.8);
+    const b = ac.createOscillator(), bg = ac.createGain(); b.frequency.setValueAtTime(140, t); b.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+    env(bg, t, 0.7, 0.003, 0.35); b.connect(bg).connect(o); b.start(t); b.stop(t + 0.4);
   }
   function charge(dur) { // the power gathering: a rising roar and a chord climbing, louder to the end
-    if (!ac) return; const t = ac.currentTime + 0.25, o = out(), end = t + dur - 0.3;
+    if (!ac) return; const t = ac.currentTime + 0.12, o = out(), end = ac.currentTime + dur - 0.03;
     const n = noise(); n.loop = true; const bp = ac.createBiquadFilter(), g = ac.createGain();
     bp.type = 'bandpass'; bp.Q.value = 4; bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(3500, end);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, end); g.gain.exponentialRampToValueAtTime(0.0001, end + 0.08);
@@ -312,7 +312,7 @@
     const lp = ac.createBiquadFilter(), cg = ac.createGain(), wob = ac.createOscillator(), wg = ac.createGain();
     lp.type = 'lowpass'; lp.frequency.setValueAtTime(400, t); lp.frequency.exponentialRampToValueAtTime(5000, end);
     cg.gain.setValueAtTime(0.0001, t); cg.gain.exponentialRampToValueAtTime(0.12, end); cg.gain.exponentialRampToValueAtTime(0.0001, end + 0.08);
-    wob.frequency.setValueAtTime(6, t); wob.frequency.linearRampToValueAtTime(22, end); wg.gain.value = 0.05; wob.connect(wg).connect(cg.gain); wob.start(t); wob.stop(end + 0.1);
+    wob.frequency.setValueAtTime(12, t); wob.frequency.linearRampToValueAtTime(44, end); wg.gain.value = 0.05; wob.connect(wg).connect(cg.gain); wob.start(t); wob.stop(end + 0.1);
     lp.connect(cg).connect(o);
     for (const m of [1, 1.5, 2, 2.52]) { const s = ac.createOscillator(); s.type = 'sawtooth'; s.frequency.setValueAtTime(110 * m, t); s.frequency.exponentialRampToValueAtTime(330 * m, end); s.connect(lp); s.start(t); s.stop(end + 0.1); }
   }
@@ -1002,7 +1002,7 @@
   }
   // the friends' close-ups for the super bounce's cut-in (not the mushroom's): <dir>/cutin/<kind>.png, on Halloween
   // their costumed ones where there (GPT sheets assets/source/gpt/cutin_*.png, tools/grid_split.py)
-  const CUTIN = { dur: 3, in: 0.28, out: 0.3 }, CUTINS = {};
+  const CUTIN = { dur: 1.5, in: 0.14, out: 0.15 }, CUTINS = {};
   const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
   const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
   function loadCutins() {
@@ -1023,16 +1023,16 @@
     g.strokeStyle = 'rgba(255, 255, 255, 0.55)'; // (the speed lines: streaming past, right to left, the way it looks)
     for (let i = 0; i < 26; i++) {
       const y = cy - H * 0.45 + ((i * 97) % 100) / 100 * H * 0.9, len = W * (0.15 + ((i * 37) % 10) / 25);
-      const x = W - ((t * W * (2.2 + (i % 5) * 0.4) + i * 211) % (W + len * 2)) + len;
+      const x = W - ((t * W * (4.4 + (i % 5) * 0.8) + i * 211) % (W + len * 2)) + len;
       g.lineWidth = 2 + (i % 4) * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y - len * 0.22); g.stroke();
     }
     if (im) { // the face (looking right): in from the left, a little shake as it shouts, off to the right
-      const h = H * 0.86, w = h * im.width / im.height, shake = t > CUTIN.in && !away ? Math.sin(t * 60) * H * 0.004 : 0;
+      const h = H * 0.86, w = h * im.width / im.height, shake = t > CUTIN.in && !away ? Math.sin(t * 120) * H * 0.004 : 0;
       const x = W * 0.42 - w / 2 - (1 - ease(into)) * W * 0.6 + ease(away) * W * 1.2;
       g.drawImage(im, x + shake, cy - h / 2 + shake, w, h);
     }
     g.restore();
-    if (t > CUTIN.dur - 0.12) { g.fillStyle = `rgba(255, 255, 255, ${(t - (CUTIN.dur - 0.12)) / 0.12})`; g.fillRect(0, 0, W, H); } // (a flash, into the burst)
+    if (t > CUTIN.dur - 0.06) { g.fillStyle = `rgba(255, 255, 255, ${(t - (CUTIN.dur - 0.06)) / 0.06})`; g.fillRect(0, 0, W, H); } // (a flash, into the burst)
   }
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
