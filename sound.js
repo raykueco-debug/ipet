@@ -38,25 +38,31 @@
   }
 
   // one piece at a time: playing one stops any other (the pet's and the game's both going at once — a touch that
-  // started the pet's as the game opened — was the music skipping on a phone)
-  const pieces = [];
+  // started the pet's as the game opened — was the music skipping on a phone). And on an iPhone a paused element
+  // that's still wired into the context keeps sounding the last bit it had, over and over, under the next scene's
+  // music (WebKit) — so a piece is taken off the speakers when it's paused, put back on when it plays.
+  // One piece per file (the fling game's look switched back and forth gets the same one again, not another).
+  const pieces = new Map();
   function music(src) { // a looping piece: { play(), pause() }, as loud as the rest
-    const el = Object.assign(new Audio(src), { loop: true });
-    const file = src.split('/').pop().split('?')[0], gain = Math.min(1, db(MIX.music - (MUSIC[file] ?? MIX.music)));
-    let node = null;
+    const file = src.split('/').pop().split('?')[0];
+    if (pieces.has(file)) return pieces.get(file);
+    const el = Object.assign(new Audio(src), { loop: true }), gain = Math.min(1, db(MIX.music - (MUSIC[file] ?? MIX.music)));
+    let node = null, on = false;
     if (!WIRED) el.volume = gain;
+    const wire = v => { if (node && v !== on) try { v ? node.connect(out) : node.disconnect(); on = v; } catch (e) {} };
     const piece = {
       el,
       get paused() { return el.paused; },
       play() {
-        for (const p of pieces) if (p !== piece && !p.el.paused) p.el.pause();
-        if (WIRED && !node) { const c = ctx(); if (c) try { node = c.createGain(); node.gain.value = gain; c.createMediaElementSource(el).connect(node); node.connect(out); } catch (e) { node = null; } }
+        for (const p of pieces.values()) if (p !== piece) p.pause();
+        if (WIRED && !node) { const c = ctx(); if (c) try { node = c.createGain(); node.gain.value = gain; c.createMediaElementSource(el).connect(node); } catch (e) { node = null; } }
         else ctx();
+        wire(true);
         return el.play();
       },
-      pause() { el.pause(); },
+      pause() { if (!el.paused) el.pause(); wire(false); },
     };
-    pieces.push(piece);
+    pieces.set(file, piece);
     return piece;
   }
 
