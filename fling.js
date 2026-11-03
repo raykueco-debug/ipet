@@ -69,7 +69,10 @@
   // lane first (over turn m), both lanes cloud a while (both m: the time to change lane), then its other edge in
   // after it. Off it (an edge past the fox's middle), the fox falls
   const FALL_IN = (-0.4 + Math.sqrt(0.16 + 4 * 9 * 0.9)) / 18; // (s off the edge: down to the sea of cloud, 0.9 lanes below — see the fall's lift)
-  const WIND = { first: 60, gap: [60, 95], turn: 12, both: 24 };
+  const ROADEND = { cards: 7, brake: 22 }; // (braking to a stop over the road's last <brake> m; the cards floating <cards> m past its end, over the
+  // sea of cloud — a tap on one, and off it leaps to it)
+  const SKYSTARS = { first: 30, gap: 26, run: 5, step: 3, full: 0.9 }; // (its stars: a row of <run> along a lane every <gap> m; <full> of them a full bar: a gold card for sure)
+  const TIER_COLOR = { blue: ['#5aa2ff', '#2f6fe0'], purple: ['#b07cff', '#7a45d8'], gold: ['#ffd25a', '#e59a1c'] };
   const FADE = 1; // s: into and out of the clouds, through black (half out, half in)
   const AUTO = params.has('auto');
   const SOAR = { fall: 2.5 }; // gliding off a squirrel: falling no faster than this, m/s
@@ -143,16 +146,20 @@
   card('shield', 'gold', () => '☁️', '🛡️', '救一次', () => '雲路上掉下去救回來一次', m => { m.shield++; });
   card('tails', 'gold', () => '🔥', '➕', '+2', () => '多兩次噴射', m => { m.refill += 2; });
 
-  function deal(when) { // three different cards: each a tier drawn by its rarity, then a card of it
-    const pool = CARDS.filter(c => !c.when || c.when === when), hand = [];
+  function deal(when, weights = null, first = null) { // three different cards: each a tier drawn by its rarity (or by <weights>), then a card of it
+    const pool = CARDS.filter(c => (!c.when || c.when === when) && c.id !== 'shield'), hand = []; // (the cloud road has no edge to fall off now: no saving card)
+    if (first) { const of = pool.filter(c => c.tier === first); hand.push(of[Math.floor(Math.random() * of.length)]); }
+    const W = weights || Object.fromEntries(Object.entries(TIER).map(([t, v]) => [t, v.w])), sum = Object.values(W).reduce((a, b) => a + b, 0);
     while (hand.length < 3) {
-      let r = Math.random() * 100, tier = 'blue';
-      for (const t in TIER) if ((r -= TIER[t].w) < 0) { tier = t; break; }
+      let r = Math.random() * sum, tier = 'blue';
+      for (const t in W) if ((r -= W[t]) < 0) { tier = t; break; }
       const of = pool.filter(c => c.tier === tier && !hand.includes(c));
       if (of.length) hand.push(of[Math.floor(Math.random() * of.length)]);
     }
     return hand;
   }
+  // the cloud road's three, by how full its star bar got (0…1): full, a gold one for sure; the fewer, the lower
+  const dealSky = k => deal('cloud', { blue: 10 + 90 * (1 - k), purple: k < 0.3 ? 0 : 50 * k, gold: k < 0.6 ? 0 : 30 * k }, k >= 1 ? 'gold' : null);
   const cardHTML = (c, i) => `<button class="fl-cd fl-${c.tier}" data-i="${i}"><span class="fl-cd-ic">${c.icon()}<i>${c.badge}</i></span>
     <b>${c.val}</b><small>${c.name()}</small><em>${TIER[c.tier].name}卡</em></button>`;
   function pick(when, then) { // the three, laid out: the one tapped is the run's (and then on)
@@ -231,7 +238,8 @@
   // the fox's clips: run (facing right: on the ground, and its most stretched frame in the air), pounce (crouched
   // on the branch; stretched out diving), roll (tumbling off a friend), joy (flung high), ouch, cheer / happy (at the end)
   const CLIPS = { run: 'walk_r_loop_run', pounce: 'walk_r_to_pounce_r', roll: 'roll_loop', joy: 'jump_joy_loop',
-    ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', up: 'back_crouch_to_back_air', down: 'back_air_to_back_crouch' };
+    ouch: 'surprised_loop', cheer: 'cheer_loop', happy: 'happy_loop', up: 'back_crouch_to_back_air', down: 'back_air_to_back_crouch',
+    brake: 'back_crouch_to_sit_back', look: 'sit_back_loop_look', sitUp: 'sit_back_to_back_air' }; // (the cloud road's end)
   // (on Halloween, in its cape: the same clips made again with it — tools/wan_cape.py, assets/fox/clips_halloween —
   // frame for frame as the plain ones, where they're there)
   const PLAIN = {}, CAPED_CLIPS = {}, CAPED_ONES = ['cheer', 'happy', 'up', 'down'], CUT = ['run', 'pounce'];
@@ -346,6 +354,7 @@
     super: () => { blip(100, 900, 0.7, 'sawtooth', 0.12); chime(660, 5, 90); },
     belly: () => { thump(260, 0.25, 0.5); wobble(85, 210, 0.7, 11, 28, 'sine', 0.5); wobble(170, 420, 0.5, 11, 40, 'triangle', 0.12); }, // (a big soft belly: pomf, boyoyoing)
     spring: () => { blip(900, 1500, 0.05, 'sine', 0.15); wobble(260, 820, 0.85, 17, 120, 'triangle', 0.3); wobble(520, 1640, 0.6, 17, 220, 'sine', 0.08); }, // (the cap: pop, boinnng)
+    brake: () => { thump(1800, 0.6, 0.18); blip(700, 260, 0.5, 'sawtooth', 0.04); }, // (a skid on cloud: a soft hiss sliding down)
     cutin: dur => { flash(); charge(dur); }, boom: () => { boom(); chime(660, 5, 90); },
   };
 
@@ -570,39 +579,32 @@
   // up on the clouds: a road of cloud on ahead, the fox running along it away from us, three lanes and stars in
   // rows on them (a tap on the left or the right half: a lane that way); SKY.run m of it, then down off its end
   function toSky() {
-    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], path: [], t: 0, leap: -1, fall: -1, intro: 0, pop: 0 };
-    let lane = 0; sky.path = [{ z: 0, lane }];
-    for (let z = WIND.first; z < SKY.run - 50; z += WIND.gap[0] + Math.random() * (WIND.gap[1] - WIND.gap[0])) {
-      lane = lane === 0 ? (Math.random() < 0.5 ? -1 : 1) : (Math.random() < 0.7 ? 0 : lane); if (lane === sky.path.at(-1).lane) continue;
-      sky.path.push({ z, lane });
+    const f = S.fox, sky = { z: 0, x0: f.x, lane: 0, x: 0, stars: [], t: 0, leap: -1, fall: -1, intro: 0, pop: 0, got: 0 };
+    let lane = 0; // rows of stars, each in a lane (a lane or two over from the last: to steer for)
+    for (let z = SKYSTARS.first; z < SKY.run - ROADEND.brake - 15; z += SKYSTARS.gap) {
+      const others = [-1, 0, 1].filter(l => l !== lane); lane = others[Math.floor(Math.random() * 2)];
+      for (let k = 0; k < SKYSTARS.run; k++) sky.stars.push({ lane, z: z + k * SKYSTARS.step, got: false });
     }
-    const holed = (l, z) => { const [a, b] = roadAt(sky, z); return b - a > 1.02 || Math.abs((a + b) / 2 - l) > 0.02; }; // (stars only on its straight stretches)
-    for (let z = 40; z < SKY.run - 30; z += 35 + Math.random() * 15) { // rows of stars, a lane each (not over a hole)
-      const l = Math.round(roadAt(sky, z).reduce((a, b) => a + b) / 2);
-      for (let k = 0; k < 4; k++) if (!holed(l, z + k * 3)) sky.stars.push({ lane: l, z: z + k * 3, got: false });
-    }
+    sky.need = Math.ceil(sky.stars.length * SKYSTARS.full);
     Object.assign(f, { vx: 0, vy: 0, hold: 0, glide: 0, ride: 0, hops: 0, dive: false, act: null, spin: 0, dash: 0, soar: false });
     S.sky = sky; S.phase = 'sky'; S.combo = 0;
     SFX.super(); hud();
   }
-  function roadAt(sky, z) { // its edges, z m along it: [left, right] (lanes: -1 … 1, a lane each side of the middle ±0.5)
-    const ease = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
-    let a = sky.path[0].lane, L = a - 0.5, R = a + 0.5;
-    for (let i = 1; i < sky.path.length; i++) {
-      const p = sky.path[i]; if (z <= p.z) break;
-      const lead = ease((z - p.z) / WIND.turn), trail = ease((z - p.z - WIND.turn - WIND.both) / WIND.turn), d = p.lane - a;
-      if (d > 0) { R = a + 0.5 + d * lead; L = a - 0.5 + d * trail; } else { L = a - 0.5 + d * lead; R = a + 0.5 + d * trail; }
-      a = p.lane;
-    }
-    return [L, R];
-  }
+  function roadAt() { return [-1.5, 1.5]; } // the road: wide, three lanes all the way (nowhere to fall off)
 
-  function steer(d) { if (S?.phase === 'sky') S.sky.lane = Math.max(-1, Math.min(1, S.sky.lane + d)); }
+  function steer(d) { if (S?.phase === 'sky' && !S.sky.end) S.sky.lane = Math.max(-1, Math.min(1, S.sky.lane + d)); } // (not once it's braking)
+  function pickCard(i) { // a card tapped at the road's end: off it leaps, to it
+    const e = S.sky?.end; if (!e || e.stage !== 'look' || i < 0 || i > 2) return;
+    e.stage = 'leap'; e.pick = i; e.to = i - 1; S.sky.leap = 0; SFX.super();
+  }
+  function cardAt(p) { return (S?.sky?.cardRects || []).findIndex(r => r && p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h); } // (the card under a touch)
   function stepSky(dt) {
     const sky = S.sky, f = S.fox;
     sky.t += dt;
-    if (sky.leap >= 0) { // off the end: a leap out over the sea of cloud, and down through black
+    if (sky.leap >= 0) { // off the end: a leap out over the sea of cloud (towards the card tapped), and down through black
       sky.leap += dt;
+      if (sky.end) sky.x += (sky.end.to * 1.6 - sky.x) * Math.min(1, dt * 4); // (off that way: towards the card chosen, out over the side)
+      if (sky.end && sky.took === undefined && sky.leap > 0.3) { const c = sky.hand[sky.end.pick]; sky.took = sky.end.pick; c.apply(S.mods, S); S.deck.push(c); deckUI(); SFX.ready(); } // (into it: taken)
       if (!S.fade && sky.leap > 0.6) S.fade = { t: 0, mid: fromSky };
       return hud();
     }
@@ -614,15 +616,25 @@
     if (S.picking) return hud(); // (at its end, the cards out: waiting for one)
     if (!S.fade || S.fade.t > FADE * 0.75) sky.pop += dt; // (from when it's out of the black, mostly)
     if (sky.intro < SKY.intro) { sky.intro = Math.min(SKY.intro, sky.pop); sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12); return hud(); } // (out of the cloud first)
-    sky.z = Math.min(SKY.run, sky.z + SKY.speed * dt);
-    if (AUTO) { const [l, r] = roadAt(sky, sky.z + 8); sky.lane = Math.max(-1, Math.min(1, Math.round((l + r) / 2))); } // (?auto: it keeps on the road by itself, to try the end)
+    const brakeAt = SKY.run - ROADEND.brake;
+    if (sky.end) { // braking, then sat there looking at the cards (waiting for a tap on one)
+      const e = sky.end, T = 2 * ROADEND.brake / SKY.speed; e.t += dt;
+      sky.z = brakeAt + SKY.speed * Math.min(e.t, T) - SKY.speed / (2 * T) * Math.min(e.t, T) ** 2; // (evenly slower, to a stop at the end)
+      e.smoke ||= []; // (a trail of cloud kicked up by its back feet as it skids, left where it was thrown up)
+      if (e.t < T) for (let n = Math.ceil(dt * 60 * (1 - e.t / T)) + 1; n-- > 0;) e.smoke.push({ x: sky.x + (Math.random() < 0.5 ? -0.17 : 0.17) + (Math.random() - 0.5) * 0.08, z: sky.z - 0.3, t: 0, r: 0.08 + Math.random() * 0.06, up: Math.random() * 0.25 });
+      for (const p of e.smoke) p.t += dt; e.smoke = e.smoke.filter(p => p.t < 0.9);
+      if (e.t >= T && e.stage === 'brake') e.stage = 'look';
+      sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
+      if (AUTO && !params.has('hold') && e.stage === 'look' && e.t > T + 1.5) pickCard(Math.floor(Math.random() * 3)); // (?auto: one of them, by itself; ?hold: not)
+      return hud();
+    }
+    sky.z = Math.min(brakeAt, sky.z + SKY.speed * dt);
+    if (sky.z >= brakeAt) { sky.end = { t: 0, stage: 'brake', to: sky.lane, pick: -1 }; sky.hand = dealSky(Math.min(1, sky.got / sky.need)); SFX.brake(); }
+    if (AUTO) { const a = sky.stars.find(a => !a.got && a.z > sky.z - 1); if (a && a.z - sky.z < 20) sky.lane = a.lane; } // (?auto: off after the stars by itself, to try it)
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
-    for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; starGot(); }
-    { const [l, r] = roadAt(sky, sky.z); if ((sky.x < l || sky.x > r) && S.mods.shield) { S.mods.shield--; sky.lane = sky.x = Math.max(-1, Math.min(1, Math.round((l + r) / 2))); SFX.boing(); S.shake = 0.3; } } // (a card: saved, back on it)
-    { const [l, r] = roadAt(sky, sky.z); if (sky.x < l || sky.x > r) { sky.fall = 0; sky.fellAt = sky.x; SFX.whoosh(); return hud(); } } // (an edge past its middle: down it goes)
+    for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; sky.got++; starGot(); }
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
-    if (sky.z >= SKY.run) pick('cloud', () => { sky.leap = 0; SFX.super(); }); // (each time up here: one more card, then off)
     hud();
   }
   function fromSky(fell) { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
@@ -687,7 +699,7 @@
   const ground = () => H * 0.84;
   const toScreen = (x, y) => ({ x: (x - S.cam.x) * S.cam.s + W * 0.3, y: ground() - y * S.cam.s });
   function draw(dt) {
-    if (S.phase === 'sky') { drawSky(dt); blackout(); return; }
+    if (S.phase === 'sky') { drawSky(dt); skyBar(S.sky); blackout(); return; }
     const f = S.fox;
     // the camera: the fox a third along, drawn smaller as it goes higher (so it stays in sight)
     const base = H / CAM.metres, want = Math.max(base * CAM.least, Math.min(base, (ground() - H * 0.18) / Math.max(1, f.y + FOX_H + 1)));
@@ -858,6 +870,57 @@
     }
     g.restore();
   }
+  function drawCard(c, cx, y, w, glow) { // a card drawn on the canvas: its tier's colours, its picture and badge, what it does
+    const h = w * 1.3, x = cx - w / 2, [c0, c1] = TIER_COLOR[c.tier], gr = g.createLinearGradient(0, y, 0, y + h);
+    gr.addColorStop(0, c0); gr.addColorStop(1, c1);
+    if (glow) { g.shadowColor = '#fff6a8'; g.shadowBlur = w * 0.3; }
+    g.fillStyle = gr; g.strokeStyle = glow ? '#fff6a8' : '#fff'; g.lineWidth = Math.max(1.5, w * (glow ? 0.07 : 0.045));
+    g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, w * 0.14) : g.rect(x, y, w, h); g.fill(); g.shadowBlur = 0; g.stroke();
+    g.fillStyle = '#fff'; g.font = `${Math.round(w * 0.42)}px sans-serif`; g.fillText(c.icon(), cx, y + h * 0.3);
+    g.font = `${Math.round(w * 0.22)}px sans-serif`; g.fillText(c.badge, cx + w * 0.26, y + h * 0.44);
+    g.font = `900 ${Math.round(w * 0.2)}px sans-serif`; g.fillText(c.val, cx, y + h * 0.64);
+    if (w > 60) { g.font = `700 ${Math.round(w * 0.085)}px sans-serif`; const n = c.name(), cut = Math.ceil(n.length / 2); g.fillText(n.slice(0, cut), cx, y + h * 0.8); g.fillText(n.slice(cut), cx, y + h * 0.9); }
+  }
+  function drawRoadCards(sky) { // the three cards at the road's end: as it brakes, up large over it (as large as the start's);
+    sky.cardRects = [];          // a tap on one, and it leaps that way — the one chosen flying to it, the others fading
+    const e = sky.end; if (!e || !sky.hand) return;
+    const T = 2 * ROADEND.brake / SKY.speed, k = Math.min(1, e.t / (T * 0.8)), ease = 1 - (1 - k) ** 3, look = e.stage === 'look';
+    const w = Math.min(190, W * 0.24, H * 0.32), gap = w * 1.12, top = H * 0.215;
+    sky.hand.forEach((c, i) => {
+      if (sky.took === i) return;
+      let cx = W / 2 + (i - 1) * gap * ease, y = top - (1 - ease) * H * 0.25, cw = w * (0.4 + 0.6 * ease);
+      g.save(); g.globalAlpha = ease;
+      if (e.stage === 'leap') {
+        const L = Math.min(1, sky.leap / 0.3);
+        if (e.pick === i) { const p = project(sky.x, sky.leap * SKY.speed / ZV * 0.7); cx += (p.x - cx) * L; y += (p.y - H * 0.25 - y) * L; cw *= 1 - L * 0.7; } // (into its paws)
+        else g.globalAlpha = Math.max(0, 1 - L * 1.5);
+      }
+      drawCard(c, cx, y + (look ? Math.sin(S.t * 3 + i) * w * 0.02 : 0), cw, look && Math.sin(S.t * 5 - i * 1.2) > 0.6);
+      g.restore();
+      if (look) sky.cardRects[i] = { x: cx - cw / 2, y, w: cw, h: cw * 1.3 };
+    });
+    if (look) { g.fillStyle = '#fff'; g.strokeStyle = '#7a6fd0'; g.lineWidth = Math.max(3, H * 0.008); g.font = `900 ${Math.round(H * 0.05)}px sans-serif`;
+      g.strokeText('點一張卡跳下去！', W / 2, top - H * 0.05); g.fillText('點一張卡跳下去！', W / 2, top - H * 0.05); }
+  }
+  function skyBar(sky) { // its star bar, along the top: full, a gold card at the end for sure (the fewer, the lower the cards)
+    if (!sky.need || sky.end?.t > 2 * ROADEND.brake / SKY.speed * 0.6) return; // (gone as the cards come up)
+    const k = Math.min(1, sky.got / sky.need), w = Math.min(W * 0.4, H * 0.9), h = H * 0.04, x = (W - w) / 2, y = H * 0.135, full = k >= 1;
+    g.save();
+    g.fillStyle = '#ffffffcc'; g.beginPath(); g.roundRect ? g.roundRect(x - h * 0.3, y - h * 0.3, w + h * 2.2, h * 1.6, h * 0.8) : g.rect(x - h * 0.3, y - h * 0.3, w + h * 2.2, h * 1.6); g.fill();
+    g.fillStyle = '#e6e2fb'; g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, h / 2) : g.rect(x, y, w, h); g.fill();
+    if (k > 0) {
+      const gr = g.createLinearGradient(x, 0, x + w, 0); ['#ff8a8a', '#ffc15e', '#ffe14d', '#7be37b', '#5ec8ff', '#b07cff'].forEach((c, i) => gr.addColorStop(i / 5, c));
+      g.fillStyle = gr; g.beginPath(); g.roundRect ? g.roundRect(x, y, Math.max(h, w * k), h, h / 2) : g.rect(x, y, w * k, h); g.fill();
+    }
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `${Math.round(h * 1.1)}px sans-serif`; g.fillText(star(), x - h * 0.05, y + h / 2);
+    g.font = `900 ${Math.round(h * 0.75)}px sans-serif`; g.fillStyle = '#5b4fb0'; g.fillText(`${Math.min(sky.got, sky.need)} / ${sky.need}`, x + w / 2, y + h / 2 + 1);
+    const cx = x + w + h * 1.05, cy = y + h / 2, pulse = full ? 1 + Math.sin(S.t * 8) * 0.08 : 1; // (the gold card it fills up to)
+    g.globalAlpha = full ? 1 : 0.45; g.fillStyle = full ? '#ffd25a' : '#d8cfa0'; g.strokeStyle = '#fff'; g.lineWidth = 2;
+    g.save(); g.translate(cx, cy); g.scale(pulse, pulse); g.beginPath(); g.roundRect ? g.roundRect(-h * 0.5, -h * 0.68, h, h * 1.36, h * 0.15) : g.rect(-h * 0.5, -h * 0.68, h, h * 1.36); g.fill(); g.stroke();
+    g.fillStyle = '#fff'; g.font = `900 ${Math.round(h * 0.5)}px sans-serif`; g.fillText('金', 0, 1); g.restore();
+    g.restore();
+  }
   function drawSky(dt) {
     const sky = S.sky, zv = sky.z / ZV, left = (SKY.run - sky.z) / ZV; // (left: how far on the road still goes)
     const hy = HOR(), grad = g.createLinearGradient(0, 0, 0, H);
@@ -892,6 +955,11 @@
     g.fillStyle = '#ffffff'; g.beginPath();
     L.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); [...R].reverse().forEach(p => g.lineTo(p.x, p.y));
     g.closePath(); g.fill();
+    g.strokeStyle = '#d8d4fa'; g.lineCap = 'round'; // (the lanes: soft dashes between them, going by)
+    for (const x of [-0.5, 0.5]) for (let z = -((zv * 1) % 2); z < end; z += 2) {
+      if (z < -CAMZ * 0.5) continue; const a = project(x, z), b = project(x, Math.min(end, z + 1));
+      g.lineWidth = Math.max(1, LANE() * a.s * 0.05); g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+    }
     for (let k = Math.ceil(end / 0.9); k >= -6; k--) { // the lumps along its edges, far to near
       const z = k * 0.9 - (zv % 0.9); if (z > end) continue;
       const e = at(z); for (const side of [-1, 1]) { const p = project(e[side > 0 ? 1 : 0], z); puff(p.x, p.y, LANE() * p.s * (0.2 + ((k * 7 + side + 9) % 3) * 0.035)); }
@@ -916,13 +984,23 @@
       lift = -9 * sky.fall * sky.fall - 0.4 * sky.fall; im = A.down?.at(-1) || up.at(-1);
     } else if (sky.leap >= 0) {
       const L = sky.leap; z = L * SKY.speed / ZV * 0.7; lift = 3.4 * L - 6 * L * L; // (lane widths)
-      im = L < 0.25 ? up[Math.min(up.length - 1, Math.floor(L / 0.25 * up.length))] : up.at(-1);
+      const off = sky.end && A.sitUp?.length ? A.sitUp : up; // (from sitting, at the end: up off its seat)
+      im = L < 0.25 ? off[Math.min(off.length - 1, Math.floor(L / 0.25 * off.length))] : off.at(-1);
+    } else if (sky.end) { // braking (its clip through once), then sat looking left and right
+      const e = sky.end, T = 2 * ROADEND.brake / SKY.speed, br = A.brake?.length ? A.brake : down, lk = A.look?.length ? A.look : [br.at(-1)];
+      im = e.t < T ? br[Math.min(br.length - 1, Math.floor(e.t / T * br.length))] : lk[Math.floor((e.t - T) * 12) % lk.length];
     } else {
       const u = (sky.t / SKY.hop) % 1;
       lift = Math.sin(Math.PI * u) * 0.45; im = hops[Math.floor(u * hops.length)];
     }
     const p = project(sky.x, z), size = H * 0.32 * p.s, rise = lift * LANE() * p.s;
     if (sky.pop < 1.4) smoke(project(0, -sky.z / ZV), sky.pop); // (a cartoon burst of smoke where it popped out)
+    if (sky.end?.smoke?.length) { // (its skid's trail: far to near, each puff growing, rising a little, fading)
+      const ps = [...sky.end.smoke].sort((a, b) => b.z - a.z);
+      for (const p of ps) { const z = (p.z - sky.z) / ZV; if (z < -CAMZ * 0.7) continue; const q = project(p.x, z), k = p.t / 0.9;
+        g.globalAlpha = Math.max(0, 1 - k) * 0.9; puff(q.x, q.y - LANE() * q.s * (p.up + k * 0.4), LANE() * q.s * (p.r * 1.4 + k * 0.42), '#b9b0ec'); }
+      g.globalAlpha = 1;
+    }
     if (sky.leap > SPLASH) { // (and where it dives into the sea of cloud below)
       const q = project(sky.x, SPLASH * SKY.speed / ZV * 0.7); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.9, s: q.s }, sky.leap - SPLASH);
     }
@@ -943,6 +1021,7 @@
     glints(0, -size * 0.45, size, dt);
     g.restore(); g.restore();
     if (sky.fall > FALL_IN * 0.5) { const q = project(sky.fellAt, 0); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.6, s: q.s }, sky.fall - FALL_IN * 0.5); } // (a puff of cloud as it goes under: as at the road's end)
+    g.textAlign = 'center'; g.textBaseline = 'middle'; drawRoadCards(sky); // (over it all)
   }
 
   function offscreen(f, s) { // up out of sight: an arrow along the top where it is, and how high
@@ -1343,7 +1422,7 @@
 
   function hud() {
     $('dist').textContent = Math.max(0, Math.floor(S.fox.x));
-    $('speed').textContent = Math.round((S.phase === 'sky' ? SKY.speed : S.phase === 'fly' ? Math.hypot(S.fox.vx, S.fox.vy) : 0) * 3.6 * PACE); // (how fast it flies, km/h)
+    $('speed').textContent = Math.round((S.phase === 'sky' ? (S.sky.end && S.sky.leap < 0 ? SKY.speed * Math.max(0, 1 - S.sky.end.t / (2 * ROADEND.brake / SKY.speed)) : SKY.speed) : S.phase === 'fly' ? Math.hypot(S.fox.vx, S.fox.vy) : 0) * 3.6 * PACE); // (how fast it flies, km/h)
     $('stars').textContent = S.got;
     $('meterBar').style.width = `${(S.ready ? 1 : Math.min(1, S.meter / need())) * 100}%`;
     $('starPill').classList.toggle('ready', S.ready);
@@ -1409,7 +1488,7 @@
     if (e.target.closest?.('.fl-card, button') || !S) return;
     if (bgm?.paused) bgm.play().catch(() => {}); // (where it couldn't start by itself: on the first touch)
     if (S.phase === 'aim') { S.drag = at(e); S.spring = null; }
-    else if (S.phase === 'sky') steer(at(e).x < W / 2 ? -1 : 1); // (on the clouds: a lane to that side)
+    else if (S.phase === 'sky') { if (S.sky.end) pickCard(cardAt(at(e))); else steer(at(e).x < W / 2 ? -1 : 1); } // (on the clouds: a lane to that side; at the end, a card)
     else tap();
   });
   layer.addEventListener('pointermove', e => { if (S?.drag && S.phase === 'aim') pullTo(e); });
@@ -1418,6 +1497,7 @@
   addEventListener('keydown', e => {
     if (layer.hidden) return;
     if (S?.picking) { const b = $('pickRow').children[+e.key - 1]; if (b) b.click(); return; } // (the cards: 1 2 3)
+    if (S?.sky?.end) { if (+e.key >= 1 && +e.key <= 3) pickCard(+e.key - 1); else if (e.code === 'Space') { e.preventDefault(); pickCard(Math.round(S.sky.x) + 1); } return; } // (at the cloud road's end: 1 2 3, or the one ahead)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); steer(e.key === 'ArrowLeft' ? -1 : 1); return; }
     if (e.code !== 'Space' && e.key !== 'ArrowUp') return;
     e.preventDefault();

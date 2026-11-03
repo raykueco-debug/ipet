@@ -70,4 +70,12 @@ want back_hang_to_back_pull && { echo "=== back_hang_to_back_pull $(date +%T)"
   run2 "$IN/back_hang.png" _to_back_pull "$IN/back_pull.png" "${FOX}牠背對你，前腳攀著邊緣，用力把身體往上撐，手肘撐到邊緣上，胸口和身體升上來，一隻後腳抬起。背對你。動作自然流暢。$KEEP"; }
 want back_pull_to_back_crouch && { echo "=== back_pull_to_back_crouch $(date +%T)"
   run2 "$IN/back_pull.png" _to_back_crouch "$IN/back_crouch.png" "${FOX}牠背對你，手肘撐在邊緣上，後腳往上一蹬，整個身體爬上來，回到地面上壓低身體的姿勢，甩甩身體，準備繼續跑。背對你。動作自然流暢。$KEEP"; }
+# the cloud road's end (fling.js): braking to a stop from its bounding, sitting there looking left and right at the
+# three cards, then a leap off (towards the one tapped: the game moves it that way)
+want back_crouch_to_sit_back && { echo "=== back_crouch_to_sit_back $(date +%T)"
+  run2 "$IN/back_crouch.png" _to_sit_back "$IN/sit_back.png" "${FOX}牠背對你，從往前衝的姿勢緊急煞車：身體往後仰、兩隻後腳用力往前伸直頂住地面，像溜滑一樣後腳在前、腳底貼地往前滑，滑了一段後慢下來，屁股往下一坐，停下來變成背對你乖乖坐著。背對你。動作有力、自然流暢。$KEEP"; }
+want sit_back_loop_look && { echo "=== sit_back_loop_look $(date +%T)"
+  run2 "$IN/sit_back.png" _loop_look - "${FOX}牠背對你坐著，好奇地把頭轉向左邊看一看，再把頭轉向右邊看一看，耳朵豎起來，尾巴輕輕擺動，最後頭轉回正中間。身體不移動。背對你。最後回到開始的姿勢。$KEEP"; }
+want sit_back_to_back_air && { echo "=== sit_back_to_back_air $(date +%T)"
+  run2 "$IN/sit_back.png" _to_back_air "$IN/back_air.png" "${FOX}牠背對你坐著，壓低身體蓄力，後腳用力一蹬，往前上方高高跳起來，後腳收起、尾巴翹高，背對你。動作有力、自然流暢。$KEEP"; }
 echo "=== all done $(date +%T)"
