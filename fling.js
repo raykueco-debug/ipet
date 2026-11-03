@@ -115,7 +115,15 @@
   const mods = () => ({ power: {}, weight: {}, glide: {}, hops: {}, noTrip: 0, noKnock: 0, refill: 0, again: 0, magnet: 0, superLess: 0,
     launch: 0, dive: 0, ground: 0, combo: 0, shield: 0 });
   const CARDS = [];
-  const card = (id, tier, icon, badge, val, name, apply, when) => CARDS.push({ id, tier, icon, badge, val, name, apply, when });
+  const card = (id, tier, icon, badge, val, name, apply, when) => CARDS.push({ id, tier, icon, badge, val, name, apply, when, art: id.replace(/-(blue|purple|gold)$/, '') });
+  // its picture, drawn for it (assets/cards/<art>.png: the three tiers of a card share one), where there is one — else its emoji
+  const CARD_ART = {};
+  const artOf = c => { const im = CARD_ART[c.art]; return im?.complete && im.naturalWidth ? im : null; };
+  async function loadCardArt() { // (those there: assets/cards/index.json, tools/card_split.py)
+    const r = await fetch('assets/cards/index.json').catch(() => null), names = r?.ok ? await r.json() : [];
+    await Promise.all(names.map(n => new Promise(done => { const im = pic(); im.onload = im.onerror = done; im.src = `assets/cards/${n}.png`; CARD_ART[n] = im; })));
+    if (pickHand && !$('pick').hidden) $('pickRow').innerHTML = pickHand.map(cardHTML).join(''); // (cards out already, before their pictures were in)
+  }
   const THROWERS = ['rabbit', 'frog', 'mushroom', 'bear', 'owl', 'giraffe', 'boar', 'squirrel'];
   const fe = k => () => FRIENDS[k].e; // (its emoji as the look has it: the mushroom a pot on Halloween night)
   for (const k of THROWERS) {
@@ -160,10 +168,11 @@
   }
   // the cloud road's three, by how full its star bar got (0…1): full, a gold one for sure; the fewer, the lower
   const dealSky = k => deal('cloud', { blue: 10 + 90 * (1 - k), purple: k < 0.3 ? 0 : 50 * k, gold: k < 0.6 ? 0 : 30 * k }, k >= 1 ? 'gold' : null);
-  const cardHTML = (c, i) => `<button class="fl-cd fl-${c.tier}" data-i="${i}"><span class="fl-cd-ic">${c.icon()}<i>${c.badge}</i></span>
+  const cardHTML = (c, i) => `<button class="fl-cd fl-${c.tier}" data-i="${i}"><span class="fl-cd-ic">${artOf(c) ? `<img src="${artOf(c).src}" alt="">` : c.icon()}<i>${c.badge}</i></span>
     <b>${c.val}</b><small>${c.name()}</small><em>${TIER[c.tier].name}卡</em></button>`;
+  let pickHand = null;
   function pick(when, then) { // the three, laid out: the one tapped is the run's (and then on)
-    const hand = deal(when), el = $('pick');
+    const hand = pickHand = deal(when), el = $('pick');
     $('pickTitle').textContent = when === 'start' ? '選一張卡出發！' : '選一張卡跳下去！';
     $('pickRow').innerHTML = hand.map(cardHTML).join('');
     el.hidden = false; S.picking = true;
@@ -876,7 +885,10 @@
     if (glow) { g.shadowColor = '#fff6a8'; g.shadowBlur = w * 0.3; }
     g.fillStyle = gr; g.strokeStyle = glow ? '#fff6a8' : '#fff'; g.lineWidth = Math.max(1.5, w * (glow ? 0.07 : 0.045));
     g.beginPath(); g.roundRect ? g.roundRect(x, y, w, h, w * 0.14) : g.rect(x, y, w, h); g.fill(); g.shadowBlur = 0; g.stroke();
-    g.fillStyle = '#fff'; g.font = `${Math.round(w * 0.42)}px sans-serif`; g.fillText(c.icon(), cx, y + h * 0.3);
+    const art = artOf(c);
+    if (art) { const a = w * 0.78; g.drawImage(art, cx - a / 2, y + h * 0.3 - a * 0.5, a, a); }
+    else { g.fillStyle = '#fff'; g.font = `${Math.round(w * 0.42)}px sans-serif`; g.fillText(c.icon(), cx, y + h * 0.3); }
+    g.fillStyle = '#fff';
     g.font = `${Math.round(w * 0.22)}px sans-serif`; g.fillText(c.badge, cx + w * 0.26, y + h * 0.44);
     g.font = `900 ${Math.round(w * 0.2)}px sans-serif`; g.fillText(c.val, cx, y + h * 0.64);
     if (w > 60) { g.font = `700 ${Math.round(w * 0.085)}px sans-serif`; const n = c.name(), cut = Math.ceil(n.length / 2); g.fillText(n.slice(0, cut), cx, y + h * 0.8); g.fillText(n.slice(cut), cx, y + h * 0.9); }
@@ -885,7 +897,7 @@
     sky.cardRects = [];          // a tap on one, and it leaps that way — the one chosen flying to it, the others fading
     const e = sky.end; if (!e || !sky.hand) return;
     const T = 2 * ROADEND.brake / SKY.speed, k = Math.min(1, e.t / (T * 0.8)), ease = 1 - (1 - k) ** 3, look = e.stage === 'look';
-    const w = Math.min(190, W * 0.24, H * 0.32), gap = w * 1.12, top = H * 0.215;
+    const w = Math.min(200, W * 0.25, H * 0.38), gap = w * 1.1, top = H * 0.2;
     sky.hand.forEach((c, i) => {
       if (sky.took === i) return;
       let cx = W / 2 + (i - 1) * gap * ease, y = top - (1 - ease) * H * 0.25, cw = w * (0.4 + 0.6 * ease);
@@ -973,6 +985,7 @@
       const p = project(a.lane, z), r = LANE() * p.s * 0.5, k = 1 + Math.sin(S.t * 6 + a.z) * 0.12;
       if (LOOK.night) candy(p.x, p.y - r * 1.2, r * 0.6 * k, a.z); else { g.font = `${Math.round(r * 1.4 * k)}px sans-serif`; g.fillText('⭐', p.x, p.y - r * 1.2); }
     }
+    drawRoadCards(sky); g.textAlign = 'center'; g.textBaseline = 'middle'; // (the cards at its end: under the fox, over the road)
     // the fox bounding on, a bound each SKY.hop s (crouched, up, stretched out, down: back_crouch_to_back_air +
     // back_air_to_back_crouch); at the end one more, a big one out off it, away and down into the cloud below
     const up = A.up || [], down = A.down || [], hops = [...up, ...down.slice(1, -1)];
@@ -1021,7 +1034,6 @@
     glints(0, -size * 0.45, size, dt);
     g.restore(); g.restore();
     if (sky.fall > FALL_IN * 0.5) { const q = project(sky.fellAt, 0); smoke({ x: q.x, y: q.y + LANE() * q.s * 0.6, s: q.s }, sky.fall - FALL_IN * 0.5); } // (a puff of cloud as it goes under: as at the road's end)
-    g.textAlign = 'center'; g.textBaseline = 'middle'; drawRoadCards(sky); // (over it all)
   }
 
   function offscreen(f, s) { // up out of sight: an arrow along the top where it is, and how high
@@ -1528,7 +1540,7 @@
   // its pictures fetched only once it's wanted (opened), or a while after the pet's page is in — not at once with the
   // pet's own: on a phone they'd fight over the network and the pet would take long to show
   let warmed = null;
-  function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends(), loadCutins()]).catch(() => {})); }
+  function warm() { return warmed ||= (loadTree(), Promise.all([loadClips(), loadBG(), loadFriends(), loadCutins(), loadCardArt()]).catch(() => {})); }
   // (the loading screen before it opens: progress(0…1) as its pictures come in; done when they all have)
   async function preload(progress) {
     let listed = false; Promise.all([warm(), looking]).then(() => { listed = true; });

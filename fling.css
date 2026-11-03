@@ -80,6 +80,7 @@
 @keyframes fl-deal { from { transform: translateY(40px) rotate(-6deg); opacity: 0; } }
 .fl-cd:active { transform: scale(.95); }
 .fl-cd-ic { position: relative; font-size: 54px; line-height: 1.1; filter: drop-shadow(0 3px 0 #0002); }
+.fl-cd-ic img { display: block; width: 112px; height: 112px; object-fit: contain; } /* (its picture, where it has one: assets/cards/) */
 .fl-cd-ic i { position: absolute; right: -18px; bottom: -4px; font-style: normal; font-size: 34px; background: #fff; border-radius: 50%; width: 46px; height: 46px;
   display: grid; place-items: center; box-shadow: 0 2px 6px #0003; }
 .fl-cd b { font-size: 30px; font-weight: 900; text-shadow: 0 2px 0 #0003; }
