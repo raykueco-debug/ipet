@@ -24,13 +24,16 @@
     : (() => { try { const a = new Audio(); a.volume = 0.5; return Math.abs(a.volume - 0.5) > 0.01; } catch (e) { return false; } })();
   if (WIRED && navigator.audioSession) try { navigator.audioSession.type = 'playback'; } catch (e) {}
 
-  let ac = null, out = null, sfx = null;
+  // muted: everything (the music and the effects), kept in this browser — ipet-mute
+  let muted = (() => { try { return localStorage.getItem('ipet-mute') === '1'; } catch (e) { return false; } })();
+  let ac = null, out = null, sfx = null, master = null;
   function ctx() { // made on the first touch (browsers want one), woken on every one after
     if (!ac) {
       try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
       out = ac.createDynamicsCompressor(); // (a limiter: clear under -6 dB)
       out.threshold.value = -6; out.knee.value = 3; out.ratio.value = 12; out.attack.value = 0.003; out.release.value = 0.15;
-      out.connect(ac.destination);
+      master = ac.createGain(); master.gain.value = muted ? 0 : 1; // (the mute: after everything)
+      out.connect(master).connect(ac.destination);
       sfx = ac.createGain(); sfx.gain.value = db(MIX.sfx - BLIPS); sfx.connect(out);
     }
     if (ac.state === 'suspended') ac.resume().catch(() => {});
@@ -49,6 +52,7 @@
     const el = Object.assign(new Audio(src), { loop: true }), gain = Math.min(1, db(MIX.music - (MUSIC[file] ?? MIX.music)));
     let node = null, on = false;
     if (!WIRED) el.volume = gain;
+    el.muted = muted; // (not through the context: its own mute)
     const wire = v => { if (node && v !== on) try { v ? node.connect(out) : node.disconnect(); on = v; } catch (e) {} };
     const piece = {
       el,
@@ -66,5 +70,12 @@
     return piece;
   }
 
-  window.Sound = { ctx, music, get sfx() { ctx(); return sfx; } };
+  function mute(v = !muted) {
+    muted = !!v;
+    try { localStorage.setItem('ipet-mute', muted ? '1' : '0'); } catch (e) {}
+    if (master) master.gain.value = muted ? 0 : 1;
+    for (const p of pieces.values()) p.el.muted = muted;
+    return muted;
+  }
+  window.Sound = { ctx, music, mute, get muted() { return muted; }, get sfx() { ctx(); return sfx; } };
 })();

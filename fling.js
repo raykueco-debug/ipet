@@ -203,7 +203,7 @@
       <span class="fl-pill fl-speed">💨 <span data-k="speed">0</span> km/h</span>
       <span class="fl-pill fl-stars" data-k="starPill"><b data-k="starIcon">⭐</b> <span data-k="stars">0</span><span class="fl-meter"><i data-k="meterBar"></i></span></span>
       <span class="fl-pill" data-k="frogPill" hidden>🐸</span>
-      <div class="fl-tails" data-k="tails"></div><button class="fl-x fl-look" data-k="look" aria-label="換普通版或萬聖節版">🎃</button><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
+      <div class="fl-tails" data-k="tails"></div><button class="fl-x" data-k="mute" aria-label="靜音">🔊</button><button class="fl-x fl-look" data-k="look" aria-label="換普通版或萬聖節版">🎃</button><button class="fl-x" data-k="close" aria-label="回到小狐">✕</button></div>
     <div class="fl-deck" data-k="deck"></div>
     <div class="fl-card fl-pick" data-k="pick" hidden><div><h1 data-k="pickTitle">選一張卡</h1><div class="fl-cds" data-k="pickRow"></div></div></div>
     <div class="fl-card" data-k="end" hidden><div>
@@ -221,6 +221,9 @@
     $('look').textContent = LOOK.night ? '☀️' : '🎃';
   }
   lookUI();
+  const muteIcon = () => { $('mute').textContent = window.Sound?.muted ? '🔇' : '🔊'; };
+  muteIcon();
+  $('mute').addEventListener('click', () => { window.Sound?.mute(); muteIcon(); }); // (all of it: the music and the effects, kept)
   $('look').addEventListener('click', () => { // (the other look: its pictures through the loading screen, as going in and out)
     const to = LOOK.night ? LOOKS.day : LOOKS.halloween;
     setLook(to);
