@@ -64,7 +64,7 @@
   const STARS = { step: 4, band: 1.5, low: 1.5, top: 0.84 * CAM.metres / CAM.least * (1 - 0.2 / 0.84) - 0.6 };
   // up past height m: off up onto the clouds, a run of run m along a cloud road (the fox seen from behind, three
   // lanes, stars on them), at speed m/s; at its end down off the cloud from drop m, onto a giraffe, and on
-  const SKY = { height: 100, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
+  const SKY = { height: 150, run: 500, speed: 40, drop: 22, hop: 0.7, intro: 0.8 }; // (hop: s a bound along the clouds; intro: s out of the cloud, up and down onto it, before the run)
   // the cloud road winds over the lanes, a lane wide; each bend: its edge on the side it goes to out over the next
   // lane first (over turn m), both lanes cloud a while (both m: the time to change lane), then its other edge in
   // after it. Off it (an edge past the fox's middle), the fox falls
@@ -158,7 +158,7 @@
   card('tails', 'gold', () => '🔥', '➕', '+2', () => '多兩次噴射', m => { m.refill += 2; });
 
   function deal(when, weights = null, first = null) { // three different cards: each a tier drawn by its rarity (or by <weights>), then a card of it
-    const pool = CARDS.filter(c => (!c.when || c.when === when) && c.id !== 'shield'), hand = []; // (the cloud road has no edge to fall off now: no saving card)
+    const pool = CARDS.filter(c => !c.when || c.when === when), hand = [];
     if (first) { const of = pool.filter(c => c.tier === first); hand.push(of[Math.floor(Math.random() * of.length)]); }
     const W = weights || Object.fromEntries(Object.entries(TIER).map(([t, v]) => [t, v.w])), sum = Object.values(W).reduce((a, b) => a + b, 0);
     while (hand.length < 3) {
@@ -398,7 +398,9 @@
   function spawn() { // keep the way ahead filled, a screen and more past the fox
     const ahead = S.fox.x + 60;
     while (S.nextFriend < ahead) {
-      S.friends.push({ x: S.nextFriend, x0: S.nextFriend, y: 0, kind: pickKind(), used: false, t: 0, carry: false, bunny: false });
+      let kind = pickKind(); // (never the same friend twice in a row — unless ?friend= asks for one kind)
+      for (let n = 0; !ONLY && kind === S.friends.at(-1)?.kind && n < 20; n++) kind = pickKind();
+      S.friends.push({ x: S.nextFriend, x0: S.nextFriend, y: 0, kind, used: false, t: 0, carry: false, bunny: false });
       S.nextFriend += 6 + Math.random() * 12 + Math.min(10, S.nextFriend / 80); // (thinning out farther on)
     }
     while (S.nextStar < ahead) { // few down low, thick up high
@@ -620,7 +622,7 @@
   }
   function roadAt() { return [-1.5, 1.5]; } // the road: wide, three lanes all the way (nowhere to fall off)
 
-  function steer(d) { if (S?.phase === 'sky' && !S.sky.end) S.sky.lane = Math.max(-1, Math.min(1, S.sky.lane + d)); } // (not once it's braking)
+  function steer(d) { if (S?.phase === 'sky' && !S.sky.end) S.sky.lane = Math.max(-2, Math.min(2, S.sky.lane + d)); } // (not once it's braking; past an outer lane: off the road's edge)
   function pickCard(i) { // a card tapped at the road's end: off it leaps, to it
     const e = S.sky?.end; if (!e || e.stage !== 'look' || i < 0 || i > 2) return;
     e.stage = 'leap'; e.pick = i; e.to = i - 1; S.sky.leap = 0; SFX.card(S.sky.hand[i].tier); SFX.whoosh();
@@ -662,6 +664,10 @@
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
     f.x = sky.x0 + sky.z;
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; sky.got++; starGot(); }
+    if (Math.abs(sky.x) > 1.5) { // steered off the road's edge: down through the cloud (a card: saved once, back on it)
+      if (S.mods.shield) { S.mods.shield--; sky.lane = sky.x = Math.sign(sky.x); SFX.boing(); S.shake = 0.3; pop('救回來了！', S.fox.x, 3, '#9be7ff', 0.6); }
+      else { sky.fall = 0; sky.fellAt = sky.x; SFX.whoosh(); return hud(); }
+    }
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); }
     hud();
   }
