@@ -375,6 +375,13 @@
       run.forEach((f, i) => setTimeout(() => { blip(f, f * 1.02, 0.28, 'triangle', 0.13); blip(f * 2, f * 2, 0.14, 'sine', 0.04); }, i * 55));
       if (tier !== 'blue') setTimeout(() => chime(tier === 'gold' ? 1568 : 1319, tier === 'gold' ? 5 : 3, 55), run.length * 55 + 40);
     },
+    perfect: () => { // tapped right on the burst: a clear bell, ringing on, and a glitter going up
+      if (!ac) return; const t = ac.currentTime, o = out();
+      for (const [fr, v, d] of [[1568, 0.22, 1.6], [3136, 0.1, 1.2], [4699, 0.05, 0.8], [2349, 0.07, 1.4]]) {
+        const s = ac.createOscillator(), sg = ac.createGain(); s.type = 'sine'; s.frequency.value = fr; env(sg, t, v, 0.002, d); s.connect(sg).connect(o); s.start(t); s.stop(t + d + 0.05);
+      }
+      [2093, 2637, 3136, 4186].forEach((fr, i) => setTimeout(() => blip(fr, fr * 1.01, 0.18, 'sine', 0.07), 90 + i * 45));
+    },
     cutin: dur => { flash(); charge(dur); }, boom: () => { boom(); chime(660, 5, 90); },
   };
 
@@ -443,7 +450,8 @@
   }
 
   function tap() {
-    if (S?.cutin) return; // (the cut-in on: held till the burst)
+    if (S?.cutin) { const c = S.cutin; if (c.hit === undefined) c.hit = c.t >= CUTIN.dur - TIMING.early; return; } // (the cut-in on: a tap judged, nothing else)
+    if (S?.late && S.t < S.late.until) { S.late = null; superBoost(); return; } // (just after the burst: still in time — not a dash)
     if (!S) return;
     ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
     if (S.phase !== 'fly') return;
@@ -1106,6 +1114,9 @@
   // the friends' close-ups for the super bounce's cut-in (not the mushroom's): <dir>/cutin/<kind>.png, on Halloween
   // their costumed ones where there (GPT sheets assets/source/gpt/cutin_*.png, tools/grid_split.py)
   const CUTIN = { dur: 1.5, in: 0.14, out: 0.15 }, CUTINS = {};
+  // its ring countdown: one closing in on the ring in the middle, onto it as the burst goes (with its sound) — a tap
+  // then (from <early> s before to <late> s after) and the super bounce is <boost> as strong again; too soon, missed
+  const TIMING = { early: 0.16, late: 0.12, boost: 1.5 };
   const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
   const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
   function loadCutins() {
@@ -1114,6 +1125,29 @@
     }))));
   }
   const cutinOf = k => (LOOK.friends && CUTINS[LOOK.friends]?.[k]) || CUTINS['assets/friends']?.[k] || null;
+  function superBoost() { // tapped as the burst went: half as strong again
+    const f = S.fox; f.vx *= TIMING.boost; f.vy *= TIMING.boost; f.glide *= TIMING.boost; f.ride *= TIMING.boost;
+    S.shake = Math.max(S.shake, 0.6); f.rainbow = Math.max(f.rainbow, 2.6);
+    starBurst(f.x, f.y + 0.6, 36, 15); SFX.perfect();
+    pop('完美！+50%', f.x, f.y + 3.4, '#fff27a', 1.2);
+  }
+  function drawRing(c) { // the countdown: a ring closing in on the one in the middle, onto it at the burst
+    const left = CUTIN.dur - c.t, k = Math.max(0, left / CUTIN.dur), cx = W / 2, cy = H * 0.5, R = H * 0.16;
+    const now = left <= TIMING.early, judged = c.hit !== undefined;
+    g.save(); g.lineCap = 'round';
+    g.strokeStyle = judged ? (c.hit ? '#fff27a' : '#ff8a8a') : now ? '#fff27a' : 'rgba(255, 255, 255, 0.85)'; // (the target)
+    g.lineWidth = H * (now && !judged ? 0.018 : 0.012); g.shadowColor = '#fff27a'; g.shadowBlur = now ? H * 0.04 : 0;
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke(); g.shadowBlur = 0;
+    if (!judged) { // (the one closing in: from three times as big)
+      g.strokeStyle = `rgba(255, 255, 255, ${0.35 + 0.6 * (1 - k)})`; g.lineWidth = H * 0.008;
+      g.beginPath(); g.arc(cx, cy, R * (1 + 2 * k), 0, Math.PI * 2); g.stroke();
+    }
+    g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = Math.max(3, H * 0.008); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `900 ${Math.round(H * (now ? 0.075 : 0.055))}px sans-serif`;
+    const word = judged ? (c.hit ? '完美！' : '太早了') : now ? '點！' : '';
+    if (word) { g.strokeText(word, cx, cy); g.fillText(word, cx, cy); }
+    g.restore();
+  }
   function drawCutin() { // the friend's face in close-up on a band across the screen, speed lines streaming by
     const c = S.cutin, im = cutinOf(c.kind), t = c.t;
     const into = Math.min(1, t / CUTIN.in), away = Math.max(0, (t - (CUTIN.dur - CUTIN.out)) / CUTIN.out);
@@ -1135,6 +1169,7 @@
       g.drawImage(im, x + shake, cy - h / 2 + shake, w, h);
     }
     g.restore();
+    drawRing(c);
     if (t > CUTIN.dur - 0.06) { g.fillStyle = `rgba(255, 255, 255, ${(t - (CUTIN.dur - 0.06)) / 0.06})`; g.fillRect(0, 0, W, H); } // (a flash, into the burst)
   }
   const art = (k, n) => ART[k]?.[n] || null;
@@ -1570,7 +1605,10 @@
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0)); last = now;
     if (S?.cutin) { // (the cut-in: all held, the world under it, then the burst)
       draw(0); drawCutin();
-      if ((S.cutin.t += dt) >= CUTIN.dur) { const then = S.cutin.then; S.cutin = null; then(); }
+      if ((S.cutin.t += dt) >= CUTIN.dur) {
+        const { then, hit } = S.cutin; S.cutin = null; then();
+        if (hit) superBoost(); else if (hit === undefined) S.late = { until: S.t + TIMING.late }; // (not tapped yet: a moment more)
+      }
     } else if (S) { step(dt * PACE); draw(dt * PACE); }
     raf = requestAnimationFrame(loop);
   }
@@ -1625,6 +1663,7 @@
     if (history.length > 1) history.back(); else location.href = 'index.html'; // (its own page: back where it came from)
   }
   window.Fling = { open, close, preload };
+  if (params.has('debug')) window.__fling = () => S; // (?debug: the run, to look into)
   if (params.has('debug')) Fling.state = () => S; // (?debug: the run, to look at from the console)
 })();
 
