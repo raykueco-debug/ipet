@@ -485,20 +485,23 @@
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0; f.soar = false;
     dust(a.x, 0.2, 5);
-    const power = (S.ready && a.kind !== 'mushroom') || a.bunny; // a super bounce (the stars full; not off the mushroom / the witch's pot: its own bounce, the stars kept for the next), or a bunny bounce (a rabbit ran here first): as strong
-    if (power) { // (the bunny's first: the stars keep for the next)
-      const bunny = a.bunny;
-      if (bunny) a.bunny = false; else { S.ready = false; S.meter = 0; }
+    // a super bounce (the stars full; not off the mushroom / the witch's pot: its own bounce, the stars kept for the
+    // next) and a bunny bounce (a rabbit ran here first) — either as strong, both at once stronger still (one boost
+    // on the other); a dive onto it on top of that
+    const bunny = a.bunny, sup = S.ready && a.kind !== 'mushroom', power = bunny || sup, boost = SUPER.boost ** ((bunny ? 1 : 0) + (sup ? 1 : 0));
+    if (power) {
+      a.bunny = false; if (sup) { S.ready = false; S.meter = 0; }
       const burst = () => {
-        f.rainbow = 2.2; S.shake = 0.5; if (bunny) SFX.super(); else SFX.boom();
-        pop(bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!', a.x, fr.h + 2.5, bunny ? '#ffb3d9' : '#ffe14d', 1.3); confetti(a.x, fr.h + 1, 60); starBurst(a.x, fr.h + 0.5, 40, 13);
+        f.rainbow = 2.2; S.shake = 0.5; if (sup) SFX.boom(); else SFX.super();
+        const word = bunny && sup ? 'BUNNY + SUPER!' : bunny ? 'BUNNY BOUNCE!' : 'SUPER BOUNCE!';
+        pop(word, a.x, fr.h + 2.5, sup ? '#ffe14d' : '#ffb3d9', 1.3); confetti(a.x, fr.h + 1, bunny && sup ? 90 : 60); starBurst(a.x, fr.h + 0.5, bunny && sup ? 56 : 40, 13);
       };
-      if (!bunny && cutinOf(a.kind)) { S.cutin = { kind: a.kind, t: 0, then: burst }; SFX.cutin(CUTIN.dur); } else burst(); // (a super bounce: the friend's close-up first, all held meanwhile)
+      if (sup && cutinOf(a.kind)) { S.cutin = { kind: a.kind, t: 0, then: burst }; SFX.cutin(CUTIN.dur); } else burst(); // (a super bounce: the friend's close-up first, all held meanwhile)
     }
     if ((dived || power || S.mods.noTrip) && a.kind === 'hedgehog') { // (or a card: never tripped on it) // curled up and rolling off along the ground, knocking flying whoever it meets
       a.roll = true; a.speed = Math.max(ROLL.least, f.vx * 0.9); a.spin = 0;
       FRIENDS.mushroom.hit(f); f.vx *= DIVE_BOOST + S.mods.dive; f.vy *= DIVE_BOOST + S.mods.dive; // (off it as off a mushroom dived onto)
-      if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; }
+      if (power) { f.vx *= boost; f.vy *= boost; }
       SFX.big(); act('joy', 0.8); S.shake = Math.max(S.shake, 0.2);
       if (!power) pop('滾出去！', a.x, fr.h + 1.5, '#ffe14d');
       if (combo) comboUp(a, fr);
@@ -509,12 +512,13 @@
     if (pw > 1) { f.vx *= pw; f.vy *= pw; f.glide *= pw; f.ride *= pw; }
     if (M.glide[a.kind]) f.soar = true;
     if (M.hops[a.kind]) f.hops += M.hops[a.kind];
-    if (power) { f.vx *= SUPER.boost; f.vy *= SUPER.boost; f.glide *= SUPER.boost; f.ride *= SUPER.boost; if (f.hops) f.hops += SUPER.hops; }
+    if (power) { f.vx *= boost; f.vy *= boost; f.glide *= boost; f.ride *= boost; if (f.hops) f.hops += SUPER.hops; }
     if (dived && s !== 'ouch') { f.vx *= DIVE_BOOST + M.dive; f.vy *= DIVE_BOOST + M.dive; pop('強力！', a.x + 1, fr.h + 2.4, '#ffb347', 0.6); }
     if (combo && s !== 'ouch') comboUp(a, fr);
     if (s === 'ouch') S.combo = 0; // (tripped: no combo on from it)
     if (a.kind === 'rabbit') { // off ahead past two friends: the first knocked flying on the way, by the second it stops — a bunny bounce off that one
-      const [k, b] = S.friends.filter(o => !o.used && !o.bunny && o.x > a.x + 2);
+      const [k, ...on] = S.friends.filter(o => !o.used && !o.bunny && o.x > a.x + 2);
+      const b = on.find(o => o.kind !== 'rabbit' && o.kind !== 'mushroom'); // (never by another rabbit, nor the mushroom: on to the next friend)
       if (b) { b.bunny = true; a.runTo = b; a.knock = M.noKnock ? null : k; a.speed = Math.max(RABBIT.run, f.vx + 6); }
     }
     if (a.kind === 'frog') { S.frog = true; pop('俯衝落地彈更高！', a.x + 1, fr.h + 2.6, '#9be27a', 0.55); }
