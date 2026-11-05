@@ -571,7 +571,9 @@
     if (f.rainbow > 0) S.fx.push({ kind: 'rain', x: f.x - 0.2, y: f.y + 0.8, t: 0, c: `hsl(${(S.t * 600) % 360}, 90%, 65%)` });
     // onto a friend (coming down)
     if (f.vy < 0) for (const a of S.friends) {
-      if (!a.used && Math.abs(f.x - a.x - box(a).cx) < (FRIENDS[a.kind].r || 0.9) && f.y < box(a).h && f.y > -0.3) { landOn(a); break; }
+      const touch = a.kind === 'giraffe' && art('giraffe', 'idle') ? overArt(a, f) // (the giraffe: all of its picture)
+        : Math.abs(f.x - a.x - box(a).cx) < (FRIENDS[a.kind].r || 0.9) && f.y < box(a).h && f.y > -0.3;
+      if (!a.used && touch) { landOn(a); break; }
     }
     // the plain ground
     if (f.y <= 0) {
@@ -1256,6 +1258,19 @@
   }
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
+  // a picture's outline: how high it reaches, column by column (a share of its square, from the bottom), measured once
+  function outline(im) {
+    if (im._top) return im._top;
+    const N = 64, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'); x.drawImage(im, 0, 0, N, N);
+    const d = x.getImageData(0, 0, N, N).data, top = [];
+    for (let i = 0; i < N; i++) { let h = 0; for (let j = 0; j < N; j++) if (d[(j * N + i) * 4 + 3] > 100) { h = (N - j) / N; break; } top.push(h); }
+    return im._top = top;
+  }
+  function overArt(a, f) { // the fox over any part of the friend's picture (as it's drawn: its square, its feet off-centre), not just a box
+    const im = art(a.kind, 'idle'), top = outline(im), M = ART_M[a.kind], left = -M / 2 - ((ART_FEET[a.kind + '_idle'] ?? 256) - 256) / 512 * M;
+    let h = 0; for (const dx of [-0.35, 0, 0.35]) { const u = (f.x + dx - a.x - left) / M; if (u >= 0 && u < 1) h = Math.max(h, top[Math.floor(u * top.length)] * M); } // (the fox's own width)
+    return h > 0 && f.y < h + 0.15 && f.y > -0.3;
+  }
   function drawArt(a, s, t) {
     const k = a.kind, side = s * (ART_M[k] || 1.2);
     const flip = t * 8 % 1 < 0.5, moving = (k === 'owl' || k === 'boar') && (a.carry || a.x !== a.x0); // (flapping / galloping)
