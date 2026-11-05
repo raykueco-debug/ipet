@@ -483,6 +483,7 @@
     S.fox.up = null; // (bouncing off the ground afresh after it)
     const f = S.fox, fr = FRIENDS[a.kind];
     const dived = f.dive; // (diving onto it: a hedgehog knocked away, any other friend's throw the stronger)
+    if (S.recordLater) { S.recordLater = false; S.recordAt = S.t + 0.3; } // (the record broken up on the clouds: now, as it flies off this one)
     const combo = S.combo > 0; S.combo++; // (from a friend, not the ground)
     a.used = true; a.t = 0; f.y = box(a).h; f.hops = 0; f.glide = 0; f.ride = 0; f.dive = false; f.dash = 0; f.soar = false;
     dust(a.x, 0.2, 5);
@@ -542,6 +543,7 @@
       if (fd.t >= FADE) S.fade = null;
     }
     S.t += dt;
+    if (S.recordAt && S.t >= S.recordAt && !S.record) { S.recordAt = 0; S.record = { t: 0 }; }
     S.shake = Math.max(0, S.shake - dt);
     const f = S.fox;
     if (f.act && (f.act.t += dt) > f.act.dur) f.act = null;
@@ -680,7 +682,7 @@
       if (S.mods.shield) { S.mods.shield--; sky.lane = sky.x = Math.sign(sky.x); SFX.boing(); S.shake = 0.3; pop('救回來了！', S.fox.x, 3, '#9be7ff', 0.6); }
       else { sky.fall = 0; sky.fellAt = sky.x; SFX.whoosh(); return hud(); }
     }
-    if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); if (best) S.record = { t: 0 }; }
+    if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); if (best) S.recordLater = true; } // (up on the clouds: its slow motion kept till it's down, off the first friend)
     hud();
   }
   function fromSky(fell) { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
@@ -1148,9 +1150,11 @@
   const cutinOf = k => (LOOK.friends && CUTINS[LOOK.friends]?.[k]) || CUTINS['assets/friends']?.[k] || null;
   // past the farthest yet: the game slowed to a crawl a moment (eased back), a band across with the fox cheering on it
   // and "破紀錄！" with the distance
-  const RECORD = { dur: 1.6, slow: t => t < 0.12 ? 1 - t / 0.12 * 0.85 : t < 1.1 ? 0.15 : 0.15 + 0.85 * Math.min(1, (t - 1.1) / 0.5) };
+  // (the moment it crosses: the whole screen in slow motion at once; the band in a little after, once it's seen going over)
+  const RECORD = { dur: 2.1, band: 0.45, slow: t => t < 0.06 ? 1 - t / 0.06 * 0.88 : t < 1.4 ? 0.12 : 0.12 + 0.88 * Math.min(1, (t - 1.4) / 0.5) };
   function drawRecord(r) {
-    const t = r.t, into = Math.min(1, t / 0.18), away = Math.max(0, (t - (RECORD.dur - 0.3)) / 0.3), ease = k => 1 - (1 - k) ** 3;
+    const t = r.t - RECORD.band, into = Math.min(1, Math.max(0, t) / 0.18), away = Math.max(0, (r.t - (RECORD.dur - 0.3)) / 0.3), ease = k => 1 - (1 - k) ** 3;
+    if (t < 0) return; // (slowed first, nothing over it)
     const bh = H * 0.34 * ease(into) * (1 - ease(away)), cy = H * 0.42, slant = H * 0.06; if (bh < 1) return;
     g.save();
     g.beginPath(); g.moveTo(0, cy - bh / 2 + slant); g.lineTo(W, cy - bh / 2 - slant); g.lineTo(W, cy + bh / 2 - slant); g.lineTo(0, cy + bh / 2 + slant); g.closePath();
