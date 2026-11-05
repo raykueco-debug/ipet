@@ -569,11 +569,12 @@
     f.spin = Math.max(0, f.spin - dt * 2);
     if (f.dash > 0) S.fx.push({ kind: 'fire', x: f.x - 0.3, y: f.y + 0.8, vx: -f.vx * 0.2, vy: 0.5, t: 0 });
     if (f.rainbow > 0) S.fx.push({ kind: 'rain', x: f.x - 0.2, y: f.y + 0.8, t: 0, c: `hsl(${(S.t * 600) % 360}, 90%, 65%)` });
-    // onto a friend (coming down)
-    if (f.vy < 0) for (const a of S.friends) {
-      const touch = a.kind === 'giraffe' && art('giraffe', 'idle') ? overArt(a, f) // (the giraffe: all of its picture)
-        : Math.abs(f.x - a.x - box(a).cx) < (FRIENDS[a.kind].r || 0.9) && f.y < box(a).h && f.y > -0.3;
-      if (!a.used && touch) { landOn(a); break; }
+    // onto a friend (coming down; the giraffe, touched anywhere on its picture, going up too: its neck met bouncing up)
+    for (const a of S.friends) {
+      if (a.used) continue;
+      const touch = a.kind === 'giraffe' && art('giraffe', 'idle') ? overArt(a, f)
+        : f.vy < 0 && Math.abs(f.x - a.x - box(a).cx) < (FRIENDS[a.kind].r || 0.9) && f.y < box(a).h && f.y > -0.3;
+      if (touch) { landOn(a); break; }
     }
     // the plain ground
     if (f.y <= 0) {
@@ -1258,18 +1259,28 @@
   }
   const art = (k, n) => ART[k]?.[n] || null;
   const box = a => (art(a.kind, 'idle') && ART_HIT[a.kind]) || { cx: 0, h: FRIENDS[a.kind].h }; // (where it's landed on)
-  // a picture's outline: how high it reaches, column by column (a share of its square, from the bottom), measured once
+  // a picture's outline: column by column, how high it reaches and where it starts (shares of its square, from the
+  // bottom: the neck's underside is high up), measured once
   function outline(im) {
-    if (im._top) return im._top;
+    if (im._cols) return im._cols;
     const N = 64, c = document.createElement('canvas'); c.width = c.height = N; const x = c.getContext('2d'); x.drawImage(im, 0, 0, N, N);
-    const d = x.getImageData(0, 0, N, N).data, top = [];
-    for (let i = 0; i < N; i++) { let h = 0; for (let j = 0; j < N; j++) if (d[(j * N + i) * 4 + 3] > 100) { h = (N - j) / N; break; } top.push(h); }
-    return im._top = top;
+    const d = x.getImageData(0, 0, N, N).data, cols = [];
+    for (let i = 0; i < N; i++) {
+      let top = 0, bot = 0;
+      for (let j = 0; j < N; j++) if (d[(j * N + i) * 4 + 3] > 100) { top = (N - j) / N; break; }
+      for (let j = N - 1; j >= 0; j--) if (d[(j * N + i) * 4 + 3] > 100) { bot = (N - 1 - j) / N; break; }
+      cols.push([bot, top]);
+    }
+    return im._cols = cols;
   }
   function overArt(a, f) { // the fox over any part of the friend's picture (as it's drawn: its square, its feet off-centre), not just a box
-    const im = art(a.kind, 'idle'), top = outline(im), M = ART_M[a.kind], left = -M / 2 - ((ART_FEET[a.kind + '_idle'] ?? 256) - 256) / 512 * M;
-    let h = 0; for (const dx of [-0.35, 0, 0.35]) { const u = (f.x + dx - a.x - left) / M; if (u >= 0 && u < 1) h = Math.max(h, top[Math.floor(u * top.length)] * M); } // (the fox's own width)
-    return h > 0 && f.y < h + 0.15 && f.y > -0.3;
+    const im = art(a.kind, 'idle'), cols = outline(im), M = ART_M[a.kind], left = -M / 2 - ((ART_FEET[a.kind + '_idle'] ?? 256) - 256) / 512 * M;
+    for (const dx of [-0.35, 0, 0.35]) { // (the fox's own width, and its height: feet to ears)
+      const u = (f.x + dx - a.x - left) / M; if (u < 0 || u >= 1) continue;
+      const [bot, top] = cols[Math.floor(u * cols.length)];
+      if (top > 0 && f.y < top * M + 0.15 && f.y + FOX_H * 0.8 > bot * M) return true;
+    }
+    return false;
   }
   function drawArt(a, s, t) {
     const k = a.kind, side = s * (ART_M[k] || 1.2);
