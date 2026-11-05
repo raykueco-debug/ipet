@@ -187,11 +187,52 @@ function flash(msg) {
 $('#adBtn').addEventListener('click', () => { setCoins(st.coins + 10); flash(t('p_adDone')); });
 $('#buyBtn').addEventListener('click', () => flash(t('p_buyNote')));
 
-// opened from the child's QR code / link (parent.html?family=CODE): paired, kept, and the code taken off the address
-const linked = (new URLSearchParams(location.search).get('family') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+/* ---------- the children: more than one, each with its own code; the one picked is the one sent to ---------- */
+const clean = c => (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+st.kids = (() => { try { return JSON.parse(localStorage.getItem('ipet-parent-kids')) || []; } catch (e) { return []; } })();
+if (!st.kids.length && st.family) st.kids = [{ code: st.family, name: t('p_kidN', { n: 1 }) }]; // (the one paired before: kept)
+const saveKids = () => localStorage.setItem('ipet-parent-kids', JSON.stringify(st.kids));
+function addKid(code, name) {
+  code = clean(code); if (code.length < 8) return false;
+  const had = st.kids.find(k => k.code === code);
+  if (had) { if (name) had.name = name; } else st.kids.push({ code, name: name || t('p_kidN', { n: st.kids.length + 1 }) });
+  saveKids(); pickKid(code); return true;
+}
+function pickKid(code) {
+  st.family = code; localStorage.setItem('ipet-parent-family', code); $('#family').value = code;
+  renderKids(); loadSchedule();
+}
+function renderKids() {
+  $('#kids').innerHTML = st.kids.map(k => `<div class="kid${k.code === st.family ? ' on' : ''}" data-code="${k.code}">`
+    + `<button class="kid-pick">${k.name.replace(/</g, '&lt;')}<small>${k.code}</small></button>`
+    + `<button class="kid-fly">${t('p_flyTogether')}</button><button class="kid-x" title="${t('p_removeKid')}">✕</button></div>`).join('')
+    || `<p class="hint">${t('p_needCode')}</p>`;
+}
+$('#kids').addEventListener('click', e => {
+  const row = e.target.closest('.kid'); if (!row) return;
+  const code = row.dataset.code;
+  if (e.target.closest('.kid-x')) { st.kids = st.kids.filter(k => k.code !== code); saveKids(); if (st.family === code) pickKid(st.kids[0]?.code || ''); else renderKids(); return; }
+  if (e.target.closest('.kid-fly')) return flyWith(code);
+  pickKid(code);
+});
+$('#addKid').addEventListener('click', () => {
+  if (!addKid($('#kidCode').value, $('#kidName').value.trim())) { flash(t('p_needCode')); $('#kidCode').focus(); return; }
+  $('#kidCode').value = $('#kidName').value = '';
+  flash(t('p_paired', { code: st.family }));
+});
+// flying together (fling.js battle, through link.js's rooms): to the game, the child's pet rung from there
+$('#myName').value = localStorage.getItem('ipet-parent-name') || t('parents');
+$('#myName').addEventListener('change', () => localStorage.setItem('ipet-parent-name', $('#myName').value.trim() || t('parents')));
+function flyWith(code) {
+  if (!window.Link?.on) { flash(t('p_fail')); return; }
+  const room = Math.random().toString(36).slice(2, 10), name = ($('#myName').value.trim() || t('parents')).slice(0, 8);
+  location.href = `fling.html?battle=${room}&invite=${code}&name=${encodeURIComponent(name)}`;
+}
+
+// opened from the child's QR code / link (parent.html?family=CODE): that child added (or picked), and the code taken off the address
+const linked = clean(new URLSearchParams(location.search).get('family'));
 if (linked) {
-  st.family = linked;
-  localStorage.setItem('ipet-parent-family', linked);
+  addKid(linked);
   history.replaceState(null, '', location.pathname);
   setTimeout(() => flash(t('p_paired', { code: linked })), 0);
 }
@@ -199,17 +240,8 @@ $('#family').value = st.family;
 if (!st.family) setTimeout(() => flash(t('p_needCode')), 0);
 $('#family').addEventListener('change', () => {
   st.family = $('#family').value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-  // opened from the child's QR code / link (parent.html?family=CODE): paired, kept, and the code taken off the address
-const linked = (new URLSearchParams(location.search).get('family') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
-if (linked) {
-  st.family = linked;
-  localStorage.setItem('ipet-parent-family', linked);
-  history.replaceState(null, '', location.pathname);
-  setTimeout(() => flash(t('p_paired', { code: linked })), 0);
-}
-$('#family').value = st.family;
-if (!st.family) setTimeout(() => flash(t('p_needCode')), 0);
   localStorage.setItem('ipet-parent-family', st.family);
+  if (st.family.length >= 8) addKid(st.family); // (a code typed in: one of the children too)
   loadSchedule();
 });
 const d = new Date(Date.now() + 5 * 60000);
@@ -224,6 +256,7 @@ fetch('api/tts/status').then(r => r.json()).then(j => { st.provider = j.provider
 
 function renderAll() {
   I18N.apply();
+  renderKids();
   renderGifts();
   renderLines();
   renderEngine();

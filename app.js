@@ -464,13 +464,13 @@ async function eat(kind) {
 }
 
 const actions = {
-  game() { // the mini game, in a layer of its own over the pet (fling.js); the rhythm run, runner.html, from the menu
+  game(battle) { // the mini game, in a layer of its own over the pet (fling.js); the rhythm run, runner.html, from the menu (battle: flying with a parent, from its invite)
     if (S.stats.energy < FLING_LEAST) { say(t('tooTiredToPlay'), 3000); setExpr('tired', 2200); return; } // (rest or a meal first)
     save();
     homeMusic.pause();
     // (the loading screen first, its pictures coming in; the tap in opens it — and goes fullscreen, where it can)
     Preload.run({ title: '小狐飛多遠', load: p => Fling.preload(p), go: () => Fling.open({
-      level: level(), best: S.fling?.best || 0,
+      level: level(), best: S.fling?.best || 0, battle,
       energy: { // a fling costs some energy, ended; under FLING_LEAST it'd rather go home and rest or eat
         get: () => Math.round(S.stats.energy), least: FLING_LEAST,
         spend: () => { S.stats.energy = clamp(S.stats.energy - FLING_ENERGY); save(); return Math.round(S.stats.energy); },
@@ -841,6 +841,23 @@ function showPairing() {
   });
 }
 
+// a parent asking to fly together (parent.html → fling.html?battle=…, which rings this pet's room while it waits):
+// asked here — yes, and into the game in that battle
+let invited = null;
+function listenForInvites() {
+  const r = window.Link?.room?.('family-' + FAMILY); if (!r) return;
+  r.on('invite', m => {
+    if (!m.room || invited === m.room || !S.hatched || document.querySelector('.fl:not([hidden])')) return; // (asked already, or flying)
+    invited = m.room;
+    const d = document.createElement('div'); d.className = 'invite';
+    d.innerHTML = `<div><b>🦊 ${t('inviteFly', { from: (m.from || t('parents')).replace(/</g, '&lt;') })}</b><span><button class="go">${t('inviteGo')}</button><button class="later">${t('inviteLater')}</button></span></div>`;
+    document.body.appendChild(d); setExpr('happy', 2500);
+    const gone = () => d.remove();
+    d.querySelector('.later').onclick = gone;
+    d.querySelector('.go').onclick = () => { gone(); if (S.sleeping) actions.sleep?.(); actions.game({ room: m.room, name: S.name || t('foxName'), host: false }); };
+    setTimeout(() => { if (d.isConnected) { gone(); invited = null; } }, 60000); // (a minute unanswered: let go — asked again, it shows again)
+  });
+}
 async function pollInbox() {
   if (!S.hatched) return;
   if (window.Link?.on) { // Supabase
@@ -1086,6 +1103,7 @@ $('#runnerBtn').addEventListener('click', () => { save(); location.href = 'runne
   setInterval(chatter, 14000);
   setInterval(pollInbox, 4000);
   pollInbox();
+  listenForInvites();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

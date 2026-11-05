@@ -470,7 +470,7 @@
     S.dashes--;
     starBurst(f.x, f.y + 0.6, 22); // (off it goes in a burst of rainbow stars)
     f.vx += DASH.up[0]; f.vy = Math.max(f.vy, 0) + DASH.up[1]; f.dive = false;
-    f.glide = f.ride = 0; f.hops = 0; f.still = 0; f.dash = 0.5; f.act = null; f.spin = 0;
+    f.glide = f.ride = 0; f.hops = Math.max(f.hops, 2); f.still = 0; f.dash = 0.5; f.act = null; f.spin = 0; // (and two bounces off the ground after it)
     SFX.dash(); hud();
   }
 
@@ -688,7 +688,7 @@
     if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); if (best) S.recordLater = true; } // (up on the clouds: its slow motion kept till it's down, off the first friend)
     hud();
   }
-  function fromSky(fell) { // off the cloud's end: down from on high, a giraffe right under it, the way on fresh from here
+  function fromSky(fell) { // off the cloud's end: down from on high, a friend right under it, the way on fresh from here
     const f = S.fox;                                     // (fallen off it: straight down from there, onto a friend)
     f.x = S.sky.x0 + (fell ? S.sky.z : SKY.run); f.y = SKY.drop; f.vx = 0; f.vy = 0; f.up = null;
     S.sky = null; S.phase = 'fly';
@@ -699,8 +699,9 @@
       spawn(); act('ouch', 0.8); pop('掉下來了！', f.x, f.y + 2.5, '#fff', 0.9); return;
     }
     S.friends = []; S.stars = []; S.nextFriend = f.x + 14; S.nextStar = f.x + 4;
-    const gi = { x: 0, x0: 0, y: 0, kind: 'giraffe', used: false, t: 0, carry: false, bunny: false };
-    gi.x = gi.x0 = f.x - box(gi).cx; S.friends.push(gi); // (its head right under the fox)
+    const under = ['rabbit', 'frog', 'mushroom', 'owl', 'giraffe', 'boar', 'squirrel']; // (any friend but the sleeping bear and the hedgehog — not the giraffe every time)
+    const gi = { x: 0, x0: 0, y: 0, kind: under[Math.floor(Math.random() * under.length)], used: false, t: 0, carry: false, bunny: false };
+    gi.x = gi.x0 = f.x - box(gi).cx; S.friends.push(gi); // (right under the fox)
     spawn(); act('joy', 0.8);
     pop('+500 m！', f.x, f.y + 2.5, '#ffe14d', 1.1);
   }
@@ -836,6 +837,7 @@
       g.save(); g.translate(p.x, p.y); g.scale(k, k); if (LOOK.night) candy(0, 0, s * 0.36, a.x + a.y); else g.fillText('⭐', 0, 0); g.restore();
     }
     // the fox
+    drawGhost(s);
     drawFox(f, s);
     { const p = toScreen(f.x, f.y), size = s * FOX_H * 1.25; glints(p.x, p.y - size * 0.45, size, dt); }
     if (S.fade?.mid === toSky) { const q = toScreen(f.x, f.y + 0.6); smoke({ x: q.x, y: q.y, s: s * 1.6 / LANE() }, S.fade.t * 1.4); } // (up into the clouds: a puff of them)
@@ -1647,13 +1649,14 @@
     if (energy) energyCard(energy.spend()); // (a fling's worth of energy spent: what's left, and whether there's enough for another)
     best = Math.max(best, d);
     hud();
+    if (B) { B.mine = d; B.live = false; B.r.send('done', { dist: d }); setTimeout(result, 1200); return; } // (a battle: who flew farther, once both are down)
     setTimeout(() => { $('end').hidden = false; }, 1200); // (a moment to see it cheer first)
   }
   function start() {
     S = fresh(); spawn(); hud(); deckUI();
     const el = bgm?.el || bgm; if (el) try { el.currentTime = 0; } catch (e) {} // (a run: its music from the top)
     bgm?.play()?.catch?.(() => {});
-    if (!params.has('nocards')) pick('start'); // (?nocards: straight to the fling)
+    if (!params.has('nocards') && !B) pick('start'); // (?nocards: straight to the fling; a battle: none, both alike)
     $('end').hidden = true; $('energyNote').hidden = true; $('again').hidden = false; $('home').textContent = '回到小狐';
     $('final').parentElement.hidden = false;
   }
@@ -1691,7 +1694,7 @@
   layer.addEventListener('pointerdown', e => {
     if (e.target.closest?.('.fl-card, button') || !S) return;
     if (bgm?.paused) bgm.play().catch(() => {}); // (where it couldn't start by itself: on the first touch)
-    if (S.phase === 'aim') { S.drag = at(e); S.spring = null; }
+    if (S.phase === 'aim') { if (B && !B.live) return; S.drag = at(e); S.spring = null; } // (a battle: not before the countdown's done)
     else if (S.phase === 'sky') { if (S.sky.end) pickCard(cardAt(at(e))); else steer(at(e).x < W / 2 ? -1 : 1); } // (on the clouds: a lane to that side; at the end, a card)
     else tap();
   });
@@ -1705,9 +1708,12 @@
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); steer(e.key === 'ArrowLeft' ? -1 : 1); return; }
     if (e.code !== 'Space' && e.key !== 'ArrowUp') return;
     e.preventDefault();
-    if (S?.phase === 'aim') { const r = PULL.max * 0.75 / Math.SQRT2; S.pull = { x: -r, y: -r }; letGo(); } else tap();
+    if (S?.phase === 'aim') { if (B && !B.live) return; const r = PULL.max * 0.75 / Math.SQRT2; S.pull = { x: -r, y: -r }; letGo(); } else tap();
   });
-  $('again').addEventListener('click', start);
+  $('again').addEventListener('click', () => { // (a battle: again once both have asked)
+    if (!B) return start();
+    B.again.me = true; B.r.send('again', {}); $('again').hidden = true; $('endTitle').textContent = `等 ${B.other?.name || '對手'} 也按「再比一次」…`; rematch();
+  });
   $('home').addEventListener('click', close);
   $('close').addEventListener('click', close);
   $('close2').addEventListener('click', close);
@@ -1723,7 +1729,8 @@
       }
     } else if (S) {
       const slow = S.record ? RECORD.slow(S.record.t) : 1; // (past the farthest: all slowed, a moment)
-      step(dt * PACE * slow); draw(dt * PACE * slow);
+      battleTick(dt);
+      step(dt * PACE * slow); draw(dt * PACE * slow); drawBattle();
       if (S.record) { drawRecord(S.record); if ((S.record.t += dt) >= RECORD.dur) S.record = null; }
     }
     raf = requestAnimationFrame(loop);
@@ -1752,6 +1759,87 @@
   }
   addEventListener('ipet-in', () => setTimeout(warm, 4000)); // (preload.js: tapped in)
   addEventListener('load', () => setTimeout(warm, 20000));
+  // 對戰: two foxes flung at once on two phones — a parent's and a child's — in one room (link.js: Realtime broadcast,
+  // nothing stored). The host (the parent's page) rings the child's pet (room family-<code>: an invite, every so often
+  // till it's answered); both in, the host says go, and both count down 3-2-1 together; on the way each tells the other
+  // where its fox is (ten times a second), drawn see-through with its name over it (off the screen: an arrow at the
+  // edge, how far); both down, who flew farther. Both on the child's level (its dashes); no start cards.
+  // o: { room, name, host, invite (the child's code: the host's to ring) }
+  let B = null;
+  const BAT = { count: 3, every: 0.1 };
+  function battle(o) {
+    const r = window.Link?.room?.('battle-' + o.room); if (!r) return null;
+    const b = { r, o, other: null, live: false, count: 0, mine: null, theirs: null, again: { me: false, them: false }, sent: 0 };
+    const ring = o.host && o.invite ? Link.room('family-' + o.invite) : null;
+    const hi = () => r.send('hi', { name: o.name, host: !!o.host, level: DASHES });
+    const call = () => { if (!b.other) { hi(); ring?.send('invite', { room: o.room, from: o.name }); } };
+    call(); b.timer = setInterval(call, 1500);
+    r.on('hi', m => {
+      if (b.other) return;
+      b.other = { name: m.name || '對手', x: PULL.rest[0], y: PULL.rest[1], ph: 'aim', d: 0 };
+      hi(); // (and so it sees this one)
+      if (!o.host && m.level) {} // (the host takes the child's level, not the other way)
+      if (o.host) { if (m.level) { DASHES = m.level; if (S) S.dashes = DASHES; hud(); } for (const ms of [0, 300, 700]) setTimeout(() => r.send('go', {}), ms); countDown(); }
+    });
+    r.on('go', () => { if (!o.host && !b.count && !b.live) countDown(); });
+    r.on('pos', m => { if (b.other) Object.assign(b.other, m); });
+    r.on('done', m => { if (b.theirs == null) { b.theirs = m.dist; if (b.mine != null) r.send('done', { dist: b.mine }); result(); } });
+    r.on('again', () => { b.again.them = true; rematch(); });
+    b.close = () => { clearInterval(b.timer); r.close(); ring?.close(); };
+    return b;
+  }
+  function countDown() { B.count = BAT.count; B.live = false; SFX.ready(); }
+  function rematch() {
+    if (!(B.again.me && B.again.them)) return;
+    B.again = { me: false, them: false }; B.mine = B.theirs = null;
+    if (B.other) Object.assign(B.other, { x: PULL.rest[0], y: PULL.rest[1], ph: 'aim', d: 0 });
+    start(); countDown();
+  }
+  function result() { // both down: who flew farther
+    if (!B || B.mine == null) return;
+    $('end').hidden = false; $('final').parentElement.hidden = false; $('final').textContent = B.mine;
+    if (B.theirs == null) { $('endTitle').textContent = `等 ${B.other?.name || '對手'} 飛完…`; $('endNote').textContent = ''; $('again').hidden = true; return; }
+    const n = B.other?.name || '對手';
+    $('endTitle').textContent = B.mine > B.theirs ? '🎉 你贏了！' : B.mine < B.theirs ? `${n} 贏了！` : '平手！';
+    $('endNote').textContent = `你 ${B.mine} m · ${n} ${B.theirs} m`;
+    $('again').hidden = false; $('again').textContent = '再比一次';
+    if (B.mine > B.theirs) { SFX.best(); confetti(S.fox.x, S.fox.y + 2, 80); }
+  }
+  function battleTick(dt) { // the countdown, and where this fox is, told
+    if (!B) return;
+    if (B.count > 0) { const was = Math.ceil(B.count); B.count -= dt; if (Math.ceil(B.count) !== was && B.count > 0) SFX.star(); if (B.count <= 0) { B.count = 0; B.live = true; SFX.super(); } }
+    if (B.live && S && (B.sent += dt) >= BAT.every) {
+      B.sent = 0; const f = S.fox;
+      B.r.send('pos', { x: +f.x.toFixed(2), y: +f.y.toFixed(2), ph: S.phase, d: Math.max(0, Math.floor(f.x)) });
+    }
+  }
+  function drawGhost(s) { // the other fox, see-through, its name over it (on the ground and in the air; not up on the clouds)
+    const o = B?.other; if (!o || o.ph === 'sky' || S.phase === 'sky') return;
+    const p = toScreen(o.x, o.y), size = s * FOX_H * 1.25;
+    if (p.x < -size * 0.3 || p.x > W + size * 0.3) { // (off the screen: an arrow at its side, how far)
+      const right = p.x > W, x = right ? W - 70 : 70, y = H * 0.3;
+      g.save(); g.fillStyle = 'rgba(122, 63, 208, 0.85)'; g.beginPath();
+      if (right) { g.moveTo(x + 40, y); g.lineTo(x + 20, y - 14); g.lineTo(x + 20, y + 14); } else { g.moveTo(x - 40, y); g.lineTo(x - 20, y - 14); g.lineTo(x - 20, y + 14); }
+      g.fill(); g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = 4; g.font = "800 18px sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const t = `${o.name} ${o.d} m`; g.strokeText(t, x, y + 30); g.fillText(t, x, y + 30); g.restore();
+      return;
+    }
+    const im = o.ph === 'aim' ? A.pounce?.[CROUCH[0]] : o.y > 0.05 ? A.run?.[AIR] : frameOf('run', S.t, 10);
+    g.save(); g.globalAlpha = 0.5;
+    if (im?.complete && im.naturalWidth) g.drawImage(im, p.x - size / 2, p.y - size * 449 / 480, size, size);
+    g.globalAlpha = 1; g.fillStyle = '#fff'; g.strokeStyle = '#7a3fd0'; g.lineWidth = 4; g.font = `800 ${Math.round(s * 0.42)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.strokeText(o.name, p.x, p.y - size * 1.0); g.fillText(o.name, p.x, p.y - size * 1.0);
+    g.restore();
+  }
+  function drawBattle() { // over it all: the other's distance; waiting for it; the countdown
+    if (!B) return;
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+    const say = (t, y, fs, c = '#fff') => { g.font = `900 ${fs}px 'Arial Rounded MT Bold', 'Nunito', sans-serif`; g.lineWidth = fs * 0.2; g.strokeStyle = '#7a3fd0'; g.strokeText(t, W / 2, y); g.fillStyle = c; g.fillText(t, W / 2, y); };
+    if (B.other && (B.live || B.mine != null)) say(`🦊 ${B.other.name} ${B.theirs ?? B.other.d} m${B.theirs != null ? '（落地）' : ''}`, H * 0.16, Math.round(H * 0.045));
+    if (!B.other) say(`等${B.o.host ? '孩子' : '對手'}加入…`, H * 0.42, Math.round(H * 0.07));
+    else if (B.count > 0) { const n = Math.ceil(B.count), k = B.count % 1; say(String(n), H * 0.45, Math.round(H * (0.2 + 0.1 * k)), '#ffe36e'); say(`和 ${B.other.name} 一起飛！`, H * 0.28, Math.round(H * 0.05)); }
+    g.restore();
+  }
   function open(o = {}) {
     warm();
     opts = o;
@@ -1764,12 +1852,16 @@
     Promise.resolve(fs).then(() => screen.orientation?.lock?.('landscape')).catch(() => {}).finally(resizeSoon);
     resizeSoon();
     energy = o.energy || petEnergy();
+    B?.close(); B = null;
+    const bo = o.battle || (params.get('battle') && { room: params.get('battle'), name: params.get('name') || '爸媽', host: params.has('invite'), invite: params.get('invite') });
+    if (bo) B = battle(bo);
     start(); // (straight onto the tree, to be pulled back)
     if (energy && energy.get() < energy.least) tooTired();
     music();
     cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(loop);
   }
   function close() {
+    B?.close(); B = null;
     cancelAnimationFrame(raf); raf = 0;
     bgm?.pause();
     layer.hidden = true; S = null;

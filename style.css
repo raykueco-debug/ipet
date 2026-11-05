@@ -336,3 +336,11 @@ body.admin .ff { display: inline-block; }
 .pair small { color: var(--muted); line-height: 1.4; }
 .pair button { width: 100%; }
 .role-link { color: var(--muted); font-size: 14px; text-decoration: underline; }
+
+/* a parent asking to fly together (app.js listenForInvites) */
+.invite { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #0005; }
+.invite > div { background: #fff; color: #3b2f2a; border-radius: 22px; padding: 22px 24px; max-width: 86vw; text-align: center; box-shadow: 0 10px 40px #0004; font-size: 20px; }
+.invite b { display: block; margin-bottom: 14px; }
+.invite span { display: flex; gap: 10px; justify-content: center; }
+.invite button { border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-weight: 800; }
+.invite .go { background: #e8743b; color: #fff; } .invite .later { background: #f1e7dc; color: #3b2f2a; }

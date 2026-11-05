@@ -80,3 +80,15 @@ textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backg
 .speak-lang button { padding: 4px 12px; font-size: 13px; border: 1px solid var(--line); background: transparent; }
 .speak-lang button.on { border-color: var(--accent); background: var(--soft); color: var(--ink); font-weight: 700; }
 .lang-row button { padding: 4px 12px; font-size: 12px; border: 1px solid var(--line); background: transparent; }
+
+/* the children (parent.js kids): each its own chip — tap to send to it; 🦊 to fly together */
+.kids { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.kid { display: flex; align-items: center; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; }
+.kid.on { border-color: var(--accent); background: var(--soft); }
+.kid-pick { flex: 1; text-align: left; background: transparent; border: 0; font: inherit; color: var(--ink); padding: 6px 8px; }
+.kid-pick small { display: block; color: var(--muted); font-size: 12px; }
+.kid-fly { border: 0; border-radius: 999px; padding: 8px 12px; font: inherit; font-weight: 700; background: var(--accent); color: var(--accent-ink); }
+.kid-x { border: 0; background: transparent; color: var(--muted); font-size: 16px; padding: 6px; }
+.kid-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.kid-add input { flex: 1; min-width: 6em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+#myName { width: 8em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px; }
