@@ -453,7 +453,7 @@
   }
 
   function tap() {
-    if (S?.cutin) { const c = S.cutin; if (c.hit === undefined) { c.hit = c.t >= CUTIN.dur - TIMING.early; c.at = c.t; } return; } // (the cut-in on: a tap judged, nothing else)
+    if (S?.cutin) { const c = S.cutin; if (c.hit === undefined) { c.hit = c.t >= CUTIN.dur - TIMING.early && c.t <= CUTIN.dur + TIMING.late; c.at = c.t; if (c.combo) B?.r.send('combo-tap', { hit: c.hit }); } return; } // (the cut-in on: a tap judged, nothing else)
     if (S?.late && S.t < S.late.until) { S.late = null; superBoost(); return; } // (just after the burst: still in time — not a dash)
     if (!S) return;
     ac = window.Sound ? Sound.ctx() : ac || (() => { try { return new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } })(); // (sound.js: one context, the effects on its bus)
@@ -1146,7 +1146,7 @@
   // then (from <early> s before to <late> s after) and the super bounce is <boost> as strong again; too soon, missed
   const TIMING = { early: 0.3, late: 0.1, boost: 1.5, cue: 0.1 }; // (a window of 0.4 s round the burst; "TAP!" up 0.1 s before it opens)
   const CUTIN_KINDS = ['rabbit', 'frog', 'bear', 'owl', 'giraffe', 'boar', 'hedgehog', 'squirrel'];
-  const CUTIN_COLOR = { rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
+  const CUTIN_COLOR = { combo: '#ff7ab8', rabbit: '#ff4fa3', frog: '#37c24a', bear: '#ff8a1f', owl: '#ffb020', giraffe: '#2f8cff', boar: '#9a3cff', hedgehog: '#22c8d8', squirrel: '#ff5c7a' };
   function loadCutins() {
     return Promise.all(['assets/friends', LOOKS.halloween.friends].flatMap(dir => CUTIN_KINDS.map(k => new Promise(done => {
       const im = pic(); im.onload = () => { (CUTINS[dir] ||= {})[k] = im; done(); }; im.onerror = done; im.src = `${dir}/cutin/${k}.png`;
@@ -1250,7 +1250,19 @@
       const x = W - ((t * W * (4.4 + (i % 5) * 0.8) + i * 211) % (W + len * 2)) + len;
       g.lineWidth = 2 + (i % 4) * 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y - len * 0.22); g.stroke();
     }
-    if (im) { // the face (looking right): in from the left, a little shake as it shouts, off to the right
+    if (c.combo) { // (合體技: both foxes, in from either side, meeting in the middle)
+      const fx = frameOf('cheer', t) || A.joy?.[0], sz = H * 0.62, k = ease(into) * (1 - ease(away)), shake = Math.sin(t * 120) * H * 0.004;
+      if (fx?.complete && fx.naturalWidth) {
+        g.drawImage(fx, W * 0.5 - sz * 1.05 - (1 - k) * W * 0.5, cy - sz * 0.55 + shake, sz, sz);
+        g.save(); g.translate(W * 0.5 + sz * 1.05 + (1 - k) * W * 0.5, 0); g.scale(-1, 1); g.drawImage(fx, 0, cy - sz * 0.55 - shake, sz, sz); g.restore();
+      }
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; const fs = Math.round(H * 0.11);
+      g.font = `900 ${fs}px 'Arial Rounded MT Bold', 'Nunito', sans-serif`; g.lineWidth = fs * 0.22; g.strokeStyle = '#7a3fd0';
+      g.strokeText('合體技！', W / 2, cy + H * 0.2); g.fillStyle = '#fff'; g.fillText('合體技！', W / 2, cy + H * 0.2);
+      g.font = `800 ${Math.round(fs * 0.36)}px sans-serif`; g.lineWidth = fs * 0.08;
+      const both = `兩個人一起點到才成功！`; g.strokeText(both, W / 2, cy + H * 0.29); g.fillText(both, W / 2, cy + H * 0.29);
+    }
+    else if (im) { // the face (looking right): in from the left, a little shake as it shouts, off to the right
       const h = H * 0.86, w = h * im.width / im.height, shake = t > CUTIN.in && !away ? Math.sin(t * 120) * H * 0.004 : 0;
       const x = W * 0.42 - w / 2 - (1 - ease(into)) * W * 0.6 + ease(away) * W * 1.2;
       g.drawImage(im, x + shake, cy - h / 2 + shake, w, h);
@@ -1723,7 +1735,10 @@
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0)); last = now;
     if (S?.cutin) { // (the cut-in: all held, the world under it, then the burst)
       draw(0); drawCutin();
-      if ((S.cutin.t += dt) >= CUTIN.dur) {
+      const c = S.cutin;
+      if (c.combo && (c.t += dt) >= CUTIN.dur) { // (a tap a moment after still counts; the other's told, or waited for a moment)
+        if (c.t >= CUTIN.dur + TIMING.late && (c.hit === false || (c.hit && c.theirs !== undefined) || c.t >= CUTIN.dur + DUO.wait)) { S.cutin = null; c.then(c); }
+      } else if (!c.combo && (c.t += dt) >= CUTIN.dur) {
         const { then, hit } = S.cutin; S.cutin = null; then();
         if (hit) superBoost(); else if (hit === undefined) S.late = { until: S.t + TIMING.late }; // (not tapped yet: a moment more)
       }
@@ -1785,13 +1800,31 @@
     r.on('pos', m => { if (b.other) Object.assign(b.other, m); });
     r.on('done', m => { if (b.theirs == null) { b.theirs = m.dist; if (b.mine != null) r.send('done', { dist: b.mine }); result(); } });
     r.on('again', () => { b.again.them = true; rematch(); });
+    r.on('combo', () => startCombo());
+    r.on('combo-tap', m => { if (S?.cutin?.combo) S.cutin.theirs = !!m.hit; });
     b.close = () => { clearInterval(b.timer); r.close(); ring?.close(); };
     return b;
+  }
+  // 合體技: the two foxes meeting in the air — its own cut-in, both foxes on the band, the ring and "TAP!" as for a
+  // super bounce; both tapped right (each tells the other), and off both go as off the owl (its 25°, its glide),
+  // half as hard again; either missed, on as they were. Once a run
+  const DUO = { near: [0.9, 1.1], wait: 0.8, power: 1.5 };
+  function startCombo() {
+    if (!B || B.combo || !S || S.phase !== 'fly') return;
+    B.combo = true; S.cutin = { kind: 'combo', combo: true, t: 0, then: comboBurst }; SFX.cutin(CUTIN.dur);
+  }
+  function comboBurst(c) {
+    const f = S.fox;
+    if (c.hit && c.theirs) {
+      FRIENDS.owl.hit(f); f.vx *= DUO.power; f.vy *= DUO.power; // (as the owl throws it: 25°, carried a while — half as hard again)
+      f.rainbow = 2.6; S.shake = 0.6; SFX.boom(); SFX.perfect();
+      starBurst(f.x, f.y + 0.6, 60, 16); confetti(f.x, f.y + 1, 90); pop('合體技！', f.x, f.y + 3.2, '#fff27a', 1.4);
+    } else pop(c.hit ? `${B.other?.name || '對手'}沒點到…` : '差一點！', f.x, f.y + 3, '#fff', 0.8);
   }
   function countDown() { B.count = BAT.count; B.live = false; SFX.ready(); }
   function rematch() {
     if (!(B.again.me && B.again.them)) return;
-    B.again = { me: false, them: false }; B.mine = B.theirs = null;
+    B.again = { me: false, them: false }; B.mine = B.theirs = null; B.combo = false;
     if (B.other) Object.assign(B.other, { x: PULL.rest[0], y: PULL.rest[1], ph: 'aim', d: 0 });
     start(); countDown();
   }
@@ -1808,6 +1841,9 @@
   function battleTick(dt) { // the countdown, and where this fox is, told
     if (!B) return;
     if (B.count > 0) { const was = Math.ceil(B.count); B.count -= dt; if (Math.ceil(B.count) !== was && B.count > 0) SFX.star(); if (B.count <= 0) { B.count = 0; B.live = true; SFX.super(); } }
+    const o = B.other, f = S?.fox;
+    if (B.live && f && o && !B.combo && !S.cutin && S.phase === 'fly' && o.ph === 'fly' && f.y > 0.3 && o.y > 0.3
+      && Math.abs(f.x - o.x) < DUO.near[0] && Math.abs(f.y - o.y) < DUO.near[1]) { B.r.send('combo', {}); startCombo(); }
     if (B.live && S && (B.sent += dt) >= BAT.every) {
       B.sent = 0; const f = S.fox;
       B.r.send('pos', { x: +f.x.toFixed(2), y: +f.y.toFixed(2), ph: S.phase, d: Math.max(0, Math.floor(f.x)) });
@@ -1872,6 +1908,7 @@
   }
   window.Fling = { open, close, preload };
   if (params.has('debug')) window.__fling = () => S; // (?debug: the run, to look into)
+  if (params.has('debug')) window.__battle = () => B; // (?debug: the battle, to look into)
   if (params.has('debug')) Fling.state = () => S; // (?debug: the run, to look at from the console)
 })();
 
