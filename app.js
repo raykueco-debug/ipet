@@ -949,6 +949,14 @@ function unbindAll() { // a new code: the old one no good any more (the parents 
   }, 1200);
 }
 $('#challengeBtn')?.addEventListener('click', challengeParents);
+// 我是家長: the parent's PIN, then the camera on the child's QR code — and on to the parent page in this same app
+// (an app on the home screen: the Camera app would open the link in Safari, paired there instead of here)
+$('#scanParent')?.addEventListener('click', async () => {
+  if (!window.Gate || !(await Gate.pin())) return;
+  const code = await Gate.scan(); if (!code) return;
+  if (code === FAMILY) { say(t('scanOwn'), 3000); return; } // (its own code: scanned off this very screen)
+  location.href = `parent.html?family=${code}`;
+});
 $('#unbindBtn')?.addEventListener('click', unbindAll);
 async function pollInbox() {
   if (!S.hatched) return;

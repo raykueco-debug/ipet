@@ -41,3 +41,11 @@
 - 誰送：Edge Function `notify`（原始碼 `supabase/functions/notify/index.ts`，在後台 Edge Functions → notify → Code 貼上、Deploy updates）。GET 回推播公鑰；POST `{ family, to, title, body, url, tag }` 送給對方所有裝置。同一配對碼＋角色 10 秒內只送一次；失效的訂閱（404／410）自動刪除。
 - 金鑰（VAPID）：函式第一次被呼叫時自己產生，存在表 `push_keys`，沒有人經手私鑰；要換金鑰就清空那張表（之後大家要重新按一次開啟通知）。
 - 挑戰等待時間拉長成 3 分鐘，讓對方有時間從通知點進來；點通知會打開（或切回）小狐／家長版，挑戰的確認框自己跳出來。
+
+## 在 App 裡掃 QR 碼、家長密碼
+
+- iPhone／iPad 上「加入主畫面」的 App 有自己的資料，用內建相機掃 QR 碼會跳到 Safari、綁在 Safari 那邊。所以要在 App 裡掃：
+  - 爸媽的裝置用小狐 App：⚙︎ 設定 →「📷 我是家長：掃孩子的 QR 碼」→ 輸入家長密碼 → 掃孩子小狐設定裡的 QR 碼 → 進家長版、綁好。
+  - 爸媽的裝置用「小狐家長版」App：孩子們下面「📷 掃孩子的 QR 碼來綁定」。
+- 家長密碼（4 位數）：第一次進家長版時設定（輸入兩次），存在這台裝置（加鹽雜湊，`ipet-parent-pin`）；每次打開 App 進家長版要再輸入一次。忘記：答一題乘法就能重設。
+- 掃描用 jsQR 1.4.0（`jsqr.js`，Apache-2.0），第一次掃描才載入。

@@ -102,3 +102,5 @@ textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backg
 #myName { width: 8em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px; }
 .push-btn { display: block; width: 100%; margin-top: 8px; }
 .push-btn[hidden] { display: none; }
+body.locked .wrap { visibility: hidden; } /* (till the parent's PIN is in: parentgate.js) */
+.scan-kid { display: block; width: 100%; margin: 4px 0 10px; }

@@ -352,3 +352,5 @@ body.admin .ff { display: inline-block; }
 .invite span { display: flex; gap: 10px; justify-content: center; }
 .invite button { border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-weight: 800; }
 .invite .go { background: #e8743b; color: #fff; } .invite .later { background: #f1e7dc; color: #3b2f2a; }
+.scan-btn { margin-top: 6px; background: #fff1e4; border: 1px dashed #e8a77a; }
+.pair-state[hidden], #pushBtn[hidden] { display: none; }

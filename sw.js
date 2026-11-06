@@ -1,5 +1,5 @@
 // cache-first offline shell; bump VERSION when assets change
-const VERSION = 'ipet-2026.11.06-2';
+const VERSION = 'ipet-2026.11.06-3';
 const CORE = ['./', 'index.html', 'manifest.json'];
 
 self.addEventListener('install', e => {

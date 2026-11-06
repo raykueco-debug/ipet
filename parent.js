@@ -357,6 +357,15 @@ function renderAll() {
 }
 document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { I18N.set(b.dataset.lang); renderAll(); }));
 
+// scanning a child's QR code in here (the Camera app would open it in Safari: on the home screen this app keeps its own)
+$('#scanKid').addEventListener('click', async () => {
+  const code = await Gate.scan(); if (!code) return;
+  if (addKid(code)) flash(t('p_paired', { code }));
+});
+// the parent's PIN before anything shows (parentgate.js; set the first time) — back to the pet if it isn't given
+document.body.classList.add('locked');
+Gate.pin().then(ok => { if (ok) document.body.classList.remove('locked'); else location.href = './'; });
+
 renderAll();
 renderPush();
 if (window.Link?.push?.state === 'on') enablePush(false); // (each time it opens: kept up to date)
