@@ -14,8 +14,8 @@
 <script> // (while it's tried out on phones: a script error shown on the page itself, there being no console to look in)
 addEventListener('error', e => { if (!e.message) return; const d = document.createElement('div'); d.className = 'jsErr'; d.textContent = `⚠️ ${e.message} (${(e.filename || '').split('/').pop()}:${e.lineno})`; d.onclick = () => d.remove(); (document.body || document.documentElement).appendChild(d); });
 </script>
-<link rel="stylesheet" href="style.css?v=2026.11.05-7">
-<link rel="stylesheet" href="fling.css?v=2026.11.05-7">
+<link rel="stylesheet" href="style.css?v=2026.11.06-1">
+<link rel="stylesheet" href="fling.css?v=2026.11.06-1">
 <title>iPet</title>
 </head>
 <body>
@@ -27,14 +27,14 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
   <div class="splash-pct">0%</div>
   <button class="splash-go" hidden>點一下進入</button>
 </div>
-<script src="preload.js?v=2026.11.05-7"></script>
+<script src="preload.js?v=2026.11.06-1"></script>
 <div id="app">
   <header class="top">
     <div class="title-row">
       <button id="nameBtn" class="name-btn"><span id="petName">iPet</span></button>
       <span class="lv" id="tailBadge">Lv 1</span>
       <span class="age" id="age"></span>
-      <span class="ver" id="ver">v2026.11.05-7</span>
+      <span class="ver" id="ver">v2026.11.06-1</span>
       <button id="menuBtn" class="icon-btn" aria-label="設定">⚙︎</button>
     </div>
     <div class="xp"><div id="growBar"></div></div>
@@ -46,6 +46,7 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
       <div class="stat" data-k="clean"><span class="ico">🫧</span><span class="lbl" data-i18n="stat_clean">清潔</span><div class="bar"><i></i></div><button class="ff" data-ff="clean" aria-label="FF">FF</button></div>
     </div>
     <button id="pantryBtn" class="pantry-btn">📦 <span data-i18n="pantry">儲物箱</span> <b id="pantryCount">0</b></button>
+    <button id="challengeBtn" class="pantry-btn challenge-btn" hidden data-i18n="challengeParents">🦊 挑戰爸媽一起飛</button>
   </header>
 
   <main id="stage">
@@ -120,10 +121,17 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
   <div class="card">
     <h1 data-i18n="settings">設定</h1>
     <div class="pair">
-      <p><span data-i18n="pairCode">配對碼</span>：<b id="familyCode"></b></p>
-      <div id="pairQr" class="pair-qr"></div>
-      <small data-i18n="pairHint">請爸媽用手機相機掃這個 QR 碼，就會打開家長版並配對好</small>
-      <button id="pairShare" data-i18n="pairShare">🔗 把家長版連結傳給爸媽</button>
+      <div id="pairState" class="pair-state" hidden>
+        <p>✅ <span data-i18n="boundWith">已綁定：</span><b id="pairNames"></b></p>
+        <button id="unbindBtn" class="ghost" data-i18n="unbind">解除綁定（換新的配對碼）</button>
+      </div>
+      <details id="pairQrBox" open>
+        <summary data-i18n="pairMore">掃 QR 碼綁定家長</summary>
+        <p><span data-i18n="pairCode">配對碼</span>：<b id="familyCode"></b></p>
+        <div id="pairQr" class="pair-qr"></div>
+        <small data-i18n="pairHint">請爸媽用手機相機掃這個 QR 碼，就會打開家長版並配對好</small>
+        <button id="pairShare" data-i18n="pairShare">🔗 把家長版連結傳給爸媽</button>
+      </details>
     </div>
     <p class="lang-row"><span data-i18n="language">Language / 語言</span>
       <button data-lang="zh">中文</button><button data-lang="en">English</button></p>
@@ -152,16 +160,16 @@ addEventListener('error', e => { if (!e.message) return; const d = document.crea
 </div>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
-<script src="i18n.js?v=2026.11.05-7"></script>
-<script src="voice.js?v=2026.11.05-7"></script>
-<script src="words.js?v=2026.11.05-7"></script>
-<script src="sound.js?v=2026.11.05-7"></script>
-<script src="fling.js?v=2026.11.05-7"></script>
-<script src="qr.js?v=2026.11.05-7"></script>
-<script src="link.js?v=2026.11.05-7"></script>
-<script src="app.js?v=2026.11.05-7"></script>
-  <script src="scene.js?v=2026.11.05-7"></script>
-  <script src="ball.js?v=2026.11.05-7"></script>
-<script src="learn.js?v=2026.11.05-7"></script>
+<script src="i18n.js?v=2026.11.06-1"></script>
+<script src="voice.js?v=2026.11.06-1"></script>
+<script src="words.js?v=2026.11.06-1"></script>
+<script src="sound.js?v=2026.11.06-1"></script>
+<script src="fling.js?v=2026.11.06-1"></script>
+<script src="qr.js?v=2026.11.06-1"></script>
+<script src="link.js?v=2026.11.06-1"></script>
+<script src="app.js?v=2026.11.06-1"></script>
+  <script src="scene.js?v=2026.11.06-1"></script>
+  <script src="ball.js?v=2026.11.06-1"></script>
+<script src="learn.js?v=2026.11.06-1"></script>
 </body>
 </html>

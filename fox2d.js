@@ -406,6 +406,7 @@
     get canPush() { return !!(clips.walk_loop_push && clips.walk_r_loop_push); },
     get canPushFront() { return !!clips.walk_front_loop_push; },
     ballMove(m) { move = m; },      // standing at the ball: play that move with it next
+    unqueue() { move = null; push = false; }, // a try at the ball over: nothing left queued to go off later, the wrong way
     get ballMoves() { // the moves there are clips for, both ways
       return MOVES.filter(m => ['walk_to_' + m, m + '_to_walk', 'walk_r_to_' + m + '_r', m + '_r_to_walk_r'].every(c => clips[c]));
     },
@@ -421,7 +422,7 @@
     eat(on) { eating = !!on; },     // bowl in front: eat until it's taken away
     drink(on) { drinking = !!on; }, // at the water bowl: lap until it's had enough
     go(dir) { go = dir; },          // start walking / turn round ('walk' left, 'walk_r' right)
-    stop() { go = null; },
+    stop() { go = null; move = null; push = false; },
     run(on) { running = !!on; },
     watch(on) { watching = !!on; if (!on) gaze = 0; }, // the ball held up: look up at it, the head after it
     look(g) { gaze = Math.max(-1, Math.min(1, g)); },

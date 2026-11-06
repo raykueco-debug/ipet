@@ -88,6 +88,14 @@ textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backg
 .kid-pick { flex: 1; text-align: left; background: transparent; border: 0; font: inherit; color: var(--ink); padding: 6px 8px; }
 .kid-pick small { display: block; color: var(--muted); font-size: 12px; }
 .kid-fly { border: 0; border-radius: 999px; padding: 8px 12px; font: inherit; font-weight: 700; background: var(--accent); color: var(--accent-ink); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #c9c2b8; margin-right: 5px; vertical-align: middle; }
+.dot.live { background: #3fb950; }
+.ask { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; background: #0005; padding: 16px; }
+.ask > div { background: #fff; color: #3b2f2a; border-radius: 22px; padding: 22px 24px; max-width: 420px; text-align: center; box-shadow: 0 10px 40px #0004; font-size: 18px; }
+.ask b { display: block; margin-bottom: 14px; }
+.ask span { display: flex; gap: 10px; justify-content: center; }
+.ask button { border: 0; border-radius: 999px; padding: 12px 20px; font: inherit; font-weight: 800; }
+.ask .go { background: #e8743b; color: #fff; } .ask .later { background: #f1e7dc; color: #3b2f2a; }
 .kid-x { border: 0; background: transparent; color: var(--muted); font-size: 16px; padding: 6px; }
 .kid-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .kid-add input { flex: 1; min-width: 6em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }

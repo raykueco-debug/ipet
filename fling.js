@@ -53,6 +53,7 @@
   // friend a rabbit ran ahead to) > a combo (onto a friend from a friend, the ground not touched between) > a tail.
   // A super / bunny bounce is the friend's own throw made stronger: boost times as fast, as long (an owl's carry, a
   // boar's ride), more hops off a frog; a hedgehog springs it up and rolls off as if dived onto
+  const DASH_STARS = 30; // stars caught for a dash used to come back
   const SUPER = { stars: 10, boost: 1.6, hops: 2 }; // stars for a super bounce; how much stronger; frog hops more
   const COMBO = 13;                                // a combo: this many m/s more, on the way the friend throws it
   const RABBIT = { run: 16, by: 1.4 };             // landed on, a rabbit runs ahead (at least this fast, m/s) to stand by the next friend
@@ -610,6 +611,9 @@
   }
   function starGot() { // a star caught (in the air or on the clouds): counted, and toward the super bounce
     S.got++; SFX.star();
+    if (S.got % DASH_STARS === 0 && S.dashes < DASHES) { // every 30 stars: a dash used comes back
+      S.dashes++; SFX.ready(); pop('噴射回復！', S.fox.x, S.fox.y + 2.2, '#ffb347', 0.7);
+    }
     for (let k = 0; k < 6; k++) S.glints.push({ x: (Math.random() - 0.5) * 1.3, y: (Math.random() - 0.5) * 1.1, t: -k * 0.05, r: 0.08 + Math.random() * 0.07, spin: Math.random() * 3 }); // (it sparkles)
     if (!S.ready && ++S.meter >= need()) {
       S.ready = true; SFX.ready();
@@ -679,18 +683,17 @@
     if (sky.z >= brakeAt) { sky.end = { t: 0, stage: 'brake', to: sky.lane, pick: -1 }; sky.hand = dealSky(Math.min(1, sky.got / sky.need)); SFX.brake(); }
     if (AUTO) { const a = sky.stars.find(a => !a.got && a.z > sky.z - 1); if (a && a.z - sky.z < 20) sky.lane = a.lane; } // (?auto: off after the stars by itself, to try it)
     sky.x += (sky.lane - sky.x) * Math.min(1, dt * 12);
-    f.x = sky.x0 + sky.z;
+    f.x = sky.x0; // (the cloud road adds no distance: down off it where it went up)
     for (const a of sky.stars) if (!a.got && Math.abs(a.z - sky.z) < 1.5 && Math.abs(a.lane - sky.x) < 0.5) { a.got = true; sky.got++; starGot(); }
     if (Math.abs(sky.x) > 1.5) { // steered off the road's edge: down through the cloud (a card: saved once, back on it)
       if (S.mods.shield) { S.mods.shield--; sky.lane = sky.x = Math.sign(sky.x); SFX.boing(); S.shake = 0.3; pop('救回來了！', S.fox.x, 3, '#9be7ff', 0.6); }
       else { sky.fall = 0; sky.fellAt = sky.x; SFX.whoosh(); return hud(); }
     }
-    if (!S.passedBest && f.x > best) { S.passedBest = true; SFX.best(); if (best) S.recordLater = true; } // (up on the clouds: its slow motion kept till it's down, off the first friend)
     hud();
   }
   function fromSky(fell) { // off the cloud's end: down from on high, a friend right under it, the way on fresh from here
     const f = S.fox;                                     // (fallen off it: straight down from there, onto a friend)
-    f.x = S.sky.x0 + (fell ? S.sky.z : SKY.run); f.y = SKY.drop; f.vx = 0; f.vy = 0; f.up = null;
+    f.x = S.sky.x0; f.y = SKY.drop; // (no distance for the cloud road: down where it went up) f.vx = 0; f.vy = 0; f.up = null;
     S.sky = null; S.phase = 'fly';
     if (fell) { // (a friend right under it to catch it — one that throws it on, not a hedgehog or the sleeping bear)
       S.friends = []; S.stars = []; S.nextFriend = f.x + 12; S.nextStar = f.x + 4;
@@ -703,7 +706,6 @@
     const gi = { x: 0, x0: 0, y: 0, kind: under[Math.floor(Math.random() * under.length)], used: false, t: 0, carry: false, bunny: false };
     gi.x = gi.x0 = f.x - box(gi).cx; S.friends.push(gi); // (right under the fox)
     spawn(); act('joy', 0.8);
-    pop('+500 m！', f.x, f.y + 2.5, '#ffe14d', 1.1);
   }
 
   // knocked flying (by the rabbit running by, or the hedgehog rolling into it): off up and back, tumbling, out of
@@ -1889,7 +1891,7 @@
     resizeSoon();
     energy = o.energy || petEnergy();
     B?.close(); B = null;
-    const bo = o.battle || (params.get('battle') && { room: params.get('battle'), name: params.get('name') || '爸媽', host: params.has('invite'), invite: params.get('invite') });
+    const bo = o.battle || (params.get('battle') && { room: params.get('battle'), name: params.get('name') || '爸媽', host: params.has('host') || params.has('invite'), invite: params.get('invite') }); // (host: the parent's side, asked and answered already on parent.html; invite: ring the child from here, as before)
     if (bo) B = battle(bo);
     start(); // (straight onto the tree, to be pulled back)
     if (energy && energy.get() < energy.least) tooTired();

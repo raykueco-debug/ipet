@@ -202,31 +202,102 @@ function pickKid(code) {
   st.family = code; localStorage.setItem('ipet-parent-family', code); $('#family').value = code;
   renderKids(); loadSchedule();
 }
+const esc = s => String(s || '').replace(/[<&]/g, c => (c === '<' ? '&lt;' : '&amp;'));
+const online = k => Date.now() - (seen[k.code] || 0) < 12000;
 function renderKids() {
+  openRooms();
   $('#kids').innerHTML = st.kids.map(k => `<div class="kid${k.code === st.family ? ' on' : ''}" data-code="${k.code}">`
-    + `<button class="kid-pick">${k.name.replace(/</g, '&lt;')}<small>${k.code}</small></button>`
+    + `<button class="kid-pick">${esc(k.name)}<small><i class="dot${online(k) ? ' live' : ''}"></i>${online(k) ? t('p_online') : t('p_away')} · ${k.code}</small></button>`
     + `<button class="kid-fly">${t('p_flyTogether')}</button><button class="kid-x" title="${t('p_removeKid')}">✕</button></div>`).join('')
     || `<p class="hint">${t('p_needCode')}</p>`;
 }
 $('#kids').addEventListener('click', e => {
   const row = e.target.closest('.kid'); if (!row) return;
-  const code = row.dataset.code;
-  if (e.target.closest('.kid-x')) { st.kids = st.kids.filter(k => k.code !== code); saveKids(); if (st.family === code) pickKid(st.kids[0]?.code || ''); else renderKids(); return; }
+  const code = row.dataset.code, kid = st.kids.find(k => k.code === code);
+  if (e.target.closest('.kid-x')) { // unbind: the child's pet told, and gone from here
+    if (!confirm(t('p_unbindAsk', { name: kid?.name || code }))) return;
+    thrice(code, 'unpair', { pid: PID });
+    setTimeout(() => dropKid(code), 1000);
+    return;
+  }
   if (e.target.closest('.kid-fly')) return flyWith(code);
   pickKid(code);
 });
+function dropKid(code) {
+  st.kids = st.kids.filter(k => k.code !== code); saveKids();
+  rooms[code]?.close(); delete rooms[code];
+  if (st.family === code) pickKid(st.kids[0]?.code || ''); else renderKids();
+}
+
+/* ---------- bound children, live (link.js rooms, room family-<code>; app.js has the other side) ----------
+   This page says hi to each child's pet every few seconds (parent-hi: binds it there, once — kept on both sides till
+   undone); the pet answers (kid-hi: shown as online). Either side challenges the other to fly together (challenge),
+   the other is asked, and accepts or not; accepted, both into one battle (fling.html, this page's side the host). */
+const PID = localStorage.getItem('ipet-parent-id') || Math.random().toString(36).slice(2, 12);
+localStorage.setItem('ipet-parent-id', PID);
+const rooms = {}, seen = {}, answered = new Set();
+let pending = null; // { code, room, mine: this page's challenge | false: a child's, accepted here }
+const myName = () => ($('#myName').value.trim() || t('parents')).slice(0, 8);
+const thrice = (code, ev, m) => { for (const ms of [0, 300, 800]) setTimeout(() => rooms[code]?.send(ev, m), ms); };
+const kidName = code => st.kids.find(k => k.code === code)?.name || code;
+function openRooms() {
+  if (!window.Link?.on) return;
+  for (const k of st.kids) if (!rooms[k.code]) {
+    const code = k.code, r = rooms[code] = Link.room('family-' + code);
+    r.send('parent-hi', { pid: PID, name: myName() });
+    r.on('kid-hi', m => {
+      const was = online(k); seen[code] = Date.now();
+      if (m.name && k.name.startsWith(t('p_kidN', { n: '' }).trim())) { k.name = String(m.name).slice(0, 10); saveKids(); renderKids(); } // (a child named only "孩子 n": its fox's name)
+      else if (!was) renderKids();
+    });
+    r.on('unpair', m => { if (!m.kid) return; flash(t('p_unbound', { name: kidName(code) })); dropKid(code); }); // (the child let go: a new code there)
+    r.on('challenge', m => { // the child's challenge: asked here
+      if (!m.kid || !m.room || answered.has(m.room) || pending) return;
+      answered.add(m.room);
+      ask(t('p_challenged', { name: esc(m.from || kidName(code)) }), {
+        go: [t('p_accept'), () => { pending = { code, room: m.room, mine: false }; thrice(code, 'accept', { room: m.room, pid: PID }); waitFor(t('p_challengeWait', { name: esc(kidName(code)) }), 8000); }],
+        later: [t('p_later'), () => thrice(code, 'decline', { room: m.room })],
+      }, m.room);
+    });
+    r.on('cancel', m => document.querySelector(`.ask[data-room="${m.room}"]`)?.remove());
+    r.on('start', m => { // the child's challenge: who got it
+      if (!pending || pending.mine || m.room !== pending.room) return;
+      if (m.pid === PID) go(pending.room); else { endPending(); flash(t('p_taken')); }
+    });
+    r.on('accept', m => { if (pending?.mine && m.room === pending.room) go(pending.room); }); // this page's challenge: yes
+    r.on('decline', m => { if (pending?.mine && m.room === pending.room) { endPending(); flash(t('p_declined', { name: kidName(code) })); } });
+  }
+}
+setInterval(() => { for (const [code, r] of Object.entries(rooms)) r.send('parent-hi', { pid: PID, name: myName() }); renderKids(); }, 4000);
+function ask(html, buttons, room) { // a card over the page: { cls: [label, fn] }
+  const d = document.createElement('div'); d.className = 'ask'; if (room) d.dataset.room = room;
+  d.innerHTML = `<div><b>${html}</b><span>${Object.entries(buttons).map(([k, [label]]) => `<button class="${k}">${label}</button>`).join('')}</span></div>`;
+  for (const [k, [, fn]] of Object.entries(buttons)) d.querySelector('.' + k).onclick = () => { d.remove(); fn?.(); };
+  document.body.appendChild(d);
+  if (room) setTimeout(() => d.remove(), 60000);
+  return d;
+}
+function waitFor(html, ms) {
+  pending.card = ask(`⏳ ${html}`, { later: [t('p_cancel'), () => { thrice(pending.code, 'cancel', { room: pending.room }); endPending(); }] });
+  pending.until = setTimeout(() => { const n = kidName(pending?.code); endPending(); flash(t('p_noAnswer', { name: n })); }, ms);
+}
+function endPending() { if (!pending) return; clearInterval(pending.timer); clearTimeout(pending.until); pending.card?.remove(); pending = null; }
+function go(room) { endPending(); location.href = `fling.html?battle=${room}&host=1&name=${encodeURIComponent(myName())}`; }
 $('#addKid').addEventListener('click', () => {
   if (!addKid($('#kidCode').value, $('#kidName').value.trim())) { flash(t('p_needCode')); $('#kidCode').focus(); return; }
   $('#kidCode').value = $('#kidName').value = '';
   flash(t('p_paired', { code: st.family }));
 });
-// flying together (fling.js battle, through link.js's rooms): to the game, the child's pet rung from there
+// flying together (fling.js battle, through link.js's rooms): the child asked first (its pet open), into the game once it says yes
 $('#myName').value = localStorage.getItem('ipet-parent-name') || t('parents');
 $('#myName').addEventListener('change', () => localStorage.setItem('ipet-parent-name', $('#myName').value.trim() || t('parents')));
 function flyWith(code) {
-  if (!window.Link?.on) { flash(t('p_fail')); return; }
-  const room = Math.random().toString(36).slice(2, 10), name = ($('#myName').value.trim() || t('parents')).slice(0, 8);
-  location.href = `fling.html?battle=${room}&invite=${code}&name=${encodeURIComponent(name)}`;
+  if (!window.Link?.on || pending) { if (!pending) flash(t('p_fail')); return; }
+  openRooms();
+  const room = Math.random().toString(36).slice(2, 10), m = { room, from: myName(), pid: PID };
+  pending = { code, room, mine: true, timer: setInterval(() => rooms[code]?.send('challenge', m), 1500) };
+  rooms[code]?.send('challenge', m);
+  waitFor(t('p_challengeWait', { name: esc(kidName(code)) }), 60000);
 }
 
 // opened from the child's QR code / link (parent.html?family=CODE): that child added (or picked), and the code taken off the address
