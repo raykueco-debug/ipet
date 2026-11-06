@@ -196,7 +196,9 @@ function addKid(code, name) {
   code = clean(code); if (code.length < 8) return false;
   const had = st.kids.find(k => k.code === code);
   if (had) { if (name) had.name = name; } else st.kids.push({ code, name: name || t('p_kidN', { n: st.kids.length + 1 }) });
-  saveKids(); pickKid(code); return true;
+  saveKids(); pickKid(code);
+  if (window.Link?.push?.state === 'on') Link.push.enable([code], 'parent', ($('#myName')?.value || '').trim()); // (notifications on here: from this child too)
+  return true;
 }
 function pickKid(code) {
   st.family = code; localStorage.setItem('ipet-parent-family', code); $('#family').value = code;
@@ -210,6 +212,7 @@ function renderKids() {
     + `<button class="kid-pick">${esc(k.name)}<small><i class="dot${online(k) ? ' live' : ''}"></i>${online(k) ? t('p_online') : t('p_away')} · ${k.code}</small></button>`
     + `<button class="kid-fly">${t('p_flyTogether')}</button><button class="kid-x" title="${t('p_removeKid')}">✕</button></div>`).join('')
     || `<p class="hint">${t('p_needCode')}</p>`;
+  renderPush();
 }
 $('#kids').addEventListener('click', e => {
   const row = e.target.closest('.kid'); if (!row) return;
@@ -225,6 +228,7 @@ $('#kids').addEventListener('click', e => {
 });
 function dropKid(code) {
   st.kids = st.kids.filter(k => k.code !== code); saveKids();
+  window.Link?.push?.drop(code); // (no notifications from that child any more)
   rooms[code]?.close(); delete rooms[code];
   if (st.family === code) pickKid(st.kids[0]?.code || ''); else renderKids();
 }
@@ -258,6 +262,7 @@ function openRooms() {
         go: [t('p_accept'), () => { pending = { code, room: m.room, mine: false }; thrice(code, 'accept', { room: m.room, pid: PID }); waitFor(t('p_challengeWait', { name: esc(kidName(code)) }), 8000); }],
         later: [t('p_later'), () => thrice(code, 'decline', { room: m.room })],
       }, m.room);
+      try { navigator.vibrate?.(200); } catch (e) {}
     });
     r.on('cancel', m => document.querySelector(`.ask[data-room="${m.room}"]`)?.remove());
     r.on('start', m => { // the child's challenge: who got it
@@ -274,7 +279,7 @@ function ask(html, buttons, room) { // a card over the page: { cls: [label, fn] 
   d.innerHTML = `<div><b>${html}</b><span>${Object.entries(buttons).map(([k, [label]]) => `<button class="${k}">${label}</button>`).join('')}</span></div>`;
   for (const [k, [, fn]] of Object.entries(buttons)) d.querySelector('.' + k).onclick = () => { d.remove(); fn?.(); };
   document.body.appendChild(d);
-  if (room) setTimeout(() => d.remove(), 60000);
+  if (room) setTimeout(() => d.remove(), 180000);
   return d;
 }
 function waitFor(html, ms) {
@@ -297,8 +302,25 @@ function flyWith(code) {
   const room = Math.random().toString(36).slice(2, 10), m = { room, from: myName(), pid: PID };
   pending = { code, room, mine: true, timer: setInterval(() => rooms[code]?.send('challenge', m), 1500) };
   rooms[code]?.send('challenge', m);
-  waitFor(t('p_challengeWait', { name: esc(kidName(code)) }), 60000);
+  waitFor(t('p_challengeWait', { name: esc(kidName(code)) }), 180000); // (three minutes: time to come from the notification)
+  Link.push?.send({ family: code, to: 'kid', title: t('pushToKid', { name: myName() }), body: t('pushTap'), url: './', tag: 'challenge' });
 }
+
+// notifications: a child's challenge shows on this phone even with this page closed (link.js push)
+function renderPush() {
+  const b = $('#pushBtn'), s = window.Link?.push?.state || 'no'; if (!b) return;
+  b.hidden = s === 'no' || !st.kids.length;
+  b.disabled = s === 'on' || s === 'denied' || s === 'home';
+  b.textContent = t({ on: 'pushOn', off: 'p_pushOff', denied: 'pushDenied', home: 'pushHome' }[s] || 'p_pushOff');
+}
+async function enablePush(ask, codes = st.kids.map(k => k.code)) {
+  if (!window.Link?.push) return;
+  const ok = await Link.push.enable(codes, 'parent', myName(), ask);
+  renderPush();
+  if (ask && ok) flash(t('pushDone'));
+}
+$('#pushBtn').addEventListener('click', () => enablePush(true));
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 // opened from the child's QR code / link (parent.html?family=CODE): that child added (or picked), and the code taken off the address
 const linked = clean(new URLSearchParams(location.search).get('family'));
@@ -336,4 +358,6 @@ function renderAll() {
 document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => { I18N.set(b.dataset.lang); renderAll(); }));
 
 renderAll();
+renderPush();
+if (window.Link?.push?.state === 'on') enablePush(false); // (each time it opens: kept up to date)
 setInterval(loadSchedule, 15000);

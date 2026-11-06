@@ -862,7 +862,23 @@ function renderBinding() {
   $('#pairNames').textContent = parents.map(p => p.name || t('parents')).join('、');
   $('#pairQrBox').open = !parents.length; // (bound: the QR code tucked away, for another parent)
   $('#challengeBtn').hidden = !parents.length || !famRoom;
+  renderPush();
 }
+// notifications: a parent's challenge shows on this phone / tablet even with the pet closed (link.js push)
+function renderPush() {
+  const b = $('#pushBtn'), st = window.Link?.push?.state || 'no'; if (!b) return;
+  b.hidden = st === 'no';
+  b.disabled = st === 'on' || st === 'denied' || st === 'home';
+  b.textContent = t({ on: 'pushOn', off: 'pushOff', denied: 'pushDenied', home: 'pushHome' }[st] || 'pushOff');
+}
+async function enablePush(ask) {
+  if (!window.Link?.push) return;
+  const ok = await Link.push.enable([FAMILY], 'kid', S.name || '', ask);
+  renderPush();
+  if (ask && ok) say(t('pushDone'), 3000);
+}
+$('#pushBtn')?.addEventListener('click', () => enablePush(true));
+if (window.Link?.push?.state === 'on') enablePush(false); // (each time it opens: kept up to date)
 function popup(html, buttons) { // a card over the pet: { cls: label → fn }
   const d = document.createElement('div'); d.className = 'invite';
   d.innerHTML = `<div><b>${html}</b><span>${Object.entries(buttons).map(([k, [label]]) => `<button class="${k}">${label}</button>`).join('')}</span></div>`;
@@ -894,7 +910,7 @@ function listenForInvites() {
       later: [t('inviteLater'), () => thrice('decline', { room: m.room })],
     });
     d.dataset.room = m.room;
-    setTimeout(() => { if (d.isConnected) d.remove(); }, 60000); // (a minute unanswered: let go)
+    setTimeout(() => { if (d.isConnected) d.remove(); }, 180000); // (three minutes unanswered: let go)
   });
   famRoom.on('cancel', m => document.querySelector(`.invite[data-room="${m.room}"]`)?.remove()); // (called off over there)
   // this pet's challenge answered by a parent
@@ -915,16 +931,18 @@ function challengeParents() { // 挑戰爸媽: asked on their page (open), every
   $('#menu').classList.add('hidden');
   const room = Math.random().toString(36).slice(2, 10), from = S.name || t('foxName');
   const wait = popup(`⏳ ${t('challengeWait')}`, { later: [t('cancel'), () => { thrice('cancel', { room }); endChallenge(); }] });
-  challenge = { room, wait, n: 0, timer: setInterval(() => {
-    if (++challenge.n > 40) { endChallenge(); popup(t('challengeNone'), { later: [t('close')] }); return; }
+  challenge = { room, wait, n: 0, timer: setInterval(() => { // (three minutes: time to come from the notification)
+    if (++challenge.n > 120) { endChallenge(); popup(t('challengeNone'), { later: [t('close')] }); return; }
     famRoom.send('challenge', { room, from, kid: true });
   }, 1500) };
   famRoom.send('challenge', { room, from, kid: true });
+  Link.push?.send({ family: FAMILY, to: 'parent', title: t('pushToParent', { name: from }), body: t('pushTap'), url: 'parent.html', tag: 'challenge' });
 }
 function endChallenge() { if (!challenge) return; clearInterval(challenge.timer); challenge.wait?.remove(); challenge = null; }
 function unbindAll() { // a new code: the old one no good any more (the parents told), to bind again by scanning
   if (!confirm(t('unbindAsk'))) return;
   famRoom?.send('unpair', { code: FAMILY, kid: true }); thrice('unpair', { code: FAMILY, kid: true });
+  window.Link?.push?.drop(FAMILY); // (no notifications for the old code)
   setTimeout(() => {
     try { localStorage.setItem('ipet-family', newCode()); localStorage.removeItem(PARENTS_KEY); localStorage.removeItem('ipet-inbox-after'); } catch (e) {}
     location.reload();

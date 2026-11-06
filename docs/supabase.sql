@@ -35,3 +35,50 @@ revoke all on function public.send_gift(text, text, text) from public;
 revoke all on function public.pet_inbox(text, bigint) from public;
 grant execute on function public.send_gift(text, text, text) to anon, authenticated;
 grant execute on function public.pet_inbox(text, bigint) to anon, authenticated;
+
+-- ===== 推播（挑戰一起飛時，對方的手機／平板跳通知）=====
+-- 每台裝置開通知時存一筆：哪個配對碼、孩子還是家長、推播地址（家長有幾個孩子就幾筆）。表格一樣不開放，只能透過函式。
+-- 真正送推播的是 Edge Function「notify」（supabase/functions/notify/index.ts），它用 service role 讀這張表。
+create table if not exists public.push_subs (
+  endpoint text not null check (char_length(endpoint) between 10 and 1000),
+  family text not null check (char_length(family) between 8 and 32),
+  role text not null check (role in ('kid', 'parent')),
+  device text not null default '' check (char_length(device) <= 40),
+  sub jsonb not null,
+  updated_at timestamptz not null default now(),
+  primary key (endpoint, family)
+);
+create index if not exists push_subs_family on public.push_subs (family, role);
+alter table public.push_subs enable row level security;
+
+-- 開通知（或每次打開時再存一次）：這台裝置收這個配對碼的推播
+create or replace function public.save_push(p_family text, p_role text, p_device text, p_sub jsonb)
+returns void language sql security definer set search_path = public as $$
+  insert into push_subs (endpoint, family, role, device, sub)
+  values (p_sub->>'endpoint', p_family, p_role, left(coalesce(p_device, ''), 40), p_sub)
+  on conflict (endpoint, family) do update set role = excluded.role, device = excluded.device, sub = excluded.sub, updated_at = now();
+$$;
+
+-- 解除綁定／關通知：這台裝置不再收這個配對碼的推播（p_family 為 null：全部）
+create or replace function public.drop_push(p_endpoint text, p_family text default null)
+returns void language sql security definer set search_path = public as $$
+  delete from push_subs where endpoint = p_endpoint and (p_family is null or family = p_family);
+$$;
+
+revoke all on function public.save_push(text, text, text, jsonb) from public;
+revoke all on function public.drop_push(text, text) from public;
+grant execute on function public.save_push(text, text, text, jsonb) to anon, authenticated;
+grant execute on function public.drop_push(text, text) to anon, authenticated;
+
+-- 推播的金鑰（VAPID）：由 notify 函式第一次被呼叫時自己產生、存在這裡；沒有人經手私鑰。表格不開放，只有函式（service role）讀得到。
+create table if not exists public.push_keys (
+  id int primary key default 1 check (id = 1),
+  public_key text not null,
+  private_key text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.push_keys enable row level security;
+
+-- notify 函式（service role）讀寫推播的兩張表（新專案不會自動給權限）
+grant select, insert on public.push_keys to service_role;
+grant select, delete on public.push_subs to service_role;

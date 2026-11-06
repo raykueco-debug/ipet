@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-title" content="小狐家長版">
 <meta name="theme-color" content="#f4f1ec">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="manifest" href="parent.webmanifest"> <!-- (its own: on the home screen it opens the parent app, and may be sent notifications) -->
 <link rel="stylesheet" href="parent.css">
 <title>小狐 家長版</title>
 </head>
@@ -26,6 +27,7 @@
     <div id="kids" class="kids"></div>
     <div class="kid-add"><input id="kidCode" maxlength="12" autocomplete="off" data-i18n-ph="p_kidCode" placeholder="配對碼"><input id="kidName" maxlength="10" autocomplete="off" data-i18n-ph="p_kidName" placeholder="名字"><button id="addKid" class="ghost" data-i18n="p_addKid">＋ 加一個孩子</button></div>
     <label class="family"><span data-i18n="p_myName">你的名字（一起飛時顯示）</span> <input id="myName" maxlength="8" autocomplete="off"></label>
+    <button id="pushBtn" class="ghost push-btn" hidden>🔔 開啟通知</button>
   </section>
 
   <section class="card">

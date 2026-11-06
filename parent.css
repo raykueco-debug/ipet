@@ -100,3 +100,5 @@ textarea { width: 100%; font: inherit; font-size: 16px; color: var(--ink); backg
 .kid-add { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .kid-add input { flex: 1; min-width: 6em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 #myName { width: 8em; font: inherit; color: var(--ink); background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 2px 6px; }
+.push-btn { display: block; width: 100%; margin-top: 8px; }
+.push-btn[hidden] { display: none; }
