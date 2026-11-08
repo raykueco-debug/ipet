@@ -9,10 +9,12 @@ window.Gate = (() => {
   const zh = (document.documentElement.lang || 'zh').startsWith('zh') && (window.I18N?.lang || 'zh') === 'zh';
   const T = zh ? {
     set: '設定 4 位數家長密碼', again: '再輸入一次確認', enter: '輸入家長密碼', wrong: '密碼不對', mismatch: '兩次不一樣，重新設定',
-    forgot: '忘記密碼？', cancel: '取消', sum: '請回答（重設密碼）：', scan: '對準孩子小狐設定裡的 QR 碼', noCam: '打不開相機（請在設定允許相機）', notOurs: '這不是小狐的配對 QR 碼',
+    forgot: '忘記密碼？', cancel: '取消', sum: '請回答（重設密碼）：', scan: '對準孩子小狐設定裡的 QR 碼', noCam: '這裡開不了即時相機，請用「拍照掃描」或輸入配對碼', notOurs: '這不是小狐的配對 QR 碼',
+    photo: '拍照掃描', code: '或輸入配對碼', ok: '確定', badCode: '配對碼是 10 碼英文和數字', noQr: '照片裡找不到 QR 碼，再拍近一點',
   } : {
     set: 'Set a 4-digit parent PIN', again: 'Enter it again', enter: 'Enter the parent PIN', wrong: 'Wrong PIN', mismatch: "They didn't match — set it again",
-    forgot: 'Forgot it?', cancel: 'Cancel', sum: 'Answer to reset the PIN: ', scan: "Point at the QR code in your child's Foxy settings", noCam: "Can't open the camera (allow it in Settings)", notOurs: "That's not a Foxy pairing code",
+    forgot: 'Forgot it?', cancel: 'Cancel', sum: 'Answer to reset the PIN: ', scan: "Point at the QR code in your child's Foxy settings", noCam: 'No live camera here — take a photo or type the code', notOurs: "That's not a Foxy pairing code",
+    photo: 'Take a photo', code: 'or type the code', ok: 'OK', badCode: 'The code is 10 letters and digits', noQr: 'No QR code in that photo — try closer',
   };
   const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const put = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
@@ -36,6 +38,10 @@ window.Gate = (() => {
   .gate-cam video { width: 100%; height: 100%; object-fit: cover; }
   .gate-cam::after { content: ''; position: absolute; inset: 14%; border: 4px solid #fff9; border-radius: 18px; }
   .gate-scan { display: flex; flex-direction: column; gap: 12px; align-items: center; color: #fff; text-align: center; }
+  .gate-cam[hidden] { display: none; }
+  .gate-photo { border-radius: 999px; padding: 12px 22px; font-weight: 800; background: #e8743b; color: #fff; cursor: pointer; }
+  .gate-type { display: flex; gap: 8px; }
+  .gate-type input { width: 9em; font: inherit; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; border: 0; border-radius: 12px; padding: 10px 12px; }
   .gate-scan button { border: 0; border-radius: 999px; padding: 12px 26px; font: inherit; font-weight: 800; background: #fff; color: #3b2f2a; }`;
   document.head.appendChild(css);
 
@@ -89,7 +95,7 @@ window.Gate = (() => {
     return a != null && Number(a.trim()) === x * y;
   }
 
-  // the camera, scanning for a pairing QR code (parent.html?family=CODE, or the code itself)
+  // a pairing QR code (parent.html?family=CODE, or the code itself)
   let lib = null;
   const loadLib = () => lib ||= new Promise((ok, no) => { if (window.jsQR) return ok(); const s = document.createElement('script'); s.src = 'jsqr.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   const codeIn = text => {
@@ -99,30 +105,61 @@ window.Gate = (() => {
     c = c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
     return c.length >= 8 ? c : '';
   };
+  // the camera on the QR code — and, where that won't open (some iPhones / iPads in a home-screen app), a photo of
+  // it taken with the camera instead, or the code typed in
+  function decode(src) { // a picture → the pairing code in its QR code, or ''
+    const c = document.createElement('canvas'), g = c.getContext('2d', { willReadFrequently: true });
+    const w = src.videoWidth || src.naturalWidth || src.width, h = src.videoHeight || src.naturalHeight || src.height;
+    for (const size of [640, 1000, 400]) { // (a photo: tried at a few sizes)
+      const k = Math.min(1, size / Math.max(w, h)); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      g.drawImage(src, 0, 0, c.width, c.height);
+      const q = window.jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'attemptBoth' });
+      if (q?.data) return codeIn(q.data) || '-';
+      if (src.videoWidth) break; // (live: one size, again in a moment)
+    }
+    return '';
+  }
   function scan() {
     return new Promise(async done => {
       const d = document.createElement('div'); d.className = 'gate';
-      d.innerHTML = `<div class="gate-scan"><div class="gate-cam"><video playsinline muted autoplay></video></div><div class="gate-msg" style="color:#fff">${T.scan}</div><button>${T.cancel}</button></div>`;
+      d.innerHTML = `<div class="gate-scan"><div class="gate-cam"><video playsinline muted autoplay></video></div>
+        <div class="gate-msg" style="color:#fff">${T.scan}</div>
+        <label class="gate-photo">📸 ${T.photo}<input type="file" accept="image/*" capture="environment" hidden></label>
+        <div class="gate-type"><input inputmode="text" autocapitalize="characters" autocomplete="off" maxlength="12" placeholder="${T.code}"><button data-k="ok">${T.ok}</button></div>
+        <button data-k="cancel">${T.cancel}</button></div>`;
       document.body.appendChild(d);
-      const video = d.querySelector('video'), msg = d.querySelector('.gate-msg');
+      const video = d.querySelector('video'), msg = d.querySelector('.gate-msg'), typed = d.querySelector('.gate-type input');
       let stream = null, live = true;
       const end = r => { live = false; stream?.getTracks().forEach(t => t.stop()); d.remove(); done(r); };
-      d.querySelector('button').onclick = () => end(null);
+      d.querySelector('[data-k=cancel]').onclick = () => end(null);
+      const ok = () => { const c = codeIn(typed.value); if (c) end(c); else msg.textContent = T.badCode; };
+      d.querySelector('[data-k=ok]').onclick = ok;
+      typed.addEventListener('keydown', e => { if (e.key === 'Enter') ok(); });
+      d.querySelector('input[type=file]').addEventListener('change', async e => { // a photo of it
+        const file = e.target.files?.[0]; if (!file) return;
+        msg.textContent = '…';
+        try {
+          await loadLib();
+          const im = new Image(); im.src = URL.createObjectURL(file); await im.decode();
+          const code = decode(im); URL.revokeObjectURL(im.src);
+          if (code && code !== '-') return end(code);
+          msg.textContent = code ? T.notOurs : T.noQr;
+        } catch (err) { msg.textContent = T.noQr; }
+      });
       try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('no getUserMedia');
         [stream] = await Promise.all([navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }), loadLib()]);
-      } catch (e) { msg.textContent = T.noCam; return; }
+      } catch (e) { // (no live camera here: the photo or the code, then)
+        d.querySelector('.gate-cam').hidden = true;
+        msg.textContent = `${T.noCam}（${e?.name || e?.message || e}）`;
+        loadLib().catch(() => {});
+        return;
+      }
       if (!live) return stream.getTracks().forEach(t => t.stop());
       video.srcObject = stream; await video.play().catch(() => {});
-      const c = document.createElement('canvas'), g = c.getContext('2d', { willReadFrequently: true });
       const look = () => {
         if (!live) return;
-        const w = video.videoWidth, h = video.videoHeight;
-        if (w && h) {
-          const k = Math.min(1, 640 / Math.max(w, h)); c.width = Math.round(w * k); c.height = Math.round(h * k);
-          g.drawImage(video, 0, 0, c.width, c.height);
-          const q = window.jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'dontInvert' });
-          if (q?.data) { const code = codeIn(q.data); if (code) { navigator.vibrate?.(80); return end(code); } msg.textContent = T.notOurs; }
-        }
+        if (video.videoWidth) { const code = decode(video); if (code && code !== '-') { navigator.vibrate?.(80); return end(code); } if (code) msg.textContent = T.notOurs; }
         setTimeout(look, 150);
       };
       look();
