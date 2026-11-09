@@ -357,9 +357,10 @@ function render() {
 /* ================= actions ================= */
 function addBond(n) { S.bond += n; }
 
-/* food bowl: meat or veggies. The fox loves both (the point: veggies are yummy too) and is happiest when it
-   gets both on the same day. The bowl is a layer in front of the fox; it shows assets/fox/food/<kind>_<3|2|1>.png
-   and empty.png once they are drawn, a simple drawn bowl until then. */
+/* food bowl: meat or veggies (or water). The fox loves both (the point: veggies are yummy too) and is happiest when
+   it gets both on the same day. The bowl is a layer in front of the fox; it shows assets/fox/food/<kind>_<3|2|1>.png
+   (meat, veg, water: GPT's sheet, tools/card_split-style) and empty.png — all fetched as the pet opens, so even the first
+   meal shows them (a simple drawn bowl only if one's missing). */
 const MEALS = { meat: { hunger: 30 }, veg: { hunger: 28, fun: 2 } };
 let eating = false;
 const foodArt = {};
@@ -381,6 +382,8 @@ function bowlSVG(kind, n) {
     <path d="M10 44 Q14 66 50 66 Q86 66 90 44 Z" fill="#fff6ea" stroke="#5a3a26" stroke-width="2"/>
     <circle cx="35" cy="56" r="3" fill="#f3a35b"/><circle cx="50" cy="58" r="3" fill="#f3a35b"/><circle cx="65" cy="56" r="3" fill="#f3a35b"/></svg>`;
 }
+const BOWLS = ['empty', ...['meat', 'veg', 'water'].flatMap(k => [1, 2, 3].map(n => `${k}_${n}`))];
+BOWLS.forEach(foodImg); // (fetched now: not the drawn bowl the first time it eats)
 function showBowl(kind, n) {
   const art = foodImg(n ? `${kind}_${n}` : 'empty');
   el.bowl.innerHTML = art ? `<img src="${art}" alt="">` : bowlSVG(kind, n);
@@ -396,14 +399,14 @@ async function drink() {
   eating = true;
   walkTarget = null;
   userWalkUntil = Date.now() + 20000;
-  el.bowl.innerHTML = '<img src="assets/scene/props/water.png" alt="">';
-  el.bowl.hidden = false;
-  el.bowl.classList.remove('out');
+  showBowl('water', 3);
   await eatClips();
   const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
   if (anim) {
     Fox2D.drink(true);
-    await wait(4000 + rand(0, 2000));
+    const lap = 4000 + rand(0, 2000); // (the water going down as it laps: full, half, a little)
+    for (const n of [2, 1]) { await wait(lap / 3); showBowl('water', n); }
+    await wait(lap / 3);
     Fox2D.drink(false);
   } else { setExpr('eat', 3000); await wait(3000); }
   S.stats.fun = clamp(S.stats.fun + 2);
