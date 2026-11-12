@@ -207,7 +207,7 @@ const $ = s => document.querySelector(s);
 const el = {
   stage: $('#stage'), petWrap: $('#petWrap'), fox: $('#fox'), body: $('#foxBody'), video: $('#foxVideo'), tails: $('#tails'),
   bubble: $('#bubble'), fx: $('#fx'), poops: $('#poops'), name: $('#petName'), tailBadge: $('#tailBadge'),
-  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'), bowl: $('#bowl'), foodPick: $('#foodPick'), ver: $('#ver'),
+  age: $('#age'), growBar: $('#growBar'), sleepBtn: $('#sleepBtn'), bowl: $('#bowl'), bowlBack: $('#bowlBack'), bowlSpot: $('#bowlSpot'), bowlSpotBack: $('#bowlSpotBack'), foodPick: $('#foodPick'), ver: $('#ver'),
 };
 
 let expr = null, exprUntil = 0, bubbleTimer = 0, lastPet = 0, renderedTails = -1, renderedStage = '';
@@ -383,12 +383,39 @@ function bowlSVG(kind, n) {
     <circle cx="35" cy="56" r="3" fill="#f3a35b"/><circle cx="50" cy="58" r="3" fill="#f3a35b"/><circle cx="65" cy="56" r="3" fill="#f3a35b"/></svg>`;
 }
 const BOWLS = ['empty', ...['meat', 'veg', 'water'].flatMap(k => [1, 2, 3].map(n => `${k}_${n}`))];
-BOWLS.forEach(foodImg); // (fetched now: not the drawn bowl the first time it eats)
+BOWLS.forEach(n => { foodImg(n); foodImg(`${n}_front`); }); // (fetched now, and their fronts: not the drawn bowl the first time it eats)
+const bowlAway = () => { el.bowl.classList.add('out'); el.bowlBack.classList.add('out'); };
+// where the bowl's put down: on the ground off to the side with the more room, a little nearer or farther — the fox
+// walks over to it; each layer in a box the fox's size there (scaled for the depth, as placeFox), the whole bowl a
+// layer under the fox standing there, its front a layer over
+let bowlAt = null;
+function placeBowl(anim) {
+  const side = foxX < 50 ? 1 : -1;
+  bowlAt = anim ? { x: clamp(foxX + side * rand(22, 32), 18, 82), z: Math.max(0.05, Math.min(0.55, foxZ + rand(-0.12, 0.12))) } : { x: foxX, z: foxZ };
+  const scale = el.petWrap.querySelector('.pet-scale') && getComputedStyle(el.petWrap.querySelector('.pet-scale')).transform;
+  for (const [spot, dz] of [[el.bowlSpotBack, -1], [el.bowlSpot, 1]]) {
+    spot.style.left = bowlAt.x + '%'; spot.style.bottom = groundAt(bowlAt.z) + '%';
+    spot.style.transform = `translateX(-50%) scale(${sizeAt(bowlAt.z)})`; spot.style.zIndex = layerAt(bowlAt.z) + dz;
+    spot.querySelector('.pet-scale').style.transform = scale && scale !== 'none' ? scale : ''; // (the fox's own size for its age)
+  }
+  return bowlAt;
+}
+// over to the bowl (2D fox): walked to the spot it was put down for, sat, facing us — then the meal
+let toBowl = false;
+async function goToBowl() {
+  if (!bowlAt || (Math.abs(foxX - bowlAt.x) < 0.5 && Math.abs(foxZ - bowlAt.z) < 0.01)) return;
+  toBowl = true;
+  await new Promise(done => { if (!walk2d(bowlAt.x, bowlAt.z, done)) done(); setTimeout(done, 15000); });
+  toBowl = false;
+  for (let k = 0; k < 40 && (Fox2D.state.go || !/^normal/.test(Fox2D.state.clip || '')); k++) await wait(100); // (sat down, facing us)
+}
 function showBowl(kind, n) {
   const art = foodImg(n ? `${kind}_${n}` : 'empty');
-  el.bowl.innerHTML = art ? `<img src="${art}" alt="">` : bowlSVG(kind, n);
-  el.bowl.hidden = false;
-  el.bowl.classList.remove('out');
+  const name = n ? `${kind}_${n}` : 'empty', front = art && foodImg(`${name}_front`);
+  el.bowlBack.innerHTML = art ? `<img src="${art}" alt="">` : bowlSVG(kind, n); // (under the fox: all of it)
+  el.bowl.innerHTML = front ? `<img src="${front}" alt="">` : ''; // (over it: its front)
+  for (const b of [el.bowl, el.bowlBack]) b.classList.remove('out');
+  el.bowlSpot.hidden = el.bowlSpotBack.hidden = false;
 }
 const wait = ms => new Promise(r => setTimeout(r, ms));
 // just opened: its eating clips may still be on the way — a few seconds' wait for them rather than none
@@ -399,9 +426,10 @@ async function drink() {
   eating = true;
   walkTarget = null;
   userWalkUntil = Date.now() + 20000;
-  showBowl('water', 3);
   await eatClips();
   const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
+  placeBowl(anim && Fox2D.canWalk); showBowl('water', 3);
+  if (anim) await goToBowl();
   if (anim) {
     Fox2D.drink(true);
     const lap = 4000 + rand(0, 2000); // (the water going down as it laps: full, half, a little)
@@ -414,9 +442,9 @@ async function drink() {
   save();
   say(pick(t('drinkYum')));
   await wait(1200);
-  el.bowl.classList.add('out');
+  bowlAway();
   await wait(300);
-  el.bowl.hidden = true;
+  el.bowlSpot.hidden = el.bowlSpotBack.hidden = true;
   eating = false;
 }
 async function eat(kind) {
@@ -425,9 +453,10 @@ async function eat(kind) {
   eating = true;
   walkTarget = null;
   userWalkUntil = Date.now() + 20000;
-  showBowl(kind, 3);
   await eatClips();
   const anim = RENDER === 'anim' && window.Fox2D && Fox2D.canEat;
+  placeBowl(anim && Fox2D.canWalk); showBowl(kind, 3);
+  if (anim) await goToBowl();
   if (anim) { // lean down to the bowl first
     Fox2D.eat(true);
     for (let k = 0; k < 80 && !Fox2D.state.eating; k++) await wait(100);
@@ -460,9 +489,9 @@ async function eat(kind) {
   if (Math.random() < 0.3) S.nextPoop = Math.min(S.nextPoop, Date.now() + rand(20, 40) * 6e4 / SPEED);
   save();
   await wait(1200);
-  el.bowl.classList.add('out');
+  bowlAway();
   await wait(300);
-  el.bowl.hidden = true;
+  el.bowlSpot.hidden = el.bowlSpotBack.hidden = true;
   eating = false;
 }
 
@@ -675,7 +704,7 @@ function placeFox() {
    side-on even when it goes deeper or nearer (it slants across the ground and shrinks / grows). */
 function walk2d(x, z = foxZ, then, keep) { // keep: on arrival stay standing, don't sit (then queues what's next)
   if (RENDER !== 'anim' || !window.Fox2D || !Fox2D.canWalk) return false;
-  if (eating) return true; // stays at its bowl
+  if (eating && !toBowl) return true; // stays at its bowl (not on its way to it)
   z = clamp(z * 100) / 100;
   for (const t of THINGS) if (!t.soft && within(t, x, z, 1, 0.01)) z = t.z + (z < t.z ? -1 : 1) * (t.rz + 0.06); // not on it: by it
   walkTarget = { x, z, then, keep, via: roundThings(x, z) };
