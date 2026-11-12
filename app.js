@@ -393,12 +393,23 @@ function placeBowl(anim) {
   const side = foxX < 50 ? 1 : -1;
   bowlAt = anim ? { x: clamp(foxX + side * rand(22, 32), 18, 82), z: Math.max(0.05, Math.min(0.55, foxZ + rand(-0.12, 0.12))) } : { x: foxX, z: foxZ };
   const scale = el.petWrap.querySelector('.pet-scale') && getComputedStyle(el.petWrap.querySelector('.pet-scale')).transform;
-  for (const [spot, dz] of [[el.bowlSpotBack, -1], [el.bowlSpot, 1]]) {
+  for (const [spot, dz] of [[el.bowlSpotBack, 1], [el.bowlSpot, 2]]) {
     spot.style.left = bowlAt.x + '%'; spot.style.bottom = groundAt(bowlAt.z) + '%';
     spot.style.transform = `translateX(-50%) scale(${sizeAt(bowlAt.z)})`; spot.style.zIndex = layerAt(bowlAt.z) + dz;
     spot.querySelector('.pet-scale').style.transform = scale && scale !== 'none' ? scale : ''; // (the fox's own size for its age)
   }
+  clearInterval(bowlTick); bowlTick = setInterval(bowlLayer, 50);
   return bowlAt;
+}
+// the bowl's back half goes under the fox only while its muzzle is down in it (eating, lapping, and the end of
+// leaning down / the start of coming up): sat by it, walking up, its paws would be inside the bowl — then the whole
+// bowl stands in front of it
+let bowlTick = 0;
+function bowlLayer() {
+  if (el.bowlSpotBack.hidden) { clearInterval(bowlTick); bowlTick = 0; return; }
+  const st = window.Fox2D?.state || {}, c = st.clip || '', u = st.frames ? st.frame / st.frames : 0;
+  const down = /^eat_loop/.test(c) || (c === 'normal_to_eat' && u >= 0.8) || (c === 'eat_to_normal' && u <= 0.2);
+  el.bowlSpotBack.style.zIndex = layerAt(bowlAt.z) + (down ? -1 : 1);
 }
 // over to the bowl (2D fox): walked to the spot it was put down for, sat, facing us — then the meal
 let toBowl = false;
