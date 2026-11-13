@@ -28,6 +28,8 @@ python server.py
 
 設計文件：[docs/design.md](docs/design.md)
 
+交接（目前狀態、做法、工具、待確認事項）：[docs/handoff.md](docs/handoff.md)
+
 測試參數：
 - `?week=5`：直接預覽第 5 週（5 條尾巴）
 - `?speed=1440`：時間加速，現實 1 分鐘＝遊戲 1 天
